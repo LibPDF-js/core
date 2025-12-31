@@ -81,80 +81,8 @@ Write tests first, then implement. Use fixtures from `fixtures/` directory.
 Prefer small, focused commits over large ones.
 
 ### Code Style
-- **Formatter/Linter**: Biome with 2-space indentation, double quotes
-- **Imports**: Use `#src/*` path alias for internal imports
-- **Tests**: Co-located as `*.test.ts` files
-- **No barrel files**: Avoid `index.ts` files that just re-export. Import directly from source files.
 
-## Whitespace & Formatting
-
-### Blank Lines Between Concepts
-
-```typescript
-// Blank line after imports
-import { prisma } from '@documenso/prisma';
-
-export const findDocuments = async () => {
-  // ...
-};
-
-// Blank line between logical sections
-const user = await prisma.user.findFirst({ where: { id: userId } });
-
-let team = null;
-
-if (teamId !== undefined) {
-  team = await getTeamById({ userId, teamId });
-}
-
-// Blank line before return statements
-const result = await someOperation();
-
-return result;
-```
-
-### Function/Method Spacing
-
-```typescript
-// No blank lines between chained methods in same operation
-const documents = await prisma.document
-  .findMany({ where: { userId } })
-  .then((docs) => docs.map(maskTokens));
-
-// Blank line between different operations
-const document = await createDocument({ userId });
-
-await sendDocument({ documentId: document.id });
-
-return document;
-```
-
-### Object and Array Formatting
-
-```typescript
-// Multi-line when complex
-const options = {
-  userId,
-  teamId,
-  status: ExtendedDocumentStatus.ALL,
-  page: 1,
-};
-
-// Single line when simple
-const coords = { x: 0, y: 0 };
-
-// Array items on separate lines when objects
-const recipients = [
-  {
-    name: 'John',
-    email: 'john@example.com',
-  },
-  {
-    name: 'Jane',
-    email: 'jane@example.com',
-  },
-];
-```
+See [CODE_STYLE.md](./CODE_STYLE.md) for detailed formatting and naming conventions.
 
 ## Test Fixtures
 
