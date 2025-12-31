@@ -380,14 +380,17 @@ describe("ObjectParser", () => {
       expect(result!.hasStream).toBe(false);
     });
 
-    it("does not consume stream keyword", () => {
-      const p = parser("<< /Length 5 >> stream");
+    it("returns streamKeywordPosition when hasStream is true", () => {
+      const input = "<< /Length 5 >> stream";
+      const p = parser(input);
+      const result = p.parseObject();
 
-      p.parseObject();
-
-      // Next parse should see the stream keyword
-      // (though it will throw since "stream" isn't a valid object start)
-      expect(() => p.parseObject()).toThrow("Unexpected keyword: stream");
+      expect(result).not.toBeNull();
+      expect(result!.hasStream).toBe(true);
+      if (result!.hasStream) {
+        // streamKeywordPosition should point to where "stream" starts
+        expect(result!.streamKeywordPosition).toBe(16); // position after ">>" and space
+      }
     });
   });
 

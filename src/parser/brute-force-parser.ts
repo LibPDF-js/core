@@ -325,7 +325,7 @@ export class BruteForceParser {
    * Collects warnings from the parser.
    */
   private parseObjectAt(offset: number, objNum: number, genNum: number): PdfDict | null {
-    this.scanner.position = offset;
+    this.scanner.moveTo(offset);
 
     const reader = new TokenReader(this.scanner);
 

@@ -194,7 +194,7 @@ describe("Scanner", () => {
       scanner.advance();
       expect(scanner.position).toBe(2);
 
-      scanner.position = 0;
+      scanner.moveTo(0);
       expect(scanner.position).toBe(0);
       expect(scanner.peek()).toBe(0x74); // 't'
     });
@@ -202,10 +202,10 @@ describe("Scanner", () => {
     it("clamps to valid range when set directly", () => {
       const scanner = new Scanner(stringToBytes("ABC"));
 
-      scanner.position = -5;
+      scanner.moveTo(-5);
       expect(scanner.position).toBe(0);
 
-      scanner.position = 100;
+      scanner.moveTo(100);
       expect(scanner.position).toBe(3); // clamped to length
     });
   });

@@ -1,5 +1,6 @@
 import type { PdfObject } from "./object";
 import type { PdfArray } from "./pdf-array";
+import type { PdfBool } from "./pdf-bool";
 import { PdfName } from "./pdf-name";
 import type { PdfNumber } from "./pdf-number";
 import type { PdfRef } from "./pdf-ref";
@@ -137,6 +138,11 @@ export class PdfDict {
   getRef(key: string): PdfRef | undefined {
     const value = this.get(key);
     return value?.type === "ref" ? (value as PdfRef) : undefined;
+  }
+
+  getBool(key: string): PdfBool | undefined {
+    const value = this.get(key);
+    return value?.type === "bool" ? (value as PdfBool) : undefined;
   }
 
   /**

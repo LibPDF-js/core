@@ -34,10 +34,6 @@ export class Scanner {
     return this._position;
   }
 
-  set position(value: number) {
-    this._position = Math.max(0, Math.min(value, this.length));
-  }
-
   /**
    * True if position >= length (no more bytes to read).
    */

@@ -13,10 +13,11 @@ import type { TokenReader } from "./token-reader";
 /**
  * Result of parsing an object.
  * hasStream indicates the 'stream' keyword follows (for dicts only).
+ * streamKeywordPosition is the byte offset where "stream" keyword starts.
  */
 export type ParseResult =
   | { object: PdfObject; hasStream: false }
-  | { object: PdfDict; hasStream: true };
+  | { object: PdfDict; hasStream: true; streamKeywordPosition: number };
 
 /**
  * Callback for warnings during parsing.
@@ -280,7 +281,10 @@ export class ObjectParser {
       }
 
       if (this.buf1.type === "delimiter" && this.buf1.value === ">>") {
-        this.shift(); // consume '>>'
+        // Partial shift: move buf2 to buf1, but DON'T fill buf2.
+        // This prevents reading past a "stream" keyword into binary data.
+        this.buf1 = this.buf2;
+        this.buf2 = null;
         break;
       }
 
@@ -329,11 +333,18 @@ export class ObjectParser {
     }
 
     // Check for stream keyword
-    this.ensureBufferFilled();
-    const nextToken = this.current();
+    // buf1 already contains the token after '>>' (from the partial shift above)
+    // We intentionally did NOT fill buf2 to avoid reading into stream binary data
+    if (this.buf1 !== null && this.buf1.type === "keyword" && this.buf1.value === "stream") {
+      const streamKeywordPosition = this.buf1.position;
+      // Clear buf1 since the caller will handle raw bytes from here
+      this.buf1 = null;
+      return { object: dict, hasStream: true, streamKeywordPosition };
+    }
 
-    if (nextToken !== null && nextToken.type === "keyword" && nextToken.value === "stream") {
-      return { object: dict, hasStream: true };
+    // Not a stream - fill buf2 normally for future parsing
+    if (this.buf1 !== null && this.buf2 === null) {
+      this.buf2 = this.reader.nextToken();
     }
 
     return { object: dict, hasStream: false };
