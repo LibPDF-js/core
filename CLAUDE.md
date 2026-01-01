@@ -37,7 +37,26 @@ checkouts/            # Reference library submodules (read-only)
   pdfjs/              # Mozilla pdf.js - parsing reference
   pdf-lib/            # pdf-lib - generation API reference
   pdfbox/             # Apache PDFBox - architecture reference
+.agents/              # AI agent working documents (see below)
 ```
+
+## Agent Working Documents (.agents/)
+
+The `.agents/` directory contains documents for AI agent planning and decision-making. **Always reference these when working on this project.**
+
+| File/Folder | Purpose | When to use |
+|-------------|---------|-------------|
+| `GOALS.md` | High-level library goals and priorities | Check before starting new features; ensure work aligns with goals |
+| `ARCHITECTURE.md` | Current architecture documentation | Review before architectural changes; update after significant changes |
+| `plans/` | Implementation plans for features | Write plans here when asked to "write a plan" |
+| `justifications/` | Decision rationale documents | Write here when asked to "justify" or explain a decision |
+| `scratch/` | Temporary notes and drafts | Use for work-in-progress that doesn't need to persist |
+
+**Key workflows:**
+- "Write a plan" → Create in `.agents/plans/`
+- "Write a justification" → Create in `.agents/justifications/`
+- "Check/update goals" → Read/edit `.agents/GOALS.md`
+- "Review/update architecture" → Read/edit `.agents/ARCHITECTURE.md`
 
 ## Design Principles
 

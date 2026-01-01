@@ -1,6 +1,14 @@
 # .agents
 
-This directory is used by AI agents to track their work and decision-making process.
+This directory is used by AI agents to track their work, planning, and decision-making process.
+
+## Top-Level Files
+
+### GOALS.md
+High-level goals and priorities for the library. Check this before starting new features to ensure work aligns with project direction.
+
+### ARCHITECTURE.md
+Current architecture documentation. Review before making architectural changes; update after significant changes to keep it accurate.
 
 ## Directories
 
