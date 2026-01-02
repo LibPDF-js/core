@@ -21,6 +21,10 @@ There's no single, comprehensive library that handles both robust parsing *and* 
 - **Modern TypeScript** - strong typing, tree-shakeable, no legacy baggage
 - **Runtime flexible** - Node.js, Bun, and browsers
 
+## Known Limitations
+
+- **Predefined CJK CMaps**: Only Identity-H and Identity-V CMaps are supported. Legacy CJK PDFs using predefined CMaps (UniGB-UCS2-H, UniJIS-UCS2-H, etc.) without ToUnicode maps may not extract text correctly. Modern PDFs include ToUnicode maps which work correctly.
+
 ## Development
 
 ```bash
