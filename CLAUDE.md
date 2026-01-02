@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent-Assisted Development
+
+This project uses AI agent-assisted development. This means:
+
+- **Complete all work fully** - Don't leave work partially done. Finish implementations, tests, and documentation before moving on.
+- **No stubbing or skipping** - Stubbed features and skipped tests are not acceptable solutions. If something is complex, implement it completely.
+- **Complexity is fine** - Don't shy away from complex changes. If a feature requires touching many files or significant refactoring, do it properly.
+- **Tests are required** - All new functionality must have tests. "I'll add tests later" is not acceptable.
+
 ## Project Overview
 
 **@libpdf/core** is a modern PDF library for TypeScript focused on both parsing and generation. It aims to combine the robust parsing of Mozilla's pdf.js with the clean generation API of pdf-lib, while supporting features like incremental updates that pdf-lib lacks.
@@ -58,6 +67,43 @@ The `.agents/` directory contains documents for AI agent planning and decision-m
 - "Write a justification" → Create in `.agents/justifications/`
 - "Check/update goals" → Read/edit `.agents/GOALS.md`
 - "Review/update architecture" → Read/edit `.agents/ARCHITECTURE.md`
+
+### Writing Plans
+
+Plans should focus on **what** and **why**, not **how**. The implementation details are discovered during coding, not during planning.
+
+**Good plan content:**
+- Problem statement and goals
+- Scope (in/out)
+- External dependencies and tradeoffs
+- Desired usage (API examples showing how users will call the code)
+- High-level architecture (components and data flow)
+- Test plan (what to test, not how)
+- Open questions and risks
+
+**Avoid in plans:**
+- Prescriptive class implementations with full method bodies
+- Detailed algorithms (discover these during implementation)
+- Line-by-line code that will just be copied during implementation
+
+**Code samples in plans should be usage-focused:**
+```typescript
+// GOOD: Shows desired API from user's perspective
+const font = await pdf.embedFont(fontBytes);
+field.setFont(font);
+field.setValue("Hello 世界");
+
+// BAD: Prescribes internal implementation
+export class TTFParser {
+  private parseTables(data: Uint8Array): Map<string, Uint8Array> {
+    const view = new DataView(data.buffer, data.byteOffset);
+    const numTables = view.getUint16(4);
+    // ... 50 more lines of implementation
+  }
+}
+```
+
+The goal is to align on the destination, not prescribe the journey.
 
 ## PDF Specification (.docs/)
 
