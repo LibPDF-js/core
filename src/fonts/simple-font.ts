@@ -21,7 +21,6 @@
 import { unicodeToGlyphName } from "#src/helpers/unicode";
 import type { PdfArray } from "#src/objects/pdf-array";
 import type { PdfDict } from "#src/objects/pdf-dict";
-import type { PdfName } from "#src/objects/pdf-name";
 import { type EmbeddedParserOptions, parseEmbeddedProgram } from "./embedded-parser";
 import { DifferencesEncoding } from "./encodings/differences";
 import type { FontEncoding } from "./encodings/encoding";
@@ -128,6 +127,7 @@ export class SimpleFont extends PdfFont {
     // Try explicit widths array first
     if (code >= this.firstChar && code <= this.lastChar) {
       const width = this.widths[code - this.firstChar];
+
       if (width !== undefined) {
         return width;
       }
@@ -137,12 +137,15 @@ export class SimpleFont extends PdfFont {
     if (this.isStandard14) {
       // Get glyph name from encoding
       const glyphName = this.getGlyphName(code);
+
       if (glyphName) {
         const width = getStandard14GlyphWidth(this.baseFontName, glyphName);
+
         if (width !== undefined) {
           return width;
         }
       }
+
       return getStandard14DefaultWidth(this.baseFontName);
     }
 
@@ -173,6 +176,7 @@ export class SimpleFont extends PdfFont {
   private getGlyphName(code: number): string | undefined {
     // Get Unicode from encoding
     const unicode = this.encoding.getUnicode(code);
+
     if (unicode === undefined) {
       return undefined;
     }
@@ -267,6 +271,7 @@ export function parseSimpleFont(
   // Parse widths array
   const widthsArray = dict.getArray("Widths");
   const widths: number[] = [];
+
   if (widthsArray) {
     for (let i = 0; i < widthsArray.length; i++) {
       const item = widthsArray.at(i);
@@ -287,8 +292,10 @@ export function parseSimpleFont(
   let embeddedProgram: FontProgram | null = null;
 
   const descriptorRef = dict.get("FontDescriptor");
+
   if (descriptorRef && options.resolveRef) {
     const descriptorDict = options.resolveRef(descriptorRef);
+
     if (descriptorDict && "getString" in descriptorDict) {
       descriptor = FontDescriptor.parse(descriptorDict as PdfDict);
 

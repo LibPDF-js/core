@@ -5,25 +5,19 @@
  * Wraps the low-level parsing and writing infrastructure.
  */
 
-import {
-  createEmbeddedFileStream,
-  createFileSpec,
-  getEmbeddedFileStream,
-  parseFileSpec,
-} from "#src/attachments/file-spec";
 import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/types";
+
 import { hasChanges } from "#src/document/change-collector";
 import {
   checkIncrementalSaveBlocker,
   type IncrementalSaveBlocker,
   isLinearizationDict,
 } from "#src/document/linearization";
-import { buildNameTree, NameTree } from "#src/document/name-tree";
 import { ObjectCopier } from "#src/document/object-copier";
 import { ObjectRegistry } from "#src/document/object-registry";
 import { PageTree } from "#src/document/page-tree";
-import { EmbeddedFont, type EmbedFontOptions } from "#src/fonts/embedded-font";
-import { createFontObjects, registerFontObjects } from "#src/fonts/font-embedder";
+import { PDFCatalog } from "#src/document/pdf-catalog";
+import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { resolvePageSize } from "#src/helpers/page-size";
 import { Scanner } from "#src/io/scanner";
 import { PdfArray } from "#src/objects/pdf-array";
@@ -40,6 +34,9 @@ import {
 } from "#src/parser/document-parser";
 import { XRefParser } from "#src/parser/xref-parser";
 import { writeComplete, writeIncremental } from "#src/writer/pdf-writer";
+import { PDFAttachments } from "./pdf-attachments";
+import { PDFFonts } from "./pdf-fonts";
+import { PDFForm } from "./pdf-form";
 
 /**
  * Options for loading a PDF.
@@ -117,14 +114,21 @@ export class PDF {
   private readonly registry: ObjectRegistry;
   private readonly originalBytes: Uint8Array;
   private readonly originalXRefOffset: number;
+
   /** Page tree, loaded eagerly during PDF.load() */
   private readonly _pages: PageTree;
 
-  /** Cached embedded files tree (undefined = not loaded, null = no tree) */
-  private embeddedFilesTree: NameTree | null | undefined = undefined;
+  /** Document catalog wrapper */
+  private readonly _catalog: PDFCatalog;
 
-  /** Embedded fonts that need to be written on save */
-  private readonly embeddedFonts: Map<EmbeddedFont, PdfRef | null> = new Map();
+  /** Font operations manager (created lazily) */
+  private _fonts: PDFFonts | null = null;
+
+  /** Attachment operations manager (created lazily) */
+  private _attachments: PDFAttachments | null = null;
+
+  /** Cached form (loaded lazily via getForm()) */
+  private _form: PDFForm | null | undefined;
 
   /** Whether this document was recovered via brute-force parsing */
   readonly recoveredViaBruteForce: boolean;
@@ -133,7 +137,9 @@ export class PDF {
   readonly isLinearized: boolean;
 
   /** Warnings from parsing and operations */
-  readonly warnings: string[];
+  get warnings(): string[] {
+    return this.registry.warnings;
+  }
 
   private constructor(
     parsed: ParsedDocument,
@@ -141,6 +147,7 @@ export class PDF {
     originalBytes: Uint8Array,
     originalXRefOffset: number,
     pages: PageTree,
+    catalog: PDFCatalog,
     options: {
       recoveredViaBruteForce: boolean;
       isLinearized: boolean;
@@ -151,9 +158,12 @@ export class PDF {
     this.originalBytes = originalBytes;
     this.originalXRefOffset = originalXRefOffset;
     this._pages = pages;
+    this._catalog = catalog;
     this.recoveredViaBruteForce = options.recoveredViaBruteForce;
     this.isLinearized = options.isLinearized;
-    this.warnings = [...parsed.warnings];
+
+    // Set up resolver so registry can fetch objects on demand
+    this.registry.setResolver(ref => this.parsed.getObject(ref));
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -199,14 +209,29 @@ export class PDF {
     } catch {
       originalXRefOffset = 0;
     }
-    // Load page tree eagerly
-    const catalog = await parsed.getCatalog();
-    const pagesRef = catalog?.getRef("Pages");
+    // Set up resolver on registry before loading anything
+    registry.setResolver(ref => parsed.getObject(ref));
+
+    // Load catalog through registry so it's tracked for changes
+    const rootRef = parsed.trailer.getRef("Root");
+
+    if (!rootRef) {
+      throw new Error("Document has no catalog (missing /Root in trailer)");
+    }
+
+    const catalogDict = await registry.resolve(rootRef);
+
+    if (!catalogDict || !(catalogDict instanceof PdfDict)) {
+      throw new Error("Document has no catalog");
+    }
+
+    const pdfCatalog = new PDFCatalog(catalogDict, registry);
+    const pagesRef = catalogDict.getRef("Pages");
     const pages = pagesRef
       ? await PageTree.load(pagesRef, parsed.getObject.bind(parsed))
       : PageTree.empty();
 
-    return new PDF(parsed, registry, bytes, originalXRefOffset, pages, {
+    return new PDF(parsed, registry, bytes, originalXRefOffset, pages, pdfCatalog, {
       recoveredViaBruteForce: parsed.recoveredViaBruteForce,
       isLinearized,
     });
@@ -241,37 +266,17 @@ export class PDF {
    * Objects are cached and tracked for modifications.
    */
   async getObject(ref: PdfRef): Promise<PdfObject | null> {
-    // Check registry first (for new/loaded objects we're tracking)
-    const tracked = this.registry.getObject(ref);
-
-    if (tracked !== undefined) {
-      return tracked;
-    }
-
-    // Load from parsed document
-    const obj = await this.parsed.getObject(ref);
-
-    if (obj !== null) {
-      // Add to registry for tracking
-      this.registry.addLoaded(ref, obj);
-    }
-
-    return obj;
+    return this.registry.resolve(ref);
   }
 
   /**
-   * Get the document catalog.
+   * Get the document catalog dictionary.
+   *
+   * Note: For internal use, prefer accessing `this._catalog` which provides
+   * higher-level methods for working with catalog structures.
    */
   async getCatalog(): Promise<PdfDict | null> {
-    const rootRef = this.parsed.trailer.getRef("Root");
-
-    if (!rootRef) {
-      return null;
-    }
-
-    const root = await this.getObject(rootRef);
-
-    return root instanceof PdfDict ? root : null;
+    return this._catalog.getDict();
   }
 
   /**
@@ -529,73 +534,53 @@ export class PDF {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
-   * Embed a font for use in the document.
-   *
-   * The font is parsed and prepared for embedding. The actual PDF objects
-   * are created during save, which allows subsetting to only include
-   * the glyphs that were actually used.
-   *
-   * @param data - Font data (TTF, OTF, or Type1)
-   * @param options - Embedding options
-   * @returns EmbeddedFont instance for encoding text
+   * Access the fonts API for embedding and managing fonts.
    *
    * @example
    * ```typescript
-   * const fontBytes = await fs.readFile("NotoSans-Regular.ttf");
-   * const font = pdf.embedFont(fontBytes);
+   * // Embed a font
+   * const font = pdf.fonts.embed(fontBytes);
    *
    * // Use the font
    * const codes = font.encodeText("Hello World");
    * const width = font.getTextWidth("Hello World", 12);
    *
-   * // Add font to page resources (using the font's reference)
-   * const fontRef = pdf.getFontRef(font);
+   * // Get font reference (after prepare or save)
+   * await pdf.fonts.prepare();
+   * const fontRef = pdf.fonts.getRef(font);
    * ```
    */
+  get fonts(): PDFFonts {
+    if (!this._fonts) {
+      this._fonts = new PDFFonts(this.registry);
+    }
+
+    return this._fonts;
+  }
+
+  /**
+   * Embed a font for use in the document.
+   *
+   * Convenience method that delegates to `pdf.fonts.embed()`.
+   *
+   * @param data - Font data (TTF, OTF, or Type1)
+   * @param options - Embedding options
+   * @returns EmbeddedFont instance for encoding text
+   */
   embedFont(data: Uint8Array, options?: EmbedFontOptions): EmbeddedFont {
-    const font = EmbeddedFont.fromBytes(data, options);
-
-    // Track the font (ref will be assigned during save)
-    this.embeddedFonts.set(font, null);
-
-    return font;
+    return this.fonts.embed(data, options);
   }
 
   /**
    * Get the reference for an embedded font.
    *
-   * Note: The reference is only available after `prepareEmbeddedFonts()` is called
-   * (which happens automatically during save). Before that, this returns null.
+   * Convenience method that delegates to `pdf.fonts.getRef()`.
    *
-   * For most use cases, you should add the font to page resources after saving,
-   * or use the async version that ensures fonts are prepared.
+   * Note: The reference is only available after `pdf.fonts.prepare()` is called
+   * (which happens automatically during save). Before that, this returns null.
    */
   getFontRef(font: EmbeddedFont): PdfRef | null {
-    return this.embeddedFonts.get(font) ?? null;
-  }
-
-  /**
-   * Prepare all embedded fonts by creating their PDF objects.
-   *
-   * This is called automatically during save, but can be called manually
-   * if you need the font references before saving.
-   */
-  async prepareEmbeddedFonts(): Promise<void> {
-    for (const [font, existingRef] of this.embeddedFonts) {
-      // Skip if already prepared
-      if (existingRef !== null) {
-        continue;
-      }
-
-      // Create PDF objects for the font
-      const result = await createFontObjects(font);
-
-      // Register all objects and get the Type0 font reference
-      const fontRef = registerFontObjects(result, obj => this.register(obj));
-
-      // Store the reference
-      this.embeddedFonts.set(font, fontRef);
-    }
+    return this.fonts.getRef(font);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -603,137 +588,72 @@ export class PDF {
   // ─────────────────────────────────────────────────────────────────────────────
 
   /**
-   * Get the embedded files name tree.
-   * Caches the result for repeated access.
+   * Access the attachments API for managing file attachments.
+   *
+   * @example
+   * ```typescript
+   * // List attachments
+   * const attachments = await pdf.attachments.list();
+   *
+   * // Add an attachment
+   * await pdf.attachments.add("report.pdf", pdfBytes, {
+   *   description: "Annual report",
+   * });
+   *
+   * // Get attachment data
+   * const data = await pdf.attachments.get("report.pdf");
+   *
+   * // Remove an attachment
+   * await pdf.attachments.remove("old-file.txt");
+   * ```
    */
-  private async getEmbeddedFilesTree(): Promise<NameTree | null> {
-    if (this.embeddedFilesTree !== undefined) {
-      return this.embeddedFilesTree;
+  get attachments(): PDFAttachments {
+    if (!this._attachments) {
+      this._attachments = new PDFAttachments(this.registry, this._catalog);
     }
 
-    const catalog = await this.getCatalog();
-    if (!catalog) {
-      this.embeddedFilesTree = null;
-      return null;
-    }
-
-    // Get /Names dictionary
-    const namesEntry = catalog.get("Names");
-    let names: PdfDict | null = null;
-
-    if (namesEntry instanceof PdfRef) {
-      const resolved = await this.getObject(namesEntry);
-      if (resolved instanceof PdfDict) {
-        names = resolved;
-      }
-    } else if (namesEntry instanceof PdfDict) {
-      names = namesEntry;
-    }
-
-    if (!names) {
-      this.embeddedFilesTree = null;
-      return null;
-    }
-
-    // Get /EmbeddedFiles entry
-    const embeddedFilesEntry = names.get("EmbeddedFiles");
-    let embeddedFiles: PdfDict | null = null;
-
-    if (embeddedFilesEntry instanceof PdfRef) {
-      const resolved = await this.getObject(embeddedFilesEntry);
-      if (resolved instanceof PdfDict) {
-        embeddedFiles = resolved;
-      }
-    } else if (embeddedFilesEntry instanceof PdfDict) {
-      embeddedFiles = embeddedFilesEntry;
-    }
-
-    if (!embeddedFiles) {
-      this.embeddedFilesTree = null;
-      return null;
-    }
-
-    this.embeddedFilesTree = new NameTree(embeddedFiles, this.getObject.bind(this));
-    return this.embeddedFilesTree;
+    return this._attachments;
   }
 
   /**
    * List all attachments in the document.
    *
+   * Convenience method that delegates to `pdf.attachments.list()`.
+   *
    * @returns Map of attachment name to attachment info
    */
   async getAttachments(): Promise<Map<string, AttachmentInfo>> {
-    const result = new Map<string, AttachmentInfo>();
-    const tree = await this.getEmbeddedFilesTree();
-
-    if (!tree) {
-      return result;
-    }
-
-    for await (const [name, value] of tree.entries()) {
-      if (!(value instanceof PdfDict)) {
-        continue;
-      }
-
-      const info = await parseFileSpec(value, name, this.getObject.bind(this));
-
-      if (info) {
-        result.set(name, info);
-      } else {
-        // External file reference - skip but warn
-        this.warnings.push(`Attachment "${name}" is an external file reference (not embedded)`);
-      }
-    }
-
-    return result;
+    return this.attachments.list();
   }
 
   /**
    * Get the raw bytes of an attachment.
    *
+   * Convenience method that delegates to `pdf.attachments.get()`.
+   *
    * @param name The attachment name (key in the EmbeddedFiles tree)
    * @returns The attachment bytes, or null if not found
    */
   async getAttachment(name: string): Promise<Uint8Array | null> {
-    const tree = await this.getEmbeddedFilesTree();
-
-    if (!tree) {
-      return null;
-    }
-
-    const fileSpec = await tree.get(name);
-
-    if (!(fileSpec instanceof PdfDict)) {
-      return null;
-    }
-
-    const stream = await getEmbeddedFileStream(fileSpec, this.getObject.bind(this));
-
-    if (!stream) {
-      return null;
-    }
-
-    return stream.getDecodedData();
+    return this.attachments.get(name);
   }
 
   /**
    * Check if an attachment exists.
    *
+   * Convenience method that delegates to `pdf.attachments.has()`.
+   *
    * @param name The attachment name
    * @returns True if the attachment exists
    */
   async hasAttachment(name: string): Promise<boolean> {
-    const tree = await this.getEmbeddedFilesTree();
-
-    if (!tree) {
-      return false;
-    }
-
-    return tree.has(name);
+    return this.attachments.has(name);
   }
 
   /**
    * Add a file attachment to the document.
+   *
+   * Convenience method that delegates to `pdf.attachments.add()`.
    *
    * @param name The attachment name (key in the EmbeddedFiles tree)
    * @param data The file data
@@ -745,152 +665,59 @@ export class PDF {
     data: Uint8Array,
     options: AddAttachmentOptions = {},
   ): Promise<void> {
-    // Check if attachment already exists
-    if (!options.overwrite && (await this.hasAttachment(name))) {
-      throw new Error(`Attachment "${name}" already exists. Use { overwrite: true } to replace.`);
-    }
-
-    // Create the embedded file stream
-    const embeddedFileStream = createEmbeddedFileStream(data, name, options);
-    const embeddedFileRef = this.register(embeddedFileStream);
-
-    // Create the file specification
-    const fileSpec = createFileSpec(name, embeddedFileRef, options);
-    const fileSpecRef = this.register(fileSpec);
-
-    // Get or create the /Names dictionary in the catalog
-    const catalog = await this.getCatalog();
-
-    if (!catalog) {
-      throw new Error("Document has no catalog");
-    }
-
-    // Collect all existing attachments
-    const existingAttachments: Array<[string, PdfRef]> = [];
-    const tree = await this.getEmbeddedFilesTree();
-
-    if (tree) {
-      for await (const [key, value] of tree.entries()) {
-        if (key === name && options.overwrite) {
-          // Skip the one we're replacing
-          continue;
-        }
-
-        // Get the ref for this file spec
-        const ref = this.registry.getRef(value);
-
-        if (ref) {
-          existingAttachments.push([key, ref]);
-        }
-      }
-    }
-
-    // Add the new attachment
-    existingAttachments.push([name, fileSpecRef]);
-
-    // Build new name tree
-    const newNameTree = buildNameTree(existingAttachments);
-    const nameTreeRef = this.register(newNameTree);
-
-    // Get or create /Names dict
-    let names: PdfDict;
-    const namesEntry = catalog.get("Names");
-
-    if (namesEntry instanceof PdfRef) {
-      const resolved = await this.getObject(namesEntry);
-
-      if (resolved instanceof PdfDict) {
-        names = resolved;
-      } else {
-        names = new PdfDict();
-        catalog.set("Names", this.register(names));
-      }
-    } else if (namesEntry instanceof PdfDict) {
-      names = namesEntry;
-    } else {
-      names = new PdfDict();
-      catalog.set("Names", this.register(names));
-    }
-
-    // Set /EmbeddedFiles to point to new tree
-    names.set("EmbeddedFiles", nameTreeRef);
-
-    // Clear the cached tree so it gets reloaded
-    this.embeddedFilesTree = undefined;
+    return this.attachments.add(name, data, options);
   }
 
   /**
    * Remove an attachment from the document.
    *
+   * Convenience method that delegates to `pdf.attachments.remove()`.
+   *
    * @param name The attachment name
    * @returns True if the attachment was removed, false if not found
    */
   async removeAttachment(name: string): Promise<boolean> {
-    const tree = await this.getEmbeddedFilesTree();
+    return this.attachments.remove(name);
+  }
 
-    if (!tree) {
-      return false;
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Interactive Form
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get the document's interactive form.
+   *
+   * Returns null if no form exists. The form is loaded lazily on first call
+   * and cached for subsequent calls.
+   *
+   * @example
+   * ```typescript
+   * const form = await pdf.getForm();
+   * if (!form) return;
+   *
+   * // Type-safe field access
+   * const name = form.getTextField("name");
+   * const agree = form.getCheckbox("terms");
+   *
+   * name?.setValue("John Doe");
+   * agree?.check();
+   *
+   * // Or fill multiple (lenient - ignores missing)
+   * form.fill({
+   *   email: "john@example.com",
+   *   country: "USA",
+   * });
+   *
+   * await form.flatten();
+   * await pdf.save({ incremental: true });
+   * ```
+   */
+  async getForm(): Promise<PDFForm | null> {
+    if (this._form === undefined) {
+      this._form = await PDFForm.load(this.registry, this._catalog);
     }
 
-    // Check if it exists
-    if (!(await tree.has(name))) {
-      return false;
-    }
-
-    // Collect all attachments except the one to remove
-    const remainingAttachments: Array<[string, PdfRef]> = [];
-
-    for await (const [key, value] of tree.entries()) {
-      if (key === name) {
-        continue; // Skip the one we're removing
-      }
-
-      const ref = this.registry.getRef(value);
-
-      if (ref) {
-        remainingAttachments.push([key, ref]);
-      }
-    }
-
-    // Get catalog and /Names
-    const catalog = await this.getCatalog();
-
-    if (!catalog) {
-      return false;
-    }
-
-    const namesEntry = catalog.get("Names");
-    let names: PdfDict | null = null;
-
-    if (namesEntry instanceof PdfRef) {
-      const resolved = await this.getObject(namesEntry);
-
-      if (resolved instanceof PdfDict) {
-        names = resolved;
-      }
-    } else if (namesEntry instanceof PdfDict) {
-      names = namesEntry;
-    }
-
-    if (!names) {
-      return false;
-    }
-
-    if (remainingAttachments.length === 0) {
-      // No attachments left - remove /EmbeddedFiles entry
-      names.delete("EmbeddedFiles");
-    } else {
-      // Build new tree with remaining attachments
-      const newNameTree = buildNameTree(remainingAttachments);
-      const nameTreeRef = this.register(newNameTree);
-
-      names.set("EmbeddedFiles", nameTreeRef);
-    }
-
-    // Clear the cached tree
-    this.embeddedFilesTree = undefined;
-
-    return true;
+    return this._form;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -931,20 +758,22 @@ export class PDF {
    */
   async save(options: SaveOptions = {}): Promise<Uint8Array> {
     // Prepare embedded fonts (creates PDF objects, subsets fonts)
-    await this.prepareEmbeddedFonts();
+    await this.fonts.prepare();
 
     const wantsIncremental = options.incremental ?? false;
     const blocker = this.canSaveIncrementally();
 
     // Check if incremental is requested but not possible
+
     if (wantsIncremental && blocker !== null) {
-      this.warnings.push(`Incremental save not possible (${blocker}), performing full save`);
+      this.registry.addWarning(`Incremental save not possible (${blocker}), performing full save`);
     }
 
     const useIncremental = wantsIncremental && blocker === null;
 
     // If no changes, return original bytes
-    if (!this.hasChanges() && this.embeddedFonts.size === 0) {
+
+    if (!this.hasChanges() && !this.fonts.hasEmbeddedFonts) {
       return this.originalBytes;
     }
 
@@ -997,12 +826,16 @@ export class PDF {
     const visited = new Set<string>();
 
     const walk = async (obj: PdfObject | null): Promise<void> => {
-      if (obj === null) return;
+      if (obj === null) {
+        return;
+      }
 
       if (obj instanceof PdfRef) {
         const key = `${obj.objectNumber} ${obj.generation}`;
 
-        if (visited.has(key)) return;
+        if (visited.has(key)) {
+          return;
+        }
 
         visited.add(key);
 

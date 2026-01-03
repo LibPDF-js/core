@@ -10,6 +10,12 @@ import { PdfRef } from "#src/objects/pdf-ref";
 import type { XRefEntry } from "#src/parser/xref-parser";
 
 /**
+ * Function to resolve objects not yet in the registry.
+ * Called when resolve() encounters an unknown reference.
+ */
+export type ObjectResolver = (ref: PdfRef) => Promise<PdfObject | null>;
+
+/**
  * Registry for managing PDF objects and their references.
  *
  * Responsibilities:
@@ -17,6 +23,8 @@ import type { XRefEntry } from "#src/parser/xref-parser";
  * - Map objects back to refs
  * - Track new objects separately from loaded
  * - Assign sequential object numbers to new objects
+ * - Resolve unknown refs via resolver callback
+ * - Collect warnings
  */
 export class ObjectRegistry {
   /** Objects loaded from the PDF (ref key → object) */
@@ -31,6 +39,12 @@ export class ObjectRegistry {
   /** Next object number to assign */
   private _nextObjNum: number;
 
+  /** Resolver for objects not in registry */
+  private resolver: ObjectResolver | null = null;
+
+  /** Warnings collected during operations */
+  readonly warnings: string[] = [];
+
   /**
    * Create a new registry.
    *
@@ -40,12 +54,18 @@ export class ObjectRegistry {
     if (xref && xref.size > 0) {
       // Find max object number from xref
       const maxObjNum = Math.max(...xref.keys());
-
       this._nextObjNum = maxObjNum + 1;
     } else {
       // Start from 1 (0 is reserved for free list head)
       this._nextObjNum = 1;
     }
+  }
+
+  /**
+   * Set the resolver for fetching objects not yet in the registry.
+   */
+  setResolver(resolver: ObjectResolver): void {
+    this.resolver = resolver;
   }
 
   /**
@@ -94,33 +114,72 @@ export class ObjectRegistry {
    * Get the reference for an object.
    *
    * @param obj - The object to look up
-   * @returns The reference, or undefined if not registered
+   * @returns The reference, or null if not registered
    */
-  getRef(obj: PdfObject): PdfRef | undefined {
+  getRef(obj: PdfObject): PdfRef | null {
     if (obj === null || typeof obj !== "object") {
-      return undefined;
+      return null;
     }
 
-    return this.objectToRef.get(obj);
+    return this.objectToRef.get(obj) ?? null;
   }
 
   /**
-   * Get an object by reference.
+   * Get an object by reference (sync version).
    *
-   * Checks both loaded and new objects.
+   * Only returns objects already in the registry.
+   * Use `resolve()` to fetch objects via the resolver.
    *
    * @param ref - The reference to look up
-   * @returns The object, or undefined if not found
+   * @returns The object, or null if not found
    */
-  getObject(ref: PdfRef): PdfObject | undefined {
-    return this.loaded.get(ref) ?? this.newObjects.get(ref);
+  getObject(ref: PdfRef): PdfObject | null {
+    return this.loaded.get(ref) ?? this.newObjects.get(ref) ?? null;
+  }
+
+  /**
+   * Resolve an object by reference.
+   *
+   * Checks the registry first, then uses the resolver callback
+   * if the object isn't found. Resolved objects are cached.
+   *
+   * @param ref - The reference to resolve
+   * @returns The object, or null if not found
+   */
+  async resolve(ref: PdfRef): Promise<PdfObject | null> {
+    // Check registry first
+    const existing = this.getObject(ref);
+
+    if (existing !== null) {
+      return existing;
+    }
+
+    // Use resolver if available
+    if (this.resolver) {
+      const obj = await this.resolver(ref);
+
+      if (obj !== null) {
+        this.addLoaded(ref, obj);
+      }
+
+      return obj;
+    }
+
+    return null;
+  }
+
+  /**
+   * Add a warning message.
+   */
+  addWarning(message: string): void {
+    this.warnings.push(message);
   }
 
   /**
    * Check if an object is registered (loaded or new).
    */
   isRegistered(obj: PdfObject): boolean {
-    return this.getRef(obj) !== undefined;
+    return this.getRef(obj) !== null;
   }
 
   /**

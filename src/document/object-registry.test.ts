@@ -177,7 +177,7 @@ describe("ObjectRegistry", () => {
       const num = PdfNumber.of(42);
 
       // Primitives can't be tracked in WeakMap
-      expect(registry.getRef(num)).toBeUndefined();
+      expect(registry.getRef(num)).toBeNull();
     });
 
     it("isRegistered returns false for primitives", () => {

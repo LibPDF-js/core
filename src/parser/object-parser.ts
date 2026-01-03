@@ -271,7 +271,8 @@ export class ObjectParser {
   private parseDict(): ParseResult {
     this.shift(); // consume '<<'
 
-    const dict = new PdfDict();
+    // Collect entries in array to pass to constructor (avoids setting dirty flag)
+    const entries: [PdfName, PdfObject][] = [];
 
     while (true) {
       this.ensureBufferFilled();
@@ -334,8 +335,11 @@ export class ObjectParser {
         throw new ObjectParseError(`Missing value for key ${key.value}`);
       }
 
-      dict.set(key, valueResult.object);
+      entries.push([key, valueResult.object]);
     }
+
+    // Create dict from entries (doesn't set dirty flag)
+    const dict = new PdfDict(entries);
 
     // Check for stream keyword
     // buf1 already contains the token after '>>' (from the partial shift above)

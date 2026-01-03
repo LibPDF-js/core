@@ -11,6 +11,24 @@ export { version } from "../package.json";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { type LoadOptions, PDF, type SaveOptions } from "./api/pdf";
+export {
+  type FieldValue,
+  type FormProperties,
+  PDFForm,
+  TextAlignment,
+} from "./api/pdf-form";
+export type { FlattenOptions } from "./document/acro-form";
+export type {
+  ButtonField,
+  CheckboxField,
+  DropdownField,
+  FieldType,
+  FormField,
+  ListBoxField,
+  RadioField,
+  SignatureField,
+  TextField,
+} from "./document/form-field";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PDF Objects

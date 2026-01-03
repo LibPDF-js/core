@@ -551,4 +551,48 @@ describe("PDF", () => {
       expect(prevCount).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe("getForm", () => {
+    it("returns null when no form exists", async () => {
+      const bytes = await loadFixture("basic", "document.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const form = await pdf.getForm();
+
+      expect(form).toBeNull();
+    });
+
+    it("returns PDFForm when form exists", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const form = await pdf.getForm();
+
+      expect(form).not.toBeNull();
+      expect(form!.fieldCount).toBeGreaterThan(0);
+    });
+
+    it("caches form on subsequent calls", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const form1 = await pdf.getForm();
+      const form2 = await pdf.getForm();
+
+      expect(form1).toBe(form2);
+    });
+  });
+
+  describe("form.acroForm()", () => {
+    it("returns AcroForm for low-level access", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const form = await pdf.getForm();
+      const acroForm = form?.acroForm();
+
+      expect(acroForm).not.toBeNull();
+      expect(acroForm!.defaultAppearance).toBeDefined();
+    });
+  });
 });
