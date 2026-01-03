@@ -7,6 +7,7 @@
  * PDF Reference: Section 12.5.6.19 "Widget Annotations"
  */
 
+import type { PdfArray } from "#src/objects/pdf-array.ts";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfNumber } from "#src/objects/pdf-number";
@@ -210,6 +211,58 @@ export class WidgetAnnotation {
   }
 
   /**
+   * Check if this widget has appearance streams for all specified states.
+   *
+   * @param states States to check (e.g., ["Yes", "Off"] for checkbox)
+   * @returns True if all states have appearance streams
+   */
+  hasAppearancesForStates(states: string[]): boolean {
+    const ap = this.dict.getDict("AP");
+
+    if (!ap) {
+      return false;
+    }
+
+    const n = ap.get("N");
+
+    if (!n) {
+      return false;
+    }
+
+    // N can be a ref to a dict of states
+    const nResolved = n.type === "ref" ? this.registry.getObject(n) : n;
+
+    // If N is a dict (not a stream), check for each state
+    if (nResolved instanceof PdfDict && !(nResolved instanceof PdfStream)) {
+      for (const state of states) {
+        if (!nResolved.has(state)) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    // If N is a stream directly (not a dict), only valid for single state
+    return states.length === 0;
+  }
+
+  /**
+   * Check if this widget has any normal appearance stream.
+   */
+  hasNormalAppearance(): boolean {
+    const ap = this.dict.getDict("AP");
+
+    if (!ap) {
+      return false;
+    }
+
+    const n = ap.get("N");
+
+    return n !== null && n !== undefined;
+  }
+
+  /**
    * Get normal appearance stream.
    * For stateful widgets (checkbox/radio), pass the state name.
    */
@@ -365,7 +418,24 @@ export class WidgetAnnotation {
    * Get appearance characteristics (/MK dictionary).
    */
   getAppearanceCharacteristics(): AppearanceCharacteristics | null {
-    const mk = this.dict.getDict("MK");
+    // MK can be a direct dict or a reference
+    const mkEntry = this.dict.get("MK");
+
+    if (!mkEntry) {
+      return null;
+    }
+
+    let mk: PdfDict | null = null;
+
+    if (mkEntry instanceof PdfDict) {
+      mk = mkEntry;
+    } else if (mkEntry.type === "ref") {
+      const resolved = this.registry.getObject(mkEntry);
+
+      if (resolved instanceof PdfDict) {
+        mk = resolved;
+      }
+    }
 
     if (!mk) {
       return null;
@@ -384,7 +454,7 @@ export class WidgetAnnotation {
   /**
    * Parse a color array (grayscale, RGB, or CMYK).
    */
-  private parseColorArray(arr: ReturnType<PdfDict["getArray"]>): number[] | undefined {
+  private parseColorArray(arr: PdfArray | undefined): number[] | undefined {
     if (!arr || arr.length === 0) {
       return undefined;
     }

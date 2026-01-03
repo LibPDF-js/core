@@ -38,17 +38,19 @@
  */
 
 import { AcroForm, type FlattenOptions } from "#src/document/acro-form";
-import type {
-  ButtonField,
-  CheckboxField,
-  DropdownField,
-  FormField,
-  ListBoxField,
-  RadioField,
-  SignatureField,
-  TextField,
+import {
+  type ButtonField,
+  type CheckboxField,
+  type DropdownField,
+  type FormField,
+  type ListBoxField,
+  type RadioField,
+  type SignatureField,
+  TerminalField,
+  type TextField,
 } from "#src/document/form-field";
 import type { ObjectRegistry } from "#src/document/object-registry";
+import type { PageTree } from "#src/document/page-tree";
 import type { PDFCatalog } from "#src/document/pdf-catalog";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,11 +104,13 @@ export interface FormProperties {
  */
 export class PDFForm {
   private readonly _acroForm: AcroForm;
+  private readonly _catalog: PDFCatalog;
   private fieldsByName: Map<string, FormField>;
   private allFields: FormField[];
 
-  private constructor(acroForm: AcroForm, fields: FormField[]) {
+  private constructor(acroForm: AcroForm, catalog: PDFCatalog, fields: FormField[]) {
     this._acroForm = acroForm;
+    this._catalog = catalog;
     this.allFields = fields;
     this.fieldsByName = new Map(fields.map(f => [f.name, f]));
   }
@@ -115,14 +119,21 @@ export class PDFForm {
    * Load and create a PDFForm instance.
    *
    * @internal Called by `PDF.load()`.
+   * @param registry The object registry
+   * @param catalog The PDF catalog
+   * @param pageTree The page tree for efficient page lookups during flattening
    * @returns PDFForm instance, or null if no form exists
    */
-  static async load(registry: ObjectRegistry, catalog: PDFCatalog): Promise<PDFForm | null> {
-    const acroForm = await AcroForm.load(catalog.getDict(), registry);
+  static async load(
+    registry: ObjectRegistry,
+    catalog: PDFCatalog,
+    pageTree: PageTree,
+  ): Promise<PDFForm | null> {
+    const acroForm = await AcroForm.load(catalog.getDict(), registry, pageTree);
     if (!acroForm) return null;
 
     const fields = await acroForm.getFields();
-    return new PDFForm(acroForm, fields);
+    return new PDFForm(acroForm, catalog, fields);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -330,7 +341,9 @@ export class PDFForm {
    */
   resetAll(): void {
     for (const field of this.allFields) {
-      field.resetValue();
+      if (field instanceof TerminalField) {
+        field.resetValue();
+      }
     }
   }
 
@@ -355,7 +368,7 @@ export class PDFForm {
    * Check if any field has been modified and needs appearance update.
    */
   get hasUnsavedChanges(): boolean {
-    return this.allFields.some(f => f.needsAppearanceUpdate);
+    return this.allFields.some(f => f instanceof TerminalField && f.needsAppearanceUpdate);
   }
 
   /**
@@ -413,6 +426,9 @@ export class PDFForm {
    */
   async flatten(options: FlattenOptions = {}): Promise<void> {
     await this._acroForm.flatten(options);
+
+    // Remove AcroForm from catalog to fully eliminate form interactivity
+    this._catalog.removeAcroForm();
 
     // Clear cached fields since form is now empty
     this.allFields = [];

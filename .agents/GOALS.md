@@ -21,23 +21,23 @@ This document captures the high-level goals for @libpdf/core. Use this to steer 
 - [ ] **Add/remove content** — Draw text, images, graphics on pages
 - [ ] **Add/remove annotations** — Comments, highlights, stamps, etc.
 - [ ] **Add/remove form fields** — Text fields, checkboxes, dropdowns, etc.
-- [ ] **Incremental updates** — Append changes without rewriting (critical for signatures)
+- [x] **Incremental updates** — Append changes without rewriting (critical for signatures)
 
 ### 4. Forms
-- [ ] **Complete form filling** — Fill all field types (text, checkbox, radio, dropdown, etc.)
-- [ ] **Read form data** — Extract current field values
-- [ ] **Flatten forms** — Convert form fields to static content
+- [x] **Complete form filling** — Fill all field types (text, checkbox, radio, dropdown, etc.)
+- [x] **Read form data** — Extract current field values
+- [x] **Flatten forms** — Convert form fields to static content
 - [ ] **Calculate fields** — Support JavaScript calculations (stretch)
 
 ### 5. Flattening
-- [ ] **Flatten forms** — Bake form field appearances into page content
+- [x] **Flatten forms** — Bake form field appearances into page content
 - [ ] **Flatten annotations** — Bake annotation appearances into page content
 - [ ] **Flatten layers** — Merge optional content groups
 
 ### 6. Attachments
-- [ ] **Extract attachments** — Get embedded files from PDF
-- [ ] **Embed attachments** — Add files to PDF
-- [ ] **File specifications** — Proper /EmbeddedFiles handling
+- [x] **Extract attachments** — Get embedded files from PDF
+- [x] **Embed attachments** — Add files to PDF
+- [x] **File specifications** — Proper /EmbeddedFiles handling
 
 ### 7. Merging & Splitting
 - [ ] **Merge PDFs** — Combine pages from multiple documents

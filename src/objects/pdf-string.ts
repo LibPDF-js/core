@@ -54,6 +54,14 @@ export class PdfString implements PdfPrimitive {
     return new PdfString(hexToBytes(hex), "hex");
   }
 
+  /**
+   * Create a PdfString from raw bytes.
+   * Uses hex format for cleaner output.
+   */
+  static fromBytes(bytes: Uint8Array): PdfString {
+    return new PdfString(bytes, "hex");
+  }
+
   toBytes(writer: ByteWriter): void {
     if (this.format === "hex") {
       writer.writeAscii(`<${bytesToHex(this.bytes)}>`);

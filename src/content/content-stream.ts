@@ -112,8 +112,13 @@ export class ContentStreamBuilder {
    *
    * @param bbox Bounding box [llx, lly, urx, ury]
    * @param resources Optional resources dictionary
+   * @param matrix Optional transformation matrix [a, b, c, d, e, f]
    */
-  toFormXObject(bbox: [number, number, number, number], resources?: PdfDict): PdfStream {
+  toFormXObject(
+    bbox: [number, number, number, number],
+    resources?: PdfDict,
+    matrix?: [number, number, number, number, number, number],
+  ): PdfStream {
     const dict = PdfDict.of({
       Type: PdfName.of("XObject"),
       Subtype: PdfName.of("Form"),
@@ -127,6 +132,20 @@ export class ContentStreamBuilder {
 
     if (resources) {
       dict.set("Resources", resources);
+    }
+
+    if (matrix) {
+      dict.set(
+        "Matrix",
+        PdfArray.of(
+          PdfNumber.of(matrix[0]),
+          PdfNumber.of(matrix[1]),
+          PdfNumber.of(matrix[2]),
+          PdfNumber.of(matrix[3]),
+          PdfNumber.of(matrix[4]),
+          PdfNumber.of(matrix[5]),
+        ),
+      );
     }
 
     return this.toStream(dict);

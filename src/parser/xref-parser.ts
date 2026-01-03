@@ -101,6 +101,29 @@ export class XRefParser {
   }
 
   /**
+   * Detect the XRef format at a given offset without fully parsing.
+   *
+   * @returns true if XRef stream, false if table, null if cannot detect
+   */
+  detectXRefFormat(offset: number): boolean | null {
+    this.scanner.moveTo(offset);
+
+    const firstByte = this.scanner.peek();
+
+    // 'x' = 0x78 starts "xref" (table format)
+    if (firstByte === 0x78) {
+      return false;
+    }
+
+    // Digit starts "N M obj" (stream format)
+    if (firstByte >= DIGIT_0 && firstByte <= DIGIT_9) {
+      return true;
+    }
+
+    return null;
+  }
+
+  /**
    * Parse traditional xref table format.
    * Scanner must be positioned at "xref" keyword.
    */

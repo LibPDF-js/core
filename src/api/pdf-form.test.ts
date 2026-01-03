@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { TerminalField } from "#src/document/form-field";
 import { loadFixture } from "#src/test-utils";
 import { PDF } from "./pdf";
 import { TextAlignment } from "./pdf-form";
@@ -229,7 +230,7 @@ describe("PDFForm", () => {
 
       form!.resetAll();
 
-      const fields = form!.getFields();
+      const fields = form!.getFields() as TerminalField[];
       expect(fields.every(f => f.needsAppearanceUpdate)).toBe(true);
     });
   });

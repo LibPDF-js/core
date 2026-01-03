@@ -1,8 +1,10 @@
 /**
  * Form field classes for reading and writing AcroForm fields.
  *
- * Provides access to field properties and values, and methods
- * to modify field values.
+ * This module implements a field hierarchy following PDFBox patterns:
+ * - FormField: Abstract base for all fields
+ * - NonTerminalField: Container fields (no value, just children)
+ * - TerminalField: Value-holding fields with widgets
  *
  * PDF Reference: Section 12.7 "Interactive Forms"
  */
@@ -14,12 +16,14 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+import type { FormFont } from "./form-font";
 import type { ObjectRegistry } from "./object-registry";
 import { WidgetAnnotation } from "./widget-annotation";
 
 // Forward declaration - AcroForm will be imported where needed
 export interface AcroFormLike {
   defaultQuadding: number;
+  updateFieldAppearance?(field: TerminalField): Promise<void>;
 }
 
 /**
@@ -33,7 +37,8 @@ export type FieldType =
   | "listbox"
   | "signature"
   | "button"
-  | "unknown";
+  | "unknown"
+  | "non-terminal";
 
 /**
  * Field flags from PDF spec Table 221.
@@ -67,7 +72,20 @@ export const FieldFlags = {
 } as const;
 
 /**
+ * RGB color for text.
+ */
+export interface RgbColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/**
  * Base class for all form fields.
+ *
+ * This is an abstract base that provides common functionality for both
+ * terminal fields (those with values and widgets) and non-terminal fields
+ * (those that serve as containers in the field hierarchy).
  */
 export abstract class FormField {
   protected readonly dict: PdfDict;
@@ -78,11 +96,8 @@ export abstract class FormField {
   /** Fully-qualified field name (e.g., "person.name.first") */
   readonly name: string;
 
-  /**
-   * Whether the field value has changed and needs appearance update.
-   * Set to true by setValue(), cleared by updateAppearance().
-   */
-  needsAppearanceUpdate = false;
+  /** Parent field in the hierarchy, null for root fields */
+  parent: FormField | null = null;
 
   constructor(
     dict: PdfDict,
@@ -150,37 +165,6 @@ export abstract class FormField {
    */
   acroField(): PdfDict {
     return this.dict;
-  }
-
-  /**
-   * Get all widget annotations for this field.
-   */
-  getWidgets(): WidgetAnnotation[] {
-    // If field has /Rect, it's merged with its widget
-    if (this.dict.has("Rect")) {
-      return [new WidgetAnnotation(this.dict, this.ref, this.registry)];
-    }
-
-    // Otherwise, /Kids contains widgets
-    const kids = this.dict.getArray("Kids");
-
-    if (!kids) {
-      return [];
-    }
-
-    const widgets: WidgetAnnotation[] = [];
-
-    for (let i = 0; i < kids.length; i++) {
-      const item = kids.at(i);
-      const ref = item instanceof PdfRef ? item : null;
-      const widgetDict = ref ? this.registry.getObject(ref) : item;
-
-      if (widgetDict instanceof PdfDict) {
-        widgets.push(new WidgetAnnotation(widgetDict, ref, this.registry));
-      }
-    }
-
-    return widgets;
   }
 
   /**
@@ -262,13 +246,315 @@ export abstract class FormField {
 
   /**
    * Get current value (type depends on field type).
+   * For non-terminal fields, this throws an error.
    */
   abstract getValue(): unknown;
 
   /**
-   * Reset field to its default value.
+   * Get widget annotations for this field.
+   * For non-terminal fields, this returns an empty array.
    */
-  resetValue(): void {
+  abstract getWidgets(): WidgetAnnotation[];
+
+  /**
+   * Default appearance string (/DA).
+   *
+   * Format: "/FontName fontSize Tf [colorArgs] colorOp"
+   * Example: "/Helv 12 Tf 0 g"
+   */
+  get defaultAppearance(): string | null {
+    const da = this.getInheritable("DA");
+
+    if (da instanceof PdfString) {
+      return da.asString();
+    }
+
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Non-Terminal Field (Container)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A non-terminal field is a container in the field hierarchy.
+ *
+ * Non-terminal fields:
+ * - Have child fields (other fields with /Parent pointing to this)
+ * - Do NOT have a value (/V)
+ * - Do NOT have widgets
+ *
+ * They exist purely to organize the field tree structure.
+ */
+export class NonTerminalField extends FormField {
+  readonly type = "non-terminal" as const;
+
+  private _children: FormField[] = [];
+
+  /**
+   * Non-terminal fields don't have values.
+   * @throws Error always - non-terminal fields don't hold values
+   */
+  getValue(): never {
+    throw new Error(`Non-terminal field "${this.name}" does not have a value`);
+  }
+
+  /**
+   * Non-terminal fields don't have widgets.
+   * @returns Empty array
+   */
+  getWidgets(): WidgetAnnotation[] {
+    return [];
+  }
+
+  /**
+   * Get child fields of this non-terminal field.
+   */
+  getChildren(): FormField[] {
+    return this._children;
+  }
+
+  /**
+   * Add a child field (called during field tree construction).
+   * @internal
+   */
+  addChild(field: FormField): void {
+    this._children.push(field);
+    field.parent = this;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Terminal Field (Value-Holding)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A terminal field holds a value and has widgets.
+ *
+ * Terminal fields:
+ * - Can have a value (/V)
+ * - Have one or more widget annotations (visual representations)
+ * - Are the actual interactive form elements
+ *
+ * All specific field types (TextField, CheckboxField, etc.) extend this.
+ */
+export abstract class TerminalField extends FormField {
+  /**
+   * Whether the field's appearance needs to be regenerated.
+   *
+   * This is set to true when font, font size, or text color changes.
+   * setValue() automatically regenerates the appearance and clears this flag.
+   */
+  needsAppearanceUpdate = false;
+
+  /** Custom font set via setFont() */
+  protected _font: FormFont | null = null;
+
+  /** Custom font size set via setFontSize() */
+  protected _fontSize: number | null = null;
+
+  /** Custom text color set via setTextColor() */
+  protected _textColor: RgbColor | null = null;
+
+  /** Cached widgets, populated during field creation */
+  private _widgets: WidgetAnnotation[] | null = null;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Font and Text Styling
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Set the font for this field.
+   *
+   * Accepts embedded fonts or existing PDF fonts.
+   * Applies to all widgets of this field.
+   *
+   * @param font The font to use for this field
+   */
+  setFont(font: FormFont): void {
+    this._font = font;
+    this.needsAppearanceUpdate = true;
+  }
+
+  /**
+   * Get the font for this field, or null if using default.
+   */
+  getFont(): FormFont | null {
+    return this._font;
+  }
+
+  /**
+   * Set the font size in points.
+   *
+   * Use 0 for auto-size (fit to field).
+   *
+   * @param size Font size in points (0 = auto)
+   * @throws Error if size is negative
+   */
+  setFontSize(size: number): void {
+    if (size < 0) {
+      throw new Error(`Font size cannot be negative: ${size}`);
+    }
+
+    this._fontSize = size;
+    this.needsAppearanceUpdate = true;
+  }
+
+  /**
+   * Get the font size, or null if using default/DA value.
+   */
+  getFontSize(): number | null {
+    return this._fontSize;
+  }
+
+  /**
+   * Set text color as RGB values (0-1 range).
+   *
+   * @param r Red component (0-1)
+   * @param g Green component (0-1)
+   * @param b Blue component (0-1)
+   * @throws Error if values are out of range
+   */
+  setTextColor(r: number, g: number, b: number): void {
+    if (r < 0 || r > 1 || g < 0 || g > 1 || b < 0 || b > 1) {
+      throw new Error(`Color values must be between 0 and 1: (${r}, ${g}, ${b})`);
+    }
+
+    this._textColor = { r, g, b };
+    this.needsAppearanceUpdate = true;
+  }
+
+  /**
+   * Get text color, or null if using existing DA color.
+   */
+  getTextColor(): RgbColor | null {
+    return this._textColor;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Widget Management
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get all widget annotations for this field.
+   *
+   * Widgets are resolved and cached during field creation (in AcroForm.getFields()),
+   * so this method is synchronous and always returns all widgets.
+   */
+  getWidgets(): WidgetAnnotation[] {
+    // Return cached widgets if available
+    if (this._widgets !== null) {
+      return this._widgets;
+    }
+
+    // Fallback: build widgets synchronously (may miss unresolved refs)
+    // This path is only hit if resolveWidgets() wasn't called during creation
+    if (this.dict.has("Rect")) {
+      this._widgets = [new WidgetAnnotation(this.dict, this.ref, this.registry)];
+
+      return this._widgets;
+    }
+
+    const kids = this.dict.getArray("Kids");
+
+    if (!kids) {
+      this._widgets = [];
+
+      return this._widgets;
+    }
+
+    const widgets: WidgetAnnotation[] = [];
+
+    for (let i = 0; i < kids.length; i++) {
+      const item = kids.at(i);
+      const ref = item instanceof PdfRef ? item : null;
+      const widgetDict = ref ? this.registry.getObject(ref) : item;
+
+      if (widgetDict instanceof PdfDict) {
+        widgets.push(new WidgetAnnotation(widgetDict, ref, this.registry));
+      }
+    }
+
+    this._widgets = widgets;
+
+    return this._widgets;
+  }
+
+  /**
+   * Resolve and cache all widgets for this field.
+   *
+   * Called during field creation to ensure all widget refs are resolved.
+   * After this, getWidgets() will return the complete list synchronously.
+   *
+   * @internal
+   */
+  async resolveWidgets(): Promise<void> {
+    // If field has /Rect, it's merged with its widget
+    if (this.dict.has("Rect")) {
+      // Also resolve MK if it's a reference
+      await this.resolveMK(this.dict);
+      this._widgets = [new WidgetAnnotation(this.dict, this.ref, this.registry)];
+
+      return;
+    }
+
+    // Otherwise, /Kids contains widgets
+    const kids = this.dict.getArray("Kids");
+
+    if (!kids) {
+      this._widgets = [];
+
+      return;
+    }
+
+    const widgets: WidgetAnnotation[] = [];
+
+    for (let i = 0; i < kids.length; i++) {
+      const item = kids.at(i);
+      const ref = item instanceof PdfRef ? item : null;
+
+      let widgetDict: PdfObject | null = null;
+
+      if (ref) {
+        widgetDict = await this.registry.resolve(ref);
+      } else if (item instanceof PdfDict) {
+        widgetDict = item;
+      }
+
+      if (widgetDict instanceof PdfDict) {
+        // Also resolve MK if it's a reference
+        await this.resolveMK(widgetDict);
+        widgets.push(new WidgetAnnotation(widgetDict, ref, this.registry));
+      }
+    }
+
+    this._widgets = widgets;
+  }
+
+  /**
+   * Resolve MK dictionary if it's a reference.
+   * This ensures getAppearanceCharacteristics() can work synchronously.
+   */
+  private async resolveMK(dict: PdfDict): Promise<void> {
+    const mkEntry = dict.get("MK");
+
+    if (mkEntry instanceof PdfRef) {
+      await this.registry.resolve(mkEntry);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Value Management
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Reset field to its default value.
+   *
+   * This method is async because it regenerates the field's appearance
+   * stream after resetting the value.
+   */
+  async resetValue(): Promise<void> {
     const dv = this.getInheritable("DV");
 
     if (dv) {
@@ -278,6 +564,9 @@ export abstract class FormField {
     }
 
     this.needsAppearanceUpdate = true;
+
+    // Regenerate appearance immediately
+    await this.applyChange();
   }
 
   /**
@@ -288,6 +577,22 @@ export abstract class FormField {
       throw new Error(`Field "${this.name}" is read-only`);
     }
   }
+
+  /**
+   * Apply the current value change and regenerate appearances.
+   *
+   * Called after value modification to update the visual representation.
+   * Subclasses should call this from their setValue() methods.
+   *
+   * @internal
+   */
+  protected async applyChange(): Promise<void> {
+    if (this.acroForm.updateFieldAppearance) {
+      await this.acroForm.updateFieldAppearance(this);
+    }
+
+    this.needsAppearanceUpdate = false;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -296,7 +601,7 @@ export abstract class FormField {
 /**
  * Text input field.
  */
-export class TextField extends FormField {
+export class TextField extends TerminalField {
   readonly type = "text" as const;
 
   /** Maximum character length (0 = no limit) */
@@ -336,17 +641,6 @@ export class TextField extends FormField {
     return q !== 0 ? q : this.acroForm.defaultQuadding;
   }
 
-  /** Default appearance string */
-  get defaultAppearance(): string | null {
-    const da = this.getInheritable("DA");
-
-    if (da instanceof PdfString) {
-      return da.asString();
-    }
-
-    return null;
-  }
-
   /**
    * Get current text value.
    */
@@ -384,10 +678,13 @@ export class TextField extends FormField {
   /**
    * Set the text value.
    *
+   * This method is async because it regenerates the field's appearance
+   * stream after setting the value.
+   *
    * @param value The new text value
    * @throws Error if field is read-only
    */
-  setValue(value: string): void {
+  async setValue(value: string): Promise<void> {
     this.assertWritable();
 
     // Truncate if maxLength is set
@@ -396,13 +693,16 @@ export class TextField extends FormField {
     // Set /V on field dict
     this.dict.set("V", PdfString.fromString(finalValue));
     this.needsAppearanceUpdate = true;
+
+    // Regenerate appearance immediately
+    await this.applyChange();
   }
 }
 
 /**
  * Checkbox field (single or group).
  */
-export class CheckboxField extends FormField {
+export class CheckboxField extends TerminalField {
   readonly type = "checkbox" as const;
 
   /**
@@ -467,24 +767,27 @@ export class CheckboxField extends FormField {
   /**
    * Check the checkbox (sets to the on-value).
    */
-  check(): void {
-    this.setValue(this.getOnValue());
+  async check(): Promise<void> {
+    await this.setValue(this.getOnValue());
   }
 
   /**
    * Uncheck the checkbox (sets to "Off").
    */
-  uncheck(): void {
-    this.setValue("Off");
+  async uncheck(): Promise<void> {
+    await this.setValue("Off");
   }
 
   /**
    * Set the checkbox value.
    *
+   * This method is async because it regenerates the field's appearance
+   * stream after setting the value.
+   *
    * @param value "Off" or one of the on-values
    * @throws Error if field is read-only or value is invalid
    */
-  setValue(value: string): void {
+  async setValue(value: string): Promise<void> {
     this.assertWritable();
 
     // Validate value
@@ -504,13 +807,16 @@ export class CheckboxField extends FormField {
     }
 
     this.needsAppearanceUpdate = true;
+
+    // Regenerate appearance immediately
+    await this.applyChange();
   }
 }
 
 /**
  * Radio button group.
  */
-export class RadioField extends FormField {
+export class RadioField extends TerminalField {
   readonly type = "radio" as const;
 
   /**
@@ -562,12 +868,44 @@ export class RadioField extends FormField {
   }
 
   /**
+   * Get export values from /Opt array.
+   *
+   * Radio buttons can have an /Opt array that provides export values
+   * that are different from the widget appearance state names.
+   */
+  getExportValues(): string[] {
+    const opt = this.dict.getArray("Opt");
+
+    if (!opt) {
+      // Fall back to widget on-values
+      return this.getOptions();
+    }
+
+    const values: string[] = [];
+
+    for (let i = 0; i < opt.length; i++) {
+      const item = opt.at(i);
+
+      if (item instanceof PdfString) {
+        values.push(item.asString());
+      } else if (item instanceof PdfName) {
+        values.push(item.value);
+      }
+    }
+
+    return values;
+  }
+
+  /**
    * Select an option.
+   *
+   * This method is async because it regenerates the field's appearance
+   * stream after setting the value.
    *
    * @param option One of getOptions() or null to deselect
    * @throws Error if field is read-only, option is invalid, or deselection not allowed
    */
-  setValue(option: string | null): void {
+  async setValue(option: string | null): Promise<void> {
     this.assertWritable();
 
     let value: string;
@@ -576,12 +914,14 @@ export class RadioField extends FormField {
       if (this.noToggleToOff) {
         throw new Error(`Field "${this.name}" cannot be deselected (noToggleToOff is set)`);
       }
+
       value = "Off";
     } else {
       // Validate
       if (!this.getOptions().includes(option)) {
         throw new Error(`Invalid option "${option}" for radio "${this.name}"`);
       }
+
       value = option;
     }
 
@@ -597,6 +937,9 @@ export class RadioField extends FormField {
     }
 
     this.needsAppearanceUpdate = true;
+
+    // Regenerate appearance immediately
+    await this.applyChange();
   }
 }
 
@@ -613,7 +956,7 @@ export interface ChoiceOption {
 /**
  * Dropdown (combo box) field.
  */
-export class DropdownField extends FormField {
+export class DropdownField extends TerminalField {
   readonly type = "dropdown" as const;
 
   /**
@@ -689,10 +1032,13 @@ export class DropdownField extends FormField {
   /**
    * Set the dropdown value.
    *
+   * This method is async because it regenerates the field's appearance
+   * stream after setting the value.
+   *
    * @param value The value to select
    * @throws Error if field is read-only or value is invalid (for non-editable dropdowns)
    */
-  setValue(value: string): void {
+  async setValue(value: string): Promise<void> {
     this.assertWritable();
 
     // Validate (unless editable)
@@ -706,13 +1052,16 @@ export class DropdownField extends FormField {
 
     this.dict.set("V", PdfString.fromString(value));
     this.needsAppearanceUpdate = true;
+
+    // Regenerate appearance immediately
+    await this.applyChange();
   }
 }
 
 /**
  * List box field.
  */
-export class ListBoxField extends FormField {
+export class ListBoxField extends TerminalField {
   readonly type = "listbox" as const;
 
   /**
@@ -734,6 +1083,15 @@ export class ListBoxField extends FormField {
    */
   get commitOnSelChange(): boolean {
     return (this.flags & FieldFlags.COMMIT_ON_SEL_CHANGE) !== 0;
+  }
+
+  /**
+   * Get the top index (first visible option when scrolled).
+   * The /TI entry specifies the index of the first option visible at the top.
+   * Defaults to 0 (first option).
+   */
+  getTopIndex(): number {
+    return this.dict.getNumber("TI")?.value ?? 0;
   }
 
   /**
@@ -807,10 +1165,13 @@ export class ListBoxField extends FormField {
   /**
    * Set the selected values.
    *
+   * This method is async because it regenerates the field's appearance
+   * stream after setting the value.
+   *
    * @param values Array of values to select
    * @throws Error if field is read-only, multiple selection not allowed, or values are invalid
    */
-  setValue(values: string[]): void {
+  async setValue(values: string[]): Promise<void> {
     this.assertWritable();
 
     if (!this.isMultiSelect && values.length > 1) {
@@ -850,13 +1211,16 @@ export class ListBoxField extends FormField {
     }
 
     this.needsAppearanceUpdate = true;
+
+    // Regenerate appearance immediately
+    await this.applyChange();
   }
 }
 
 /**
  * Signature field.
  */
-export class SignatureField extends FormField {
+export class SignatureField extends TerminalField {
   readonly type = "signature" as const;
 
   /**
@@ -896,7 +1260,7 @@ export class SignatureField extends FormField {
 /**
  * Push button field.
  */
-export class ButtonField extends FormField {
+export class ButtonField extends TerminalField {
   readonly type = "button" as const;
 
   /**
@@ -910,7 +1274,7 @@ export class ButtonField extends FormField {
 /**
  * Unknown field type.
  */
-export class UnknownField extends FormField {
+export class UnknownField extends TerminalField {
   readonly type = "unknown" as const;
 
   getValue(): unknown {
@@ -922,7 +1286,10 @@ export class UnknownField extends FormField {
 // Factory
 // ─────────────────────────────────────────────────────────────────────────────
 /**
- * Create a FormField instance based on /FT and /Ff.
+ * Create a terminal FormField instance based on /FT and /Ff.
+ *
+ * This factory creates only terminal fields (value-holding fields with widgets).
+ * Non-terminal fields (containers) are created directly in AcroForm.
  */
 export function createFormField(
   dict: PdfDict,
@@ -930,7 +1297,7 @@ export function createFormField(
   registry: ObjectRegistry,
   acroForm: AcroFormLike,
   name: string,
-): FormField {
+): TerminalField {
   const ft = getInheritableFieldName(dict, "FT", registry);
   const ff = getInheritableFieldNumber(dict, "Ff", registry);
 

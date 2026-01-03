@@ -20,15 +20,22 @@ import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
-import { AppearanceGenerator } from "./appearance-generator";
+import { AppearanceGenerator, extractAppearanceStyle } from "./appearance-generator";
+import { FieldTree } from "./field-tree";
 import {
   type AcroFormLike,
+  type CheckboxField,
   createFormField,
+  type DropdownField,
   type FieldType,
-  type FormField,
+  type ListBoxField,
+  type RadioField,
+  type TerminalField,
   type TextField,
 } from "./form-field";
+import { type ExistingFont, type FormFont, parseExistingFont } from "./form-font";
 import type { ObjectRegistry } from "./object-registry";
+import type { PageTree } from "./page-tree";
 import type { WidgetAnnotation } from "./widget-annotation";
 
 /**
@@ -37,19 +44,38 @@ import type { WidgetAnnotation } from "./widget-annotation";
 export class AcroForm implements AcroFormLike {
   private readonly dict: PdfDict;
   private readonly registry: ObjectRegistry;
+  private readonly pageTree: PageTree | null;
 
-  private fieldsCache: FormField[] | null = null;
+  private fieldsCache: TerminalField[] | null = null;
 
-  private constructor(dict: PdfDict, registry: ObjectRegistry) {
+  /** Default font for all fields */
+  private _defaultFont: FormFont | null = null;
+
+  /** Default font size for all fields */
+  private _defaultFontSize = 0;
+
+  /** Cache of existing fonts from /DR */
+  private existingFontsCache: Map<string, ExistingFont> | null = null;
+
+  private constructor(dict: PdfDict, registry: ObjectRegistry, pageTree: PageTree | null) {
     this.dict = dict;
     this.registry = registry;
+    this.pageTree = pageTree;
   }
 
   /**
    * Load AcroForm from catalog.
    * Returns null if no AcroForm present.
+   *
+   * @param catalog The document catalog dictionary
+   * @param registry The object registry for resolving references
+   * @param pageTree Optional page tree for efficient page lookups during flattening
    */
-  static async load(catalog: PdfDict, registry: ObjectRegistry): Promise<AcroForm | null> {
+  static async load(
+    catalog: PdfDict,
+    registry: ObjectRegistry,
+    pageTree?: PageTree,
+  ): Promise<AcroForm | null> {
     const acroFormEntry = catalog.get("AcroForm");
 
     if (!acroFormEntry) {
@@ -72,7 +98,7 @@ export class AcroForm implements AcroFormLike {
       return null;
     }
 
-    return new AcroForm(dict, registry);
+    return new AcroForm(dict, registry, pageTree ?? null);
   }
 
   /**
@@ -146,7 +172,7 @@ export class AcroForm implements AcroFormLike {
    * Get all terminal fields (flattened).
    * Non-terminal fields (containers) are not included.
    */
-  async getFields(): Promise<FormField[]> {
+  async getFields(): Promise<TerminalField[]> {
     if (this.fieldsCache) {
       return this.fieldsCache;
     }
@@ -169,7 +195,7 @@ export class AcroForm implements AcroFormLike {
    * Get field by fully-qualified name.
    * Returns null if not found.
    */
-  async getField(name: string): Promise<FormField | null> {
+  async getField(name: string): Promise<TerminalField | null> {
     const fields = await this.getFields();
 
     return fields.find(f => f.name === name) ?? null;
@@ -178,10 +204,10 @@ export class AcroForm implements AcroFormLike {
   /**
    * Get all fields of a specific type.
    */
-  async getFieldsOfType<T extends FormField>(type: FieldType): Promise<T[]> {
+  async getFieldsOfType<T extends TerminalField>(type: FieldType): Promise<T[]> {
     const fields = await this.getFields();
 
-    return fields.filter(f => f.type === type) as T[];
+    return fields.filter(f => f.type === type) as unknown as T[];
   }
 
   /**
@@ -192,11 +218,254 @@ export class AcroForm implements AcroFormLike {
   }
 
   /**
+   * Get the field tree for safe iteration over the form hierarchy.
+   *
+   * The field tree provides:
+   * - Cycle-safe iteration (handles circular references)
+   * - Breadth-first ordering
+   * - Access to both terminal and non-terminal fields
+   * - Parent references set on all fields
+   *
+   * @example
+   * ```typescript
+   * const tree = await form.getFieldTree();
+   *
+   * // Iterate all fields
+   * for (const field of tree) {
+   *   console.log(field.name, field.type);
+   * }
+   *
+   * // Iterate only terminal fields (value-holding)
+   * for (const field of tree.terminalFields()) {
+   *   console.log(field.name, field.getValue());
+   * }
+   * ```
+   */
+  async getFieldTree(): Promise<FieldTree> {
+    return FieldTree.load(this, this.registry);
+  }
+
+  /**
    * Clear the fields cache.
    * Call this after modifying the form structure.
    */
   clearCache(): void {
     this.fieldsCache = null;
+    this.existingFontsCache = null;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Default Font Management
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Set the default font for all fields.
+   *
+   * This font will be used for fields that don't have an explicit font set.
+   */
+  setDefaultFont(font: FormFont): void {
+    this._defaultFont = font;
+  }
+
+  /**
+   * Get the default font.
+   */
+  getDefaultFont(): FormFont | null {
+    return this._defaultFont;
+  }
+
+  /**
+   * Set the default font size for all fields.
+   *
+   * Use 0 for auto-size.
+   */
+  setDefaultFontSize(size: number): void {
+    if (size < 0) {
+      throw new Error(`Font size cannot be negative: ${size}`);
+    }
+
+    this._defaultFontSize = size;
+  }
+
+  /**
+   * Get the default font size.
+   */
+  getDefaultFontSize(): number {
+    return this._defaultFontSize;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Existing Font Access
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get an existing font from the PDF's resources.
+   *
+   * Looks up fonts in the AcroForm's /DR (Default Resources) dictionary.
+   *
+   * @param name Font name including slash, e.g., "/Helv", "/ZaDb"
+   * @returns ExistingFont wrapper or null if not found
+   */
+  getExistingFont(name: string): ExistingFont | null {
+    this.ensureExistingFontsLoaded();
+
+    const cleanName = name.startsWith("/") ? name.slice(1) : name;
+
+    return this.existingFontsCache?.get(cleanName) ?? null;
+  }
+
+  /**
+   * List all fonts available in the PDF's default resources.
+   */
+  getAvailableFonts(): ExistingFont[] {
+    this.ensureExistingFontsLoaded();
+
+    return this.existingFontsCache ? [...this.existingFontsCache.values()] : [];
+  }
+
+  /**
+   * Load existing fonts from /DR if not already cached.
+   */
+  private ensureExistingFontsLoaded(): void {
+    if (this.existingFontsCache !== null) {
+      return;
+    }
+
+    this.existingFontsCache = new Map();
+
+    const dr = this.dict.getDict("DR");
+
+    if (!dr) {
+      return;
+    }
+
+    const fonts = dr.getDict("Font");
+
+    if (!fonts) {
+      return;
+    }
+
+    for (const key of fonts.keys()) {
+      const fontName = key.value;
+      const fontObj = fonts.get(fontName);
+
+      if (fontObj) {
+        const existingFont = parseExistingFont(
+          fontName,
+          fontObj as PdfDict | PdfRef,
+          this.registry,
+        );
+
+        this.existingFontsCache.set(fontName, existingFont);
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Appearance Generation
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Update appearance for a single field.
+   *
+   * Called automatically by setValue() on field classes.
+   * Regenerates the visual appearance stream for the field.
+   *
+   * @internal
+   */
+  async updateFieldAppearance(field: TerminalField): Promise<void> {
+    // Skip read-only fields during regeneration (preserve existing appearance)
+    if (field.isReadOnly()) {
+      return;
+    }
+
+    const generator = new AppearanceGenerator(this, this.registry);
+
+    switch (field.type) {
+      case "text": {
+        const textField = field as TextField;
+
+        for (const widget of textField.getWidgets()) {
+          const existingAppearance = await widget.getNormalAppearance();
+          const existingStyle = existingAppearance
+            ? await extractAppearanceStyle(existingAppearance)
+            : undefined;
+
+          const stream = generator.generateTextAppearance(textField, widget, existingStyle);
+          widget.setNormalAppearance(stream);
+        }
+
+        break;
+      }
+
+      case "checkbox": {
+        const checkboxField = field as CheckboxField;
+
+        for (const widget of checkboxField.getWidgets()) {
+          const onValue = widget.getOnValue() ?? "Yes";
+
+          // Skip if all state appearances exist
+          if (widget.hasAppearancesForStates([onValue, "Off"])) {
+            continue;
+          }
+
+          const { on, off } = generator.generateCheckboxAppearance(checkboxField, widget, onValue);
+          widget.setNormalAppearance(on, onValue);
+          widget.setNormalAppearance(off, "Off");
+        }
+
+        break;
+      }
+
+      case "radio": {
+        const radioField = field as RadioField;
+
+        for (const widget of radioField.getWidgets()) {
+          const value = widget.getOnValue() ?? "Choice";
+
+          // Skip if all state appearances exist
+          if (widget.hasAppearancesForStates([value, "Off"])) {
+            continue;
+          }
+
+          const { selected, off } = generator.generateRadioAppearance(radioField, widget, value);
+          widget.setNormalAppearance(selected, value);
+          widget.setNormalAppearance(off, "Off");
+        }
+
+        break;
+      }
+
+      case "dropdown": {
+        const dropdownField = field as DropdownField;
+
+        for (const widget of dropdownField.getWidgets()) {
+          const stream = generator.generateDropdownAppearance(dropdownField, widget);
+          widget.setNormalAppearance(stream);
+        }
+
+        break;
+      }
+
+      case "listbox": {
+        const listboxField = field as ListBoxField;
+
+        for (const widget of listboxField.getWidgets()) {
+          const stream = generator.generateListBoxAppearance(listboxField, widget);
+          widget.setNormalAppearance(stream);
+        }
+
+        break;
+      }
+
+      case "button": {
+        // NEVER regenerate button appearances
+        break;
+      }
+    }
+
+    // Clear NeedAppearances flag
+    this.dict.delete("NeedAppearances");
   }
 
   /**
@@ -204,8 +473,10 @@ export class AcroForm implements AcroFormLike {
    *
    * This generates appearance streams for fields whose values
    * have been modified (needsAppearanceUpdate is true).
+   *
+   * @param options.forceRegenerate Force regeneration even if appearances exist
    */
-  async updateAppearances(): Promise<void> {
+  async updateAppearances(options: { forceRegenerate?: boolean } = {}): Promise<void> {
     const generator = new AppearanceGenerator(this, this.registry);
 
     const fields = await this.getFields();
@@ -215,18 +486,115 @@ export class AcroForm implements AcroFormLike {
         continue;
       }
 
-      if (field.type === "text") {
-        // Generate text field appearances
-        const textField = field as TextField;
-
-        for (const widget of textField.getWidgets()) {
-          const stream = generator.generateTextAppearance(textField, widget);
-          widget.setNormalAppearance(stream);
-        }
+      // Skip read-only fields during regeneration (preserve existing appearance)
+      if (field.isReadOnly()) {
+        field.needsAppearanceUpdate = false;
+        continue;
       }
 
-      // Checkboxes and radios typically use existing AP states
-      // Dropdowns/listboxes would need their own generator
+      const forceRegen = options.forceRegenerate ?? false;
+
+      switch (field.type) {
+        case "text": {
+          const textField = field as TextField;
+
+          for (const widget of textField.getWidgets()) {
+            // Extract existing styling before regenerating
+            // This preserves colors, fonts, borders from the original appearance
+            const existingAppearance = await widget.getNormalAppearance();
+            const existingStyle = existingAppearance
+              ? await extractAppearanceStyle(existingAppearance)
+              : undefined;
+
+            const stream = generator.generateTextAppearance(textField, widget, existingStyle);
+            widget.setNormalAppearance(stream);
+          }
+
+          break;
+        }
+
+        case "checkbox": {
+          const checkboxField = field as CheckboxField;
+
+          for (const widget of checkboxField.getWidgets()) {
+            const onValue = widget.getOnValue() ?? "Yes";
+
+            // Skip if all state appearances exist and not forcing regeneration
+            // Existing appearances are usually better than generated ones
+            if (!forceRegen && widget.hasAppearancesForStates([onValue, "Off"])) {
+              continue;
+            }
+
+            const { on, off } = generator.generateCheckboxAppearance(
+              checkboxField,
+              widget,
+              onValue,
+            );
+            widget.setNormalAppearance(on, onValue);
+            widget.setNormalAppearance(off, "Off");
+          }
+
+          break;
+        }
+
+        case "radio": {
+          const radioField = field as RadioField;
+
+          for (const widget of radioField.getWidgets()) {
+            const value = widget.getOnValue() ?? "Choice";
+
+            // Skip if all state appearances exist and not forcing regeneration
+            if (!forceRegen && widget.hasAppearancesForStates([value, "Off"])) {
+              continue;
+            }
+
+            const { selected, off } = generator.generateRadioAppearance(radioField, widget, value);
+            widget.setNormalAppearance(selected, value);
+            widget.setNormalAppearance(off, "Off");
+          }
+
+          break;
+        }
+
+        case "dropdown": {
+          const dropdownField = field as DropdownField;
+
+          for (const widget of dropdownField.getWidgets()) {
+            // Skip if appearance exists and not forcing regeneration
+            if (!forceRegen && widget.hasNormalAppearance()) {
+              continue;
+            }
+
+            const stream = generator.generateDropdownAppearance(dropdownField, widget);
+            widget.setNormalAppearance(stream);
+          }
+
+          break;
+        }
+
+        case "listbox": {
+          const listboxField = field as ListBoxField;
+
+          for (const widget of listboxField.getWidgets()) {
+            // Skip if appearance exists and not forcing regeneration
+            if (!forceRegen && widget.hasNormalAppearance()) {
+              continue;
+            }
+
+            const stream = generator.generateListBoxAppearance(listboxField, widget);
+            widget.setNormalAppearance(stream);
+          }
+
+          break;
+        }
+
+        case "button": {
+          // NEVER regenerate button appearances - they have custom artwork
+          // that we cannot faithfully reproduce. Button appearances are
+          // created by the PDF author and should be preserved.
+          break;
+        }
+      }
 
       field.needsAppearanceUpdate = false;
     }
@@ -253,8 +621,8 @@ export class AcroForm implements AcroFormLike {
     kids: PdfArray,
     visited: Set<string>,
     parentName: string,
-  ): Promise<FormField[]> {
-    const fields: FormField[] = [];
+  ): Promise<TerminalField[]> {
+    const fields: TerminalField[] = [];
 
     for (let i = 0; i < kids.length; i++) {
       const item = kids.at(i);
@@ -262,7 +630,6 @@ export class AcroForm implements AcroFormLike {
       const refKey = ref ? `${ref.objectNumber} ${ref.generation}` : "";
 
       // Detect circular references
-
       if (refKey && visited.has(refKey)) {
         this.registry.addWarning(`Circular reference in form field tree: ${refKey}`);
         continue;
@@ -301,6 +668,9 @@ export class AcroForm implements AcroFormLike {
 
       if (await this.isTerminalField(dict)) {
         const field = createFormField(dict, ref, this.registry, this, fullName);
+
+        await field.resolveWidgets();
+
         fields.push(field);
       } else {
         // Non-terminal: recurse into children
@@ -379,24 +749,55 @@ export class AcroForm implements AcroFormLike {
    * @param options Flattening options
    */
   async flatten(options: FlattenOptions = {}): Promise<void> {
-    // Ensure appearances are up-to-date
+    // Apply font/size options if provided
+    if (options.font || options.fontSize !== undefined) {
+      const fields = await this.getFields();
 
+      for (const field of fields) {
+        // Skip read-only fields - they keep their existing appearance
+        if (field.isReadOnly()) {
+          continue;
+        }
+
+        if (options.font) {
+          field.setFont(options.font);
+        }
+
+        if (options.fontSize !== undefined) {
+          field.setFontSize(options.fontSize);
+        }
+      }
+    }
+
+    // Ensure appearances are up-to-date
     if (!options.skipAppearanceUpdate) {
-      await this.updateAppearances();
+      await this.updateAppearances({
+        forceRegenerate: options.regenerateAppearances,
+      });
     }
 
     // Collect widgets grouped by page
     const pageWidgets = await this.collectWidgetsByPage();
 
     // Process each page
-
-    for (const [, { pageRef, widgets }] of pageWidgets) {
+    for (const { pageRef, widgets } of pageWidgets.values()) {
       await this.flattenWidgetsOnPage(pageRef, widgets);
     }
 
     // Clear form structure
     this.dict.set("Fields", new PdfArray([]));
     this.dict.delete("NeedAppearances");
+
+    // Remove XFA for hybrid forms (per PDFBox)
+    // If we flatten a hybrid PDF but leave XFA, viewers might still try to
+    // render the XFA (which would now be invalid/disconnected from the flattened fields)
+    this.dict.delete("XFA");
+
+    // Remove SigFlags if no signatures remain (per PDFBox)
+    // After flattening, signature fields are gone, so the flags are meaningless
+    if (!this.hasSignatures) {
+      this.dict.delete("SigFlags");
+    }
 
     // Clear field cache
     this.fieldsCache = null;
@@ -412,11 +813,11 @@ export class AcroForm implements AcroFormLike {
     const fields = await this.getFields();
 
     for (const field of fields) {
+      // Widgets are pre-resolved during field creation (resolveWidgets)
       for (const widget of field.getWidgets()) {
         let pageRef = widget.pageRef;
 
         // If widget doesn't have /P, try to find its page
-
         if (!pageRef) {
           pageRef = await this.findPageForWidget(widget);
         }
@@ -444,14 +845,21 @@ export class AcroForm implements AcroFormLike {
   /**
    * Find the page containing a widget by scanning page /Annots arrays.
    * This is expensive but needed for widgets without /P.
+   *
+   * Uses the PageTree if available for efficient page iteration.
    */
   private async findPageForWidget(widget: WidgetAnnotation): Promise<PdfRef | null> {
     if (!widget.ref) {
       return null;
     }
 
-    // Walk from catalog to find all pages
-    const pageRefs = await this.collectAllPageRefs();
+    // Use the page tree if available
+    if (!this.pageTree) {
+      this.registry.addWarning("No page tree available; cannot find page for widget without /P");
+      return null;
+    }
+
+    const pageRefs = this.pageTree.getPages();
 
     for (const pageRef of pageRefs) {
       const pageDict = await this.registry.resolve(pageRef);
@@ -468,8 +876,8 @@ export class AcroForm implements AcroFormLike {
 
       for (let i = 0; i < annots.length; i++) {
         const annotRef = annots.at(i);
-        // PdfRefs are interned, so we can compare with ===
 
+        // PdfRefs are interned, so we can compare with ===
         if (annotRef instanceof PdfRef && annotRef === widget.ref) {
           return pageRef;
         }
@@ -480,106 +888,13 @@ export class AcroForm implements AcroFormLike {
   }
 
   /**
-   * Collect all page references by walking the page tree from catalog.
-   */
-  private async collectAllPageRefs(): Promise<PdfRef[]> {
-    const pageRefs: PdfRef[] = [];
-    const visited = new Set<string>();
-
-    // Get catalog from the AcroForm's parent - we need to find /Pages
-    // The AcroForm dict is under the catalog, so we can try to find the catalog
-    // via the registry by looking for a dict with /Pages
-
-    // Walk from form's /Fields to find any field's page, then get catalog
-    const fields = await this.getFields();
-
-    if (fields.length === 0) {
-      return [];
-    }
-
-    // Try to find a widget with /P to get the catalog
-
-    for (const field of fields) {
-      for (const widget of field.getWidgets()) {
-        const pageRef = widget.pageRef;
-
-        if (pageRef) {
-          const pageDict = await this.registry.resolve(pageRef);
-
-          if (pageDict instanceof PdfDict) {
-            // Found a page - walk up to find the root Pages
-            let parent = pageDict.get("Parent");
-
-            while (parent instanceof PdfRef) {
-              const parentDict = await this.registry.resolve(parent);
-
-              if (!(parentDict instanceof PdfDict)) {
-                break;
-              }
-
-              // Check if this is the root Pages
-              const kids = parentDict.getArray("Kids");
-
-              if (kids) {
-                // Walk all kids to collect page refs
-                await this.walkPageTree(parent, pageRefs, visited);
-
-                return pageRefs;
-              }
-
-              parent = parentDict.get("Parent");
-            }
-          }
-        }
-      }
-    }
-
-    return pageRefs;
-  }
-
-  /**
-   * Recursively walk page tree to collect page refs.
-   */
-  private async walkPageTree(
-    nodeRef: PdfRef,
-    pageRefs: PdfRef[],
-    visited: Set<string>,
-  ): Promise<void> {
-    const key = `${nodeRef.objectNumber} ${nodeRef.generation}`;
-
-    if (visited.has(key)) {
-      return;
-    }
-
-    visited.add(key);
-
-    const node = await this.registry.resolve(nodeRef);
-
-    if (!(node instanceof PdfDict)) {
-      return;
-    }
-
-    const type = node.getName("Type")?.value;
-
-    if (type === "Page") {
-      pageRefs.push(nodeRef);
-    } else if (type === "Pages") {
-      const kids = node.getArray("Kids");
-
-      if (kids) {
-        for (let i = 0; i < kids.length; i++) {
-          const kid = kids.at(i);
-
-          if (kid instanceof PdfRef) {
-            await this.walkPageTree(kid, pageRefs, visited);
-          }
-        }
-      }
-    }
-  }
-
-  /**
    * Flatten widgets on a single page.
+   *
+   * Following PDFBox's approach, we:
+   * 1. Wrap the existing page content in q...Q (save/restore graphics state)
+   * 2. Append our flattened content after the Q
+   *
+   * This isolates the original page's graphics state from our flattened fields.
    */
   private async flattenWidgetsOnPage(pageRef: PdfRef, widgets: WidgetAnnotation[]): Promise<void> {
     const pageDict = await this.registry.resolve(pageRef);
@@ -607,10 +922,10 @@ export class AcroForm implements AcroFormLike {
     const content = new ContentStreamBuilder();
     const widgetRefs = new Set<string>();
     let xObjectIndex = 0;
+    let hasVisibleWidgets = false;
 
     for (const widget of widgets) {
       // Skip hidden widgets
-
       if (this.isWidgetHidden(widget)) {
         continue;
       }
@@ -620,6 +935,11 @@ export class AcroForm implements AcroFormLike {
 
       if (!appearance) {
         this.registry.addWarning("Widget without appearance stream skipped during flatten");
+        continue;
+      }
+
+      // Check appearance stream has valid BBox dimensions
+      if (!this.isVisibleAppearance(appearance)) {
         continue;
       }
 
@@ -644,28 +964,110 @@ export class AcroForm implements AcroFormLike {
         popGraphicsState(),
       );
 
-      // Track widget ref for removal
+      hasVisibleWidgets = true;
 
+      // Track widget ref for removal
       if (widget.ref) {
         widgetRefs.add(`${widget.ref.objectNumber} ${widget.ref.generation}`);
       }
     }
 
-    // Append content to page
-
-    if (!content.isEmpty()) {
-      this.appendToPageContent(pageDict, content.toBytes());
+    // Wrap existing content and append flattened content
+    if (hasVisibleWidgets && !content.isEmpty()) {
+      this.wrapAndAppendContent(pageDict, content.toBytes());
     }
 
     // Remove widget annotations from page
-    this.removeAnnotations(pageDict, widgetRefs);
+    await this.removeAnnotations(pageDict, widgetRefs);
+  }
+
+  /**
+   * Check if appearance stream has valid dimensions.
+   * Per PDFBox: BBox must exist and have width/height > 0.
+   */
+  private isVisibleAppearance(appearance: PdfStream): boolean {
+    const bbox = appearance.getArray("BBox");
+
+    if (!bbox || bbox.length < 4) {
+      return false;
+    }
+
+    const x1 = (bbox.at(0) as PdfNumber | undefined)?.value ?? 0;
+    const y1 = (bbox.at(1) as PdfNumber | undefined)?.value ?? 0;
+    const x2 = (bbox.at(2) as PdfNumber | undefined)?.value ?? 0;
+    const y2 = (bbox.at(3) as PdfNumber | undefined)?.value ?? 0;
+
+    const width = Math.abs(x2 - x1);
+    const height = Math.abs(y2 - y1);
+
+    return width > 0 && height > 0;
+  }
+
+  /**
+   * Wrap existing page content in q...Q and append new content.
+   *
+   * Following PDFBox's approach:
+   * - Prepend "q\n" to the existing content streams
+   * - Append "Q\n" + new content after
+   *
+   * This isolates the original page's graphics state from our additions.
+   */
+  private wrapAndAppendContent(page: PdfDict, newContent: Uint8Array): void {
+    const existing = page.get("Contents");
+
+    // Create prefix stream with "q\n"
+    const prefixBytes = new Uint8Array([0x71, 0x0a]); // "q\n"
+    const prefixStream = new PdfStream(new PdfDict(), prefixBytes);
+    const prefixRef = this.registry.register(prefixStream);
+
+    // Create suffix stream with "Q\n" + new content
+    const suffixBytes = new Uint8Array(2 + newContent.length);
+    suffixBytes[0] = 0x51; // "Q"
+    suffixBytes[1] = 0x0a; // "\n"
+    suffixBytes.set(newContent, 2);
+    const suffixStream = new PdfStream(new PdfDict(), suffixBytes);
+    const suffixRef = this.registry.register(suffixStream);
+
+    if (!existing) {
+      // No existing content - just add our content (no wrapping needed)
+      page.set("Contents", suffixRef);
+    } else if (existing instanceof PdfArray) {
+      // Array of content streams
+      // Insert prefix at start, suffix at end
+      const newArray = PdfArray.of(prefixRef, ...this.getArrayItems(existing), suffixRef);
+      page.set("Contents", newArray);
+    } else {
+      // Single stream or ref - convert to array with prefix and suffix
+      page.set("Contents", PdfArray.of(prefixRef, existing, suffixRef));
+    }
+  }
+
+  /**
+   * Get all items from a PdfArray.
+   */
+  private getArrayItems(arr: PdfArray): PdfRef[] {
+    const items: PdfRef[] = [];
+
+    for (let i = 0; i < arr.length; i++) {
+      const item = arr.at(i);
+
+      if (item instanceof PdfRef) {
+        items.push(item);
+      }
+    }
+
+    return items;
   }
 
   /**
    * Calculate transformation matrix to position appearance in widget rect.
    *
-   * The appearance stream has a BBox defining its coordinate system.
-   * We transform this to fit in the widget's Rect on the page.
+   * This follows PDFBox's approach:
+   * 1. The appearance stream may have its own Matrix (handling rotation)
+   * 2. We transform the BBox by the appearance Matrix to get "real" bounds
+   * 3. We calculate a simple translate+scale to fit in the annotation rect
+   *
+   * Rotation is handled by the appearance stream's Matrix, NOT by this transform.
    */
   private calculateTransformMatrix(
     widget: WidgetAnnotation,
@@ -676,61 +1078,94 @@ export class AcroForm implements AcroFormLike {
     const rectWidth = rx2 - rx1;
     const rectHeight = ry2 - ry1;
 
-    // Appearance BBox
+    // Get the transformed appearance bounding box
+    // This accounts for any Matrix in the appearance stream
+    const transformedBBox = this.getTransformedAppearanceBBox(appearance);
+
+    // Calculate simple translate + scale (no rotation - that's in appearance Matrix)
+    const scaleX = transformedBBox.width !== 0 ? rectWidth / transformedBBox.width : 1;
+    const scaleY = transformedBBox.height !== 0 ? rectHeight / transformedBBox.height : 1;
+
+    // Translate to annotation position, accounting for BBox origin
+    const translateX = rx1 - transformedBBox.x * scaleX;
+    const translateY = ry1 - transformedBBox.y * scaleY;
+
+    return {
+      a: scaleX,
+      b: 0,
+      c: 0,
+      d: scaleY,
+      e: translateX,
+      f: translateY,
+    };
+  }
+
+  /**
+   * Get the appearance BBox transformed by the appearance's Matrix.
+   *
+   * The appearance stream may have a Matrix that transforms its coordinate
+   * system (e.g., for rotation). We need to transform the BBox corners
+   * by this matrix to get the "real" bounding box.
+   */
+  private getTransformedAppearanceBBox(appearance: PdfStream): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } {
     const bbox = this.getAppearanceBBox(appearance);
     const [bx1, by1, bx2, by2] = bbox;
-    const bboxWidth = bx2 - bx1;
-    const bboxHeight = by2 - by1;
 
-    // Get rotation from widget's MK dictionary
-    const mk = widget.getAppearanceCharacteristics();
-    const rotation = mk?.rotation ?? 0;
+    // Get the appearance's Matrix (if any)
+    const matrixArray = appearance.getArray("Matrix");
 
-    // Calculate scale factors
-    let scaleX = bboxWidth !== 0 ? rectWidth / bboxWidth : 1;
-    let scaleY = bboxHeight !== 0 ? rectHeight / bboxHeight : 1;
-
-    // Apply rotation
-    let a: number, b: number, c: number, d: number, e: number, f: number;
-
-    switch (rotation) {
-      case 90:
-        // Swap scale factors for 90° rotation
-        [scaleX, scaleY] = [rectWidth / bboxHeight || 1, rectHeight / bboxWidth || 1];
-        a = 0;
-        b = scaleY;
-        c = -scaleX;
-        d = 0;
-        e = rx1 + rectWidth;
-        f = ry1;
-        break;
-      case 180:
-        a = -scaleX;
-        b = 0;
-        c = 0;
-        d = -scaleY;
-        e = rx2;
-        f = ry2;
-        break;
-      case 270:
-        [scaleX, scaleY] = [rectWidth / bboxHeight || 1, rectHeight / bboxWidth || 1];
-        a = 0;
-        b = -scaleY;
-        c = scaleX;
-        d = 0;
-        e = rx1;
-        f = ry1 + rectHeight;
-        break;
-      default: // 0
-        a = scaleX;
-        b = 0;
-        c = 0;
-        d = scaleY;
-        e = rx1 - bx1 * scaleX;
-        f = ry1 - by1 * scaleY;
+    if (!matrixArray || matrixArray.length < 6) {
+      // No matrix - return BBox as-is
+      return {
+        x: bx1,
+        y: by1,
+        width: bx2 - bx1,
+        height: by2 - by1,
+      };
     }
 
-    return { a, b, c, d, e, f };
+    // Extract matrix components [a, b, c, d, e, f]
+    const a = (matrixArray.at(0) as PdfNumber | undefined)?.value ?? 1;
+    const b = (matrixArray.at(1) as PdfNumber | undefined)?.value ?? 0;
+    const c = (matrixArray.at(2) as PdfNumber | undefined)?.value ?? 0;
+    const d = (matrixArray.at(3) as PdfNumber | undefined)?.value ?? 1;
+    const e = (matrixArray.at(4) as PdfNumber | undefined)?.value ?? 0;
+    const f = (matrixArray.at(5) as PdfNumber | undefined)?.value ?? 0;
+
+    // Transform all four corners of the BBox
+    // x' = a*x + c*y + e
+    // y' = b*x + d*y + f
+    const corners = [
+      { x: bx1, y: by1 }, // bottom-left
+      { x: bx2, y: by1 }, // bottom-right
+      { x: bx2, y: by2 }, // top-right
+      { x: bx1, y: by2 }, // top-left
+    ];
+
+    const transformed = corners.map(({ x, y }) => ({
+      x: a * x + c * y + e,
+      y: b * x + d * y + f,
+    }));
+
+    // Find the bounding box of transformed corners
+    const xs = transformed.map(p => p.x);
+    const ys = transformed.map(p => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
   }
 
   /**
@@ -753,37 +1188,32 @@ export class AcroForm implements AcroFormLike {
   }
 
   /**
-   * Append content to page's content stream(s).
-   */
-  private appendToPageContent(page: PdfDict, content: Uint8Array): void {
-    const newStream = new PdfStream(new PdfDict(), content);
-    const newRef = this.registry.register(newStream);
-
-    const existing = page.get("Contents");
-
-    if (!existing) {
-      // No existing content
-      page.set("Contents", newRef);
-    } else if (existing instanceof PdfArray) {
-      // Array of content streams - append
-      existing.push(newRef);
-    } else {
-      // Single stream or ref - convert to array
-      page.set("Contents", PdfArray.of(existing, newRef));
-    }
-  }
-
-  /**
    * Remove specific annotations from page.
    */
-  private removeAnnotations(page: PdfDict, toRemove: Set<string>): void {
-    const annots = page.getArray("Annots");
+  private async removeAnnotations(page: PdfDict, toRemove: Set<string>): Promise<void> {
+    // Get Annots - may be direct array or a reference to an array
+    const annotsEntry = page.get("Annots");
+
+    if (!annotsEntry) {
+      return;
+    }
+
+    let annots: PdfArray | null = null;
+
+    if (annotsEntry instanceof PdfArray) {
+      annots = annotsEntry;
+    } else if (annotsEntry instanceof PdfRef) {
+      const resolved = await this.registry.resolve(annotsEntry);
+      if (resolved instanceof PdfArray) {
+        annots = resolved;
+      }
+    }
 
     if (!annots) {
       return;
     }
 
-    const remaining: (typeof annots extends PdfArray ? ReturnType<typeof annots.at> : never)[] = [];
+    const remaining: PdfRef[] = [];
 
     for (let i = 0; i < annots.length; i++) {
       const item = annots.at(i);
@@ -794,15 +1224,14 @@ export class AcroForm implements AcroFormLike {
         if (!toRemove.has(key)) {
           remaining.push(item);
         }
-      } else if (item) {
-        remaining.push(item); // Keep non-ref items
       }
     }
 
     if (remaining.length === 0) {
       page.delete("Annots");
     } else if (remaining.length < annots.length) {
-      page.set("Annots", PdfArray.of(...(remaining as PdfRef[])));
+      // Replace the Annots entry with the filtered array
+      page.set("Annots", PdfArray.of(...remaining));
     }
   }
 
@@ -849,6 +1278,23 @@ export class AcroForm implements AcroFormLike {
 export interface FlattenOptions {
   /** Skip appearance update (use if appearances are known good) */
   skipAppearanceUpdate?: boolean;
+
+  /**
+   * Force regeneration of all appearances even if they already exist.
+   *
+   * By default, existing appearances are preserved to maintain styling
+   * (backgrounds, borders, rotation) that the generator cannot reproduce.
+   * Set this to true to always use generated appearances with new values.
+   *
+   * Note: Generated appearances may lack custom styling from the original PDF.
+   */
+  regenerateAppearances?: boolean;
+
+  /** Font to use when regenerating appearances */
+  font?: FormFont;
+
+  /** Font size to use (0 = auto) */
+  fontSize?: number;
 }
 
 /**

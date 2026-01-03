@@ -39,6 +39,14 @@ export class PDFCatalog {
   }
 
   /**
+   * Remove the /AcroForm entry from the catalog.
+   * Called after form flattening to fully remove form interactivity.
+   */
+  removeAcroForm(): void {
+    this.dict.delete("AcroForm");
+  }
+
+  /**
    * Get the /Names dictionary.
    */
   async getNames(): Promise<PdfDict | null> {

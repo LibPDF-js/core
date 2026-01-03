@@ -136,6 +136,9 @@ export class PDF {
   /** Whether this document is linearized */
   readonly isLinearized: boolean;
 
+  /** Whether the original document uses XRef streams (PDF 1.5+) */
+  readonly usesXRefStreams: boolean;
+
   /** Warnings from parsing and operations */
   get warnings(): string[] {
     return this.registry.warnings;
@@ -151,6 +154,7 @@ export class PDF {
     options: {
       recoveredViaBruteForce: boolean;
       isLinearized: boolean;
+      usesXRefStreams: boolean;
     },
   ) {
     this.parsed = parsed;
@@ -161,6 +165,7 @@ export class PDF {
     this._catalog = catalog;
     this.recoveredViaBruteForce = options.recoveredViaBruteForce;
     this.isLinearized = options.isLinearized;
+    this.usesXRefStreams = options.usesXRefStreams;
 
     // Set up resolver so registry can fetch objects on demand
     this.registry.setResolver(ref => this.parsed.getObject(ref));
@@ -200,12 +205,16 @@ export class PDF {
       // Ignore errors during linearization detection
     }
 
-    // Find original xref offset
+    // Find original xref offset and detect format
     const xrefParser = new XRefParser(scanner);
     let originalXRefOffset: number;
+    let usesXRefStreams = false;
 
     try {
       originalXRefOffset = xrefParser.findStartXRef();
+      // Detect if the original uses XRef streams
+      const format = xrefParser.detectXRefFormat(originalXRefOffset);
+      usesXRefStreams = format === true;
     } catch {
       originalXRefOffset = 0;
     }
@@ -234,6 +243,7 @@ export class PDF {
     return new PDF(parsed, registry, bytes, originalXRefOffset, pages, pdfCatalog, {
       recoveredViaBruteForce: parsed.recoveredViaBruteForce,
       isLinearized,
+      usesXRefStreams,
     });
   }
 
@@ -714,7 +724,7 @@ export class PDF {
    */
   async getForm(): Promise<PDFForm | null> {
     if (this._form === undefined) {
-      this._form = await PDFForm.load(this.registry, this._catalog);
+      this._form = await PDFForm.load(this.registry, this._catalog, this._pages);
     }
 
     return this._form;
@@ -788,7 +798,9 @@ export class PDF {
     const info = this.parsed.trailer.getRef("Info");
 
     // TODO: Handle encryption, ID arrays properly
-    const useXRefStream = options.useXRefStream;
+    // For incremental saves, use the same XRef format as the original document
+    // unless explicitly overridden by the caller
+    const useXRefStream = options.useXRefStream ?? (useIncremental ? this.usesXRefStreams : false);
 
     if (useIncremental) {
       const result = await writeIncremental(this.registry, {
