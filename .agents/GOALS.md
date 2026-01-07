@@ -10,11 +10,11 @@ This document captures the high-level goals for @libpdf/core. Use this to steer 
 - [ ] **Encrypt on save** — Apply encryption when writing PDFs (encryption logic done, needs writer)
 
 ### 2. Digital Signatures
-- [ ] **Add digital signatures** — Sign PDFs with certificates
+- [x] **Add digital signatures** — Sign PDFs with certificates (P12, CryptoKey signers)
 - [ ] **Verify signatures** — Validate existing signatures
-- [ ] **LTV (Long-Term Validation)** — Embed CRLs, OCSP responses for long-term validity
-- [ ] **DSS (Document Security Store)** — Full DSS support for archival signatures
-- [ ] **PAdES compliance** — Support PAdES-B, PAdES-T, PAdES-LT, PAdES-LTA profiles
+- [x] **LTV (Long-Term Validation)** — Embed CRLs, OCSP responses for long-term validity
+- [x] **DSS (Document Security Store)** — Full DSS support for archival signatures
+- [x] **PAdES compliance** — Support PAdES B-B, B-T, B-LT, B-LTA profiles
 
 ### 3. Modification
 - [x] **Add/remove pages** — Insert, delete, reorder pages
@@ -71,7 +71,7 @@ These enable most other features:
 ### Tier 2: High Value
 Most commonly requested features:
 1. **Form Filling** — Very common use case ✓
-2. **Digital Signatures** — Enterprise requirement
+2. **Digital Signatures** — Enterprise requirement ✓ (signing done, verification pending)
 3. **Merge/Split** — Common document workflows ✓
 4. **Attachments** — Common for invoices, contracts ✓
 5. **Layer Flattening** — Required before signing (security)

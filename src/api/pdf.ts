@@ -6,7 +6,6 @@
  */
 
 import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/types";
-
 import { hasChanges } from "#src/document/change-collector";
 import { isLinearizationDict } from "#src/document/linearization";
 import { ObjectCopier } from "#src/document/object-copier";
@@ -15,6 +14,8 @@ import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { resolvePageSize } from "#src/helpers/page-size";
 import { checkIncrementalSaveBlocker, type IncrementalSaveBlocker } from "#src/helpers/save-utils";
 import { Scanner } from "#src/io/scanner";
+import * as LayerUtils from "#src/layers/index";
+import type { FlattenLayersResult, LayerInfo } from "#src/layers/types";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
@@ -1212,6 +1213,83 @@ export class PDF {
     const signature = new PDFSignature(this);
 
     return signature.sign(options);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Layers (Optional Content Groups)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Check if the document contains Optional Content Groups (layers).
+   *
+   * Performs a thorough check that verifies OCProperties exists and
+   * contains at least one valid OCG entry.
+   *
+   * @returns true if document has layers
+   *
+   * @example
+   * ```typescript
+   * if (await pdf.hasLayers()) {
+   *   console.log("Document has layers");
+   *   await pdf.removeLayers();
+   * }
+   * ```
+   */
+  async hasLayers(): Promise<boolean> {
+    return LayerUtils.hasLayers(this.ctx);
+  }
+
+  /**
+   * Get information about all layers in the document.
+   *
+   * Returns layer metadata including name, visibility state,
+   * intent, and locked status based on the default configuration.
+   *
+   * @returns Array of layer information
+   *
+   * @example
+   * ```typescript
+   * const layers = await pdf.getLayers();
+   * for (const layer of layers) {
+   *   console.log(`${layer.name}: visible=${layer.visible}, locked=${layer.locked}`);
+   * }
+   * ```
+   */
+  async getLayers(): Promise<LayerInfo[]> {
+    return LayerUtils.getLayers(this.ctx);
+  }
+
+  /**
+   * Flatten all Optional Content Groups (layers) in the document.
+   *
+   * This removes the OCProperties dictionary from the catalog, which:
+   * - Makes ALL layer content unconditionally visible (nothing is deleted)
+   * - Removes the layer panel/toggle UI from PDF viewers
+   * - Content that was in "OFF" layers becomes visible
+   * - Content that was in "ON" layers remains visible
+   *
+   * Use this before signing to prevent "hidden content" attacks where
+   * malicious content is placed in an OFF layer, signed, then revealed
+   * by toggling the layer back on.
+   *
+   * Note: This does NOT modify page content streams - the BDC/EMC marked
+   * content operators remain but are ignored since OCProperties is gone.
+   * The visual result is identical to having all layers turned ON.
+   *
+   * @returns Statistics about the flattening operation
+   *
+   * @example
+   * ```typescript
+   * // Security workflow before signing
+   * if (await pdf.hasLayers()) {
+   *   const result = await pdf.flattenLayers();
+   *   console.log(`Flattened ${result.layerCount} layers`);
+   * }
+   * await pdf.sign({ signer });
+   * ```
+   */
+  async flattenLayers(): Promise<FlattenLayersResult> {
+    return LayerUtils.flattenLayers(this.ctx);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

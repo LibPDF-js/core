@@ -9,27 +9,7 @@
  */
 
 import { sha1 } from "@noble/hashes/legacy.js";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper Functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Concatenate multiple Uint8Arrays into one */
-function concat(...arrays: Uint8Array[]): Uint8Array {
-  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
-
-  const result = new Uint8Array(totalLength);
-
-  let offset = 0;
-
-  for (const arr of arrays) {
-    result.set(arr, offset);
-
-    offset += arr.length;
-  }
-
-  return result;
-}
+import { concatBytes } from "#src/helpers/buffer";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
@@ -94,7 +74,7 @@ export class PKCS12KDF {
     }
 
     // Step 4: I = S || P
-    const I = concat(S, P);
+    const I = concatBytes([S, P]);
 
     // Step 5-7: Generate key material
     const result = new Uint8Array(length);
@@ -102,7 +82,7 @@ export class PKCS12KDF {
 
     while (offset < length) {
       // Step 6a: Hash D || I
-      let A = sha1(concat(D, I));
+      let A = sha1(concatBytes([D, I]));
 
       // Step 6b: Iterate hash
       for (let i = 1; i < iterations; i++) {

@@ -1,0 +1,48 @@
+%PDF-1.5
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [4 0 R 6 0 R 7 0 R] /D << /BaseState /ON /OFF [6 0 R] /Locked [7 0 R] >> >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Properties << /MC0 4 0 R /MC1 6 0 R /MC2 7 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /OCG /Name (Background) /Intent /View >>
+endobj
+5 0 obj
+<< /Length 172 >>
+stream
+/OC /MC0 BDC
+BT /F1 12 Tf 100 700 Td (Background) Tj ET
+EMC
+/OC /MC1 BDC
+BT /F1 12 Tf 100 650 Td (Hidden) Tj ET
+EMC
+/OC /MC2 BDC
+BT /F1 12 Tf 100 600 Td (Locked) Tj ET
+EMC
+endstream
+endobj
+6 0 obj
+<< /Type /OCG /Name (Hidden Layer) >>
+endobj
+7 0 obj
+<< /Type /OCG /Name (Locked Layer) /Intent /Design >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000158 00000 n 
+0000000215 00000 n 
+0000000382 00000 n 
+0000000447 00000 n 
+0000000700 00000 n 
+0000000754 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+818
+%%EOF

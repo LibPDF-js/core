@@ -1,23 +1,7 @@
+import { concatBytes } from "#src/helpers/buffer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 import { applyPredictor } from "./predictor";
-
-/**
- * Concatenate multiple Uint8Arrays into one.
- */
-function concat(chunks: Uint8Array[]): Uint8Array {
-  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
-
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return result;
-}
 
 /**
  * Check if native DecompressionStream is available.
@@ -118,7 +102,7 @@ export class FlateFilter implements Filter {
       chunks.push(value);
     }
 
-    return concat(chunks);
+    return concatBytes(chunks);
   }
 
   /**

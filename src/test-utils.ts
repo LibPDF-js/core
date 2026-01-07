@@ -28,6 +28,7 @@ export type FixtureCategory =
   | "filter"
   | "fonts"
   | "forms"
+  | "layers"
   | "malformed"
   | "text"
   | "xref";

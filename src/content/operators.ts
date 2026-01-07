@@ -15,6 +15,7 @@
  * This module provides type-safe creation and serialization of operators.
  */
 
+import { concatBytes } from "#src/helpers/buffer";
 import { formatPdfNumber } from "#src/helpers/format";
 import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfArray } from "#src/objects/pdf-array";
@@ -25,26 +26,8 @@ import type { PdfString } from "#src/objects/pdf-string";
 /** Valid operand types */
 export type Operand = number | string | PdfName | PdfString | PdfArray | PdfDict;
 
-/**
- * Format an operand for content stream output.
- */
-function formatOperand(operand: Operand): string {
-  if (typeof operand === "number") {
-    return formatPdfNumber(operand);
-  }
-
-  if (typeof operand === "string") {
-    // Assume already formatted (e.g., "/FontName")
-    return operand;
-  }
-
-  // PdfName, PdfString, PdfArray, PdfDict all have toBytes()
-  // We serialize them to get the string representation
-  const writer = new ByteWriter();
-  operand.toBytes(writer);
-
-  return new TextDecoder().decode(writer.toBytes());
-}
+const encoder = new TextEncoder();
+const SPACE = 0x20;
 
 /** All PDF content stream operator names */
 export const Op = {
@@ -162,23 +145,58 @@ export class Operator {
   }
 
   /**
-   * Serialize to PDF content stream syntax.
+   * Serialize to bytes for content stream output.
+   * Format: "operand1 operand2 ... operator"
+   */
+  toBytes(): Uint8Array {
+    if (this.operands.length === 0) {
+      return encoder.encode(this.op);
+    }
+
+    const parts: Uint8Array[] = [];
+
+    for (const operand of this.operands) {
+      parts.push(serializeOperand(operand));
+      parts.push(new Uint8Array([SPACE]));
+    }
+
+    parts.push(encoder.encode(this.op));
+
+    return concatBytes(parts);
+  }
+
+  /**
+   * Serialize to PDF content stream syntax string.
    * Format: "operand1 operand2 ... operator"
    */
   toString(): string {
-    if (this.operands.length === 0) {
-      return this.op;
-    }
-
-    const parts = this.operands.map(formatOperand);
-    parts.push(this.op);
-    return parts.join(" ");
+    return new TextDecoder().decode(this.toBytes());
   }
 
   /**
    * Get byte length when serialized (for pre-allocation).
    */
   byteLength(): number {
-    return this.toString().length;
+    return this.toBytes().length;
   }
+}
+
+/**
+ * Serialize an operand to bytes.
+ */
+function serializeOperand(operand: Operand): Uint8Array {
+  if (typeof operand === "number") {
+    return encoder.encode(formatPdfNumber(operand));
+  }
+
+  if (typeof operand === "string") {
+    // Assume already formatted (e.g., "/FontName")
+    return encoder.encode(operand);
+  }
+
+  // PdfName, PdfString, PdfArray, PdfDict all have toBytes()
+  const writer = new ByteWriter();
+  operand.toBytes(writer);
+
+  return writer.toBytes();
 }

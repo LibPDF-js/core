@@ -40,6 +40,12 @@ export type {
 export type { FlattenOptions } from "./document/forms/form-flattener";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Layers (Optional Content Groups)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type { FlattenLayersResult, LayerInfo } from "./layers/types";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Digital Signatures
 // ─────────────────────────────────────────────────────────────────────────────
 

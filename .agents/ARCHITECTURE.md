@@ -7,10 +7,13 @@ This document outlines the architecture of @libpdf/core. It's a living document 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      High-Level API                             │
-│           (PDF, PDFPage, PDFForm, PDFAttachments)               │
+│        (PDF, PDFPage, PDFForm, PDFAttachments, PDFSignature)    │
 ├─────────────────────────────────────────────────────────────────┤
 │                     Document Layer                              │
 │    (ObjectRegistry, ObjectCopier, AcroForm, ChangeCollector)    │
+├─────────────────────────────────────────────────────────────────┤
+│                     Signatures Layer                            │
+│  (Signers, CMS Formats, Timestamp, Revocation, DSS, Placeholder)│
 ├─────────────────────────────────────────────────────────────────┤
 │                       Fonts Layer                               │
 │    (FontFactory, FontEmbedder, SimpleFont, CompositeFont)       │
@@ -504,6 +507,88 @@ Handles PDF encryption and decryption for the Standard security handler.
 
 ---
 
+## Signatures Layer (`src/signatures/`)
+
+PDF digital signature creation with PAdES compliance.
+
+### High-Level API
+
+```typescript
+import { PDF } from "@libpdf/core";
+
+const pdf = await PDF.load(bytes);
+
+// Basic signing (B-B level)
+const signed = await pdf.sign({
+  signer: await P12Signer.create(p12Bytes, "password"),
+  reason: "I approve this document",
+});
+
+// With timestamp (B-T level)
+const signed = await pdf.sign({
+  signer,
+  timestampAuthority: new HttpTimestampAuthority("http://tsa.example.com"),
+});
+
+// Long-term archival (B-LTA level)
+const signed = await pdf.sign({
+  signer,
+  level: "B-LTA",
+  timestampAuthority,
+});
+
+// Multiple signatures (each returns new bytes)
+let bytes = await pdf.sign({ signer: signer1, fieldName: "Author" });
+bytes = await (await PDF.load(bytes)).sign({ signer: signer2, fieldName: "Reviewer" });
+```
+
+### Signers (`src/signatures/signers/`)
+
+| Component | Purpose |
+|-----------|---------|
+| `Signer` | Interface for signing implementations |
+| `P12Signer` | Signs using PKCS#12 files (.p12/.pfx) |
+| `CryptoKeySigner` | Signs using Web Crypto CryptoKey |
+
+### Signature Formats (`src/signatures/formats/`)
+
+| Component | Purpose |
+|-----------|---------|
+| `pkcs7-detached.ts` | Legacy `adbe.pkcs7.detached` format |
+| `cades-detached.ts` | Modern `ETSI.CAdES.detached` format (PAdES) |
+
+### Supporting Components
+
+| Component | Purpose |
+|-----------|---------|
+| `placeholder.ts` | ByteRange/Contents placeholder handling |
+| `timestamp.ts` | RFC 3161 timestamp authority client |
+| `revocation.ts` | OCSP/CRL fetching for certificate validation |
+| `dss.ts` | Document Security Store for LTV data |
+| `aia.ts` | Authority Information Access chain building |
+| `sign.ts` | Main signing orchestration |
+
+### Crypto Utilities (`src/signatures/crypto/`)
+
+Legacy cryptographic implementations for PKCS#12 parsing (Web Crypto doesn't support these older algorithms):
+
+| Component | Purpose |
+|-----------|---------|
+| `pkcs12-kdf.ts` | PKCS#12 key derivation function |
+| `rc2.ts` | RC2 cipher (legacy P12 files) |
+| `triple-des.ts` | 3DES cipher (legacy P12 files) |
+
+### PAdES Compliance Levels
+
+| Level | Features |
+|-------|----------|
+| B-B | Basic signature with certificate |
+| B-T | + RFC 3161 timestamp |
+| B-LT | + DSS with OCSP/CRL data |
+| B-LTA | + Document timestamp for archival |
+
+---
+
 ## I/O Layer (`src/io/`)
 
 **Scanner** — Lowest-level byte reader for PDF parsing.
@@ -687,6 +772,10 @@ When implementing, consult the reference libraries in `checkouts/`:
 - [x] PDF merge and split
 - [x] Page embedding (Form XObjects for overlays/watermarks)
 - [x] Content stream parsing
+- [x] Digital signature creation (PAdES B-B, B-T, B-LT, B-LTA)
+- [x] Signature signers (P12/PKCS#12, CryptoKey)
+- [x] Timestamp authority support (RFC 3161)
+- [x] Long-term validation (DSS, OCSP, CRL)
 
 ### Partial / In Progress
 - [ ] Linearized PDF fast-open (detection only, no optimization)
@@ -697,7 +786,7 @@ When implementing, consult the reference libraries in `checkouts/`:
 - [ ] Full drawing API (drawText, drawImage, drawRect, etc.)
 - [ ] Image embedding
 - [ ] Annotation support (read/write)
-- [ ] Digital signatures (verification/creation)
+- [ ] Digital signature verification
 - [ ] Certificate-based decryption (/Adobe.PubSec handler)
 - [ ] Outline/bookmark support
 - [ ] Metadata (XMP) editing

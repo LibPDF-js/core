@@ -8,6 +8,7 @@ import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfStream } from "#src/objects/pdf-stream";
 import type { Operator } from "./operators";
+import { ContentStreamSerializer } from "./parsing/content-stream-serializer";
 
 /**
  * Builder for constructing content streams from operators.
@@ -84,14 +85,14 @@ export class ContentStreamBuilder {
    * Each operator on its own line.
    */
   toString(): string {
-    return this.operators.map(op => op.toString()).join("\n");
+    return new TextDecoder().decode(this.toBytes());
   }
 
   /**
    * Serialize to bytes.
    */
   toBytes(): Uint8Array {
-    return new TextEncoder().encode(this.toString());
+    return ContentStreamSerializer.serialize(this.operators);
   }
 
   /**

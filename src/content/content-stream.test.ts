@@ -104,9 +104,9 @@ describe("ContentStreamBuilder", () => {
       expect(builder.toString()).toBe("");
     });
 
-    it("returns single operator without trailing newline", () => {
+    it("serializes single operator", () => {
       const builder = ContentStreamBuilder.from([pushGraphicsState()]);
-      expect(builder.toString()).toBe("q");
+      expect(builder.toString()).toBe("q\n");
     });
 
     it("joins multiple operators with newlines", () => {
@@ -115,7 +115,7 @@ describe("ContentStreamBuilder", () => {
         setLineWidth(2),
         popGraphicsState(),
       ]);
-      expect(builder.toString()).toBe("q\n2 w\nQ");
+      expect(builder.toString()).toBe("q\n2 w\nQ\n");
     });
 
     it("serializes complex content stream", () => {
@@ -142,6 +142,7 @@ describe("ContentStreamBuilder", () => {
         "h",
         "S",
         "Q",
+        "", // trailing newline
       ].join("\n");
 
       expect(builder.toString()).toBe(expected);
@@ -153,7 +154,7 @@ describe("ContentStreamBuilder", () => {
       const builder = ContentStreamBuilder.from([pushGraphicsState(), popGraphicsState()]);
       const bytes = builder.toBytes();
       expect(bytes).toBeInstanceOf(Uint8Array);
-      expect(new TextDecoder().decode(bytes)).toBe("q\nQ");
+      expect(new TextDecoder().decode(bytes)).toBe("q\nQ\n");
     });
   });
 
@@ -163,8 +164,8 @@ describe("ContentStreamBuilder", () => {
       const stream = builder.toStream();
 
       expect(stream.type).toBe("stream");
-      expect(stream.get("Length")).toEqual(PdfNumber.of(3)); // "q\nQ"
-      expect(new TextDecoder().decode(stream.data)).toBe("q\nQ");
+      expect(stream.get("Length")).toEqual(PdfNumber.of(4)); // "q\nQ\n"
+      expect(new TextDecoder().decode(stream.data)).toBe("q\nQ\n");
     });
 
     it("merges with base dict", () => {
@@ -175,7 +176,7 @@ describe("ContentStreamBuilder", () => {
       const stream = builder.toStream(baseDict);
 
       expect(stream.get("CustomKey")).toEqual(PdfName.of("CustomValue"));
-      expect(stream.get("Length")).toEqual(PdfNumber.of(1)); // "q"
+      expect(stream.get("Length")).toEqual(PdfNumber.of(2)); // "q\n"
     });
 
     it("does not modify base dict", () => {
@@ -204,7 +205,7 @@ describe("ContentStreamBuilder", () => {
       expect(bbox?.at(2)).toEqual(PdfNumber.of(100));
       expect(bbox?.at(3)).toEqual(PdfNumber.of(50));
 
-      expect(stream.get("Length")).toEqual(PdfNumber.of(3)); // "q\nQ"
+      expect(stream.get("Length")).toEqual(PdfNumber.of(4)); // "q\nQ\n"
     });
 
     it("includes resources when provided", () => {
