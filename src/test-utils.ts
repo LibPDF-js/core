@@ -28,6 +28,7 @@ export type FixtureCategory =
   | "filter"
   | "fonts"
   | "forms"
+  | "images"
   | "layers"
   | "malformed"
   | "text"
