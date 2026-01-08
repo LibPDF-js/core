@@ -1,4 +1,5 @@
 import { CR, hexValue, LF, SPACE, TAB } from "#src/helpers/chars";
+import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 
@@ -20,7 +21,7 @@ export class ASCIIHexFilter implements Filter {
   private static readonly NIBBLE_MASK = 0x0f;
 
   async decode(data: Uint8Array, _params?: PdfDict): Promise<Uint8Array> {
-    const result: number[] = [];
+    const output = new ByteWriter();
 
     let high: number | null = null;
 
@@ -44,17 +45,17 @@ export class ASCIIHexFilter implements Filter {
       if (high === null) {
         high = nibble;
       } else {
-        result.push((high << 4) | nibble);
+        output.writeByte((high << 4) | nibble);
         high = null;
       }
     }
 
     // Odd number of digits: pad final nibble with 0
     if (high !== null) {
-      result.push(high << 4);
+      output.writeByte(high << 4);
     }
 
-    return new Uint8Array(result);
+    return output.toBytes();
   }
 
   async encode(data: Uint8Array, _params?: PdfDict): Promise<Uint8Array> {

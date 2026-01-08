@@ -1,3 +1,4 @@
+import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 
@@ -17,7 +18,7 @@ export class RunLengthFilter implements Filter {
   readonly name = "RunLengthDecode";
 
   async decode(data: Uint8Array, _params?: PdfDict): Promise<Uint8Array> {
-    const output: number[] = [];
+    const output = new ByteWriter();
     let i = 0;
 
     while (i < data.length) {
@@ -33,7 +34,7 @@ export class RunLengthFilter implements Filter {
         const count = length + 1;
 
         for (let j = 0; j < count && i < data.length; j++) {
-          output.push(data[i++]);
+          output.writeByte(data[i++]);
         }
       } else {
         // Repeat run: repeat next byte (257 - length) times
@@ -41,16 +42,16 @@ export class RunLengthFilter implements Filter {
         const value = data[i++];
 
         for (let j = 0; j < count; j++) {
-          output.push(value);
+          output.writeByte(value);
         }
       }
     }
 
-    return new Uint8Array(output);
+    return output.toBytes();
   }
 
   async encode(data: Uint8Array, _params?: PdfDict): Promise<Uint8Array> {
-    const output: number[] = [];
+    const output = new ByteWriter();
     let i = 0;
 
     while (i < data.length) {
@@ -64,8 +65,8 @@ export class RunLengthFilter implements Filter {
 
       if (runLength >= 2) {
         // Repeat run is worthwhile (2+ bytes)
-        output.push(257 - runLength); // Length byte
-        output.push(runValue);
+        output.writeByte(257 - runLength); // Length byte
+        output.writeByte(runValue);
         i += runLength;
       } else {
         // Literal run: find extent of non-repeating bytes
@@ -99,18 +100,18 @@ export class RunLengthFilter implements Filter {
         }
 
         if (literalLength > 0) {
-          output.push(literalLength - 1); // Length byte
+          output.writeByte(literalLength - 1); // Length byte
 
           for (let j = 0; j < literalLength; j++) {
-            output.push(data[literalStart + j]);
+            output.writeByte(data[literalStart + j]);
           }
         }
       }
     }
 
     // Add EOD marker
-    output.push(128);
+    output.writeByte(128);
 
-    return new Uint8Array(output);
+    return output.toBytes();
   }
 }

@@ -1,3 +1,4 @@
+import { ByteWriter } from "#src/io/byte-writer.ts";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 import { applyPredictor } from "./predictor";
@@ -41,7 +42,7 @@ export class LZWFilter implements Filter {
   }
 
   private lzwDecode(data: Uint8Array, earlyChange: number): Uint8Array {
-    const output: number[] = [];
+    const output = new ByteWriter();
 
     // LZW constants
     // Bit reading state
@@ -127,7 +128,7 @@ export class LZWFilter implements Filter {
 
       // Output entry
       for (const byte of entry) {
-        output.push(byte);
+        output.writeByte(byte);
       }
 
       // Add new dictionary entry: prevEntry + first byte of entry
@@ -156,6 +157,6 @@ export class LZWFilter implements Filter {
       prevEntry = entry;
     }
 
-    return new Uint8Array(output);
+    return output.toBytes();
   }
 }

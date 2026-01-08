@@ -1,4 +1,5 @@
 import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
+import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 
@@ -73,7 +74,7 @@ export class CCITTFaxFilter implements Filter {
     _endOfBlock: boolean,
   ): Uint8Array {
     const bytesPerRow = Math.ceil(columns / 8);
-    const output: number[] = [];
+    const output = new ByteWriter();
 
     // Bit reading state
     let bitPos = 0;
@@ -283,7 +284,7 @@ export class CCITTFaxFilter implements Filter {
           }
         }
 
-        output.push(value);
+        output.writeByte(value);
       }
 
       // Current row becomes reference row
@@ -291,7 +292,7 @@ export class CCITTFaxFilter implements Filter {
       rowCount++;
     }
 
-    return new Uint8Array(output);
+    return output.toBytes();
   }
 
   /**

@@ -1,4 +1,4 @@
-import { concatBytes } from "#src/helpers/buffer";
+import { ByteWriter } from "#src/io/byte-writer.ts";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 import { applyPredictor } from "./predictor";
@@ -89,7 +89,7 @@ export class FlateFilter implements Filter {
     await writer.close();
 
     // Read all output chunks
-    const chunks: Uint8Array[] = [];
+    const output = new ByteWriter();
     const reader = ds.readable.getReader();
 
     while (true) {
@@ -99,10 +99,10 @@ export class FlateFilter implements Filter {
         break;
       }
 
-      chunks.push(value);
+      output.writeBytes(value);
     }
 
-    return concatBytes(chunks);
+    return output.toBytes();
   }
 
   /**

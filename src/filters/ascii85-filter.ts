@@ -1,4 +1,5 @@
 import { SINGLE_BYTE_MASK, SPACE } from "#src/helpers/chars";
+import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { Filter } from "./filter";
 
@@ -23,7 +24,7 @@ export class ASCII85Filter implements Filter {
   private static readonly ZERO_SHORTCUT = 0x7a;
 
   async decode(data: Uint8Array, _params?: PdfDict): Promise<Uint8Array> {
-    const result: number[] = [];
+    const output = new ByteWriter();
 
     let buffer = 0;
     let count = 0;
@@ -52,7 +53,10 @@ export class ASCII85Filter implements Filter {
           // 'z' inside a group - invalid, but be lenient
           continue;
         }
-        result.push(0, 0, 0, 0);
+        output.writeByte(0);
+        output.writeByte(0);
+        output.writeByte(0);
+        output.writeByte(0);
         continue;
       }
 
@@ -68,12 +72,10 @@ export class ASCII85Filter implements Filter {
 
       if (count === 5) {
         // Complete group - output 4 bytes
-        result.push(
-          (buffer >> 24) & SINGLE_BYTE_MASK,
-          (buffer >> 16) & SINGLE_BYTE_MASK,
-          (buffer >> 8) & SINGLE_BYTE_MASK,
-          buffer & SINGLE_BYTE_MASK,
-        );
+        output.writeByte((buffer >> 24) & SINGLE_BYTE_MASK);
+        output.writeByte((buffer >> 16) & SINGLE_BYTE_MASK);
+        output.writeByte((buffer >> 8) & SINGLE_BYTE_MASK);
+        output.writeByte(buffer & SINGLE_BYTE_MASK);
 
         buffer = 0;
         count = 0;
@@ -91,15 +93,15 @@ export class ASCII85Filter implements Filter {
       const outputBytes = count - 1;
 
       for (let i = 0; i < outputBytes; i++) {
-        result.push((buffer >> (24 - i * 8)) & SINGLE_BYTE_MASK);
+        output.writeByte((buffer >> (24 - i * 8)) & SINGLE_BYTE_MASK);
       }
     }
 
-    return new Uint8Array(result);
+    return output.toBytes();
   }
 
   async encode(data: Uint8Array, _params?: PdfDict): Promise<Uint8Array> {
-    const result: number[] = [];
+    const output = new ByteWriter();
 
     // Process 4 bytes at a time
     let i = 0;
@@ -113,10 +115,10 @@ export class ASCII85Filter implements Filter {
 
         if (value === 0) {
           // Special case: all zeros → 'z'
-          result.push(ASCII85Filter.ZERO_SHORTCUT);
+          output.writeByte(ASCII85Filter.ZERO_SHORTCUT);
         } else {
           // Encode as 5 base-85 digits
-          this.encodeGroup(value, 5, result);
+          this.encodeGroup(value, 5, output);
         }
 
         i += 4;
@@ -129,18 +131,19 @@ export class ASCII85Filter implements Filter {
         }
 
         // Output (remaining + 1) characters
-        this.encodeGroup(value, remaining + 1, result);
+        this.encodeGroup(value, remaining + 1, output);
         i += remaining;
       }
     }
 
     // Add end marker '~>'
-    result.push(ASCII85Filter.END_MARKER, ASCII85Filter.END_MARKER_FOLLOWING);
+    output.writeByte(ASCII85Filter.END_MARKER);
+    output.writeByte(ASCII85Filter.END_MARKER_FOLLOWING);
 
-    return new Uint8Array(result);
+    return output.toBytes();
   }
 
-  private encodeGroup(value: number, numChars: number, output: number[]): void {
+  private encodeGroup(value: number, numChars: number, output: ByteWriter): void {
     // Convert to unsigned 32-bit for division
     let v = value >>> 0;
 
@@ -155,7 +158,7 @@ export class ASCII85Filter implements Filter {
 
     // Output requested number of characters
     for (let i = 0; i < numChars; i++) {
-      output.push(digits[i]);
+      output.writeByte(digits[i]);
     }
   }
 }
