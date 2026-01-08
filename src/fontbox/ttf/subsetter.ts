@@ -137,6 +137,25 @@ export class TTFSubsetter {
   }
 
   /**
+   * Get the mapping from old GID to new GID.
+   * This is used for creating CIDToGIDMap streams in PDF.
+   */
+  getOldToNewGIDMap(): Map<number, number> {
+    this.addCompoundReferences();
+
+    const sortedGids = [...this.glyphIds].sort((a, b) => a - b);
+    const oldToNew = new Map<number, number>();
+    let newGID = 0;
+
+    for (const oldGID of sortedGids) {
+      oldToNew.set(oldGID, newGID);
+      newGID++;
+    }
+
+    return oldToNew;
+  }
+
+  /**
    * Write the subset font to a byte array.
    */
   async write(): Promise<Uint8Array> {
@@ -571,7 +590,7 @@ export class TTFSubsetter {
           flags = view.getUint16(pos);
           pos += 2;
           const componentGid = view.getUint16(pos);
-          const newComponentGid = this.getNewGlyphId(componentGid, sortedGids);
+          const newComponentGid = this.getNewGlyphId(componentGid, sortedGids, gid);
           view.setUint16(pos, newComponentGid);
           pos += 2;
 
@@ -1138,12 +1157,18 @@ export class TTFSubsetter {
 
   /**
    * Get new glyph ID from old glyph ID.
+   *
+   * @param oldGid - Original glyph ID to remap
+   * @param sortedGids - Sorted array of GIDs in the subset
+   * @param parentGid - Optional parent glyph ID for better error context
    */
-  private getNewGlyphId(oldGid: number, sortedGids: number[]): number {
+  private getNewGlyphId(oldGid: number, sortedGids: number[], parentGid?: number): number {
     const index = sortedGids.indexOf(oldGid);
 
     if (index === -1) {
-      throw new Error(`Component glyph ${oldGid} not in subset`);
+      const context =
+        parentGid !== undefined ? ` (referenced by composite glyph ${parentGid})` : "";
+      throw new Error(`Component glyph ${oldGid} not in subset${context}`);
     }
 
     return index;

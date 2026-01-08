@@ -5,6 +5,7 @@
  * Wraps the low-level parsing and writing infrastructure.
  */
 
+import { deflate } from "pako";
 import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/types";
 import { hasChanges } from "#src/document/change-collector";
 import { isLinearizationDict } from "#src/document/linearization";
@@ -13,6 +14,9 @@ import { ObjectRegistry } from "#src/document/object-registry";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { resolvePageSize } from "#src/helpers/page-size";
 import { checkIncrementalSaveBlocker, type IncrementalSaveBlocker } from "#src/helpers/save-utils";
+import { isJpeg, parseJpegHeader } from "#src/images/jpeg";
+import { PDFImage } from "#src/images/pdf-image";
+import { isPng, parsePng } from "#src/images/png";
 import { Scanner } from "#src/io/scanner";
 import * as LayerUtils from "#src/layers/index";
 import type { FlattenLayersResult, LayerInfo } from "#src/layers/types";
@@ -55,6 +59,16 @@ export interface SaveOptions {
 
   /** Use XRef stream instead of table. Default: matches original format */
   useXRefStream?: boolean;
+
+  /**
+   * Subset embedded fonts to include only used glyphs.
+   *
+   * Reduces file size but takes additional processing time.
+   * Fonts used in form fields are never subsetted (users may type any character).
+   *
+   * @default false
+   */
+  subsetFonts?: boolean;
 }
 
 /**
@@ -181,6 +195,12 @@ export class PDF {
     this.recoveredViaBruteForce = options.recoveredViaBruteForce;
     this.isLinearized = options.isLinearized;
     this.usesXRefStreams = options.usesXRefStreams;
+
+    // Set up font resolver for the context
+    // Refs are pre-allocated, so this is synchronous
+    this.ctx.setFontRefResolver(font => {
+      return this.fonts.getRef(font);
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1015,6 +1035,145 @@ export class PDF {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // Image Embedding
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Embed an image (JPEG or PNG) into the document.
+   *
+   * Automatically detects the image format and calls the appropriate
+   * embedding method. The returned PDFImage can be drawn on pages
+   * using `page.drawImage()`.
+   *
+   * @param bytes - Image file bytes (JPEG or PNG)
+   * @returns PDFImage that can be drawn with page.drawImage()
+   * @throws {Error} If image format is not recognized or invalid
+   *
+   * @example
+   * ```typescript
+   * const image = await pdf.embedImage(imageBytes);
+   * const page = pdf.addPage();
+   * page.drawImage(image, { x: 50, y: 500 });
+   * ```
+   */
+  async embedImage(bytes: Uint8Array): Promise<PDFImage> {
+    if (isJpeg(bytes)) {
+      return this.embedJpeg(bytes);
+    }
+
+    if (isPng(bytes)) {
+      return this.embedPng(bytes);
+    }
+
+    throw new Error("Unsupported image format. Only JPEG and PNG are supported.");
+  }
+
+  /**
+   * Embed a JPEG image into the document.
+   *
+   * JPEG images are embedded directly using DCTDecode filter,
+   * which means the JPEG data is stored as-is without re-encoding.
+   *
+   * @param bytes - JPEG file bytes
+   * @returns PDFImage that can be drawn with page.drawImage()
+   * @throws {Error} If not a valid JPEG image
+   *
+   * @example
+   * ```typescript
+   * const image = await pdf.embedJpeg(jpegBytes);
+   * page.drawImage(image, {
+   *   x: 50,
+   *   y: 500,
+   *   width: 200,  // Scale to specific width
+   * });
+   * ```
+   */
+  async embedJpeg(bytes: Uint8Array): Promise<PDFImage> {
+    const info = parseJpegHeader(bytes);
+
+    // Create XObject image stream with DCTDecode filter
+    const stream = PdfStream.fromDict(
+      {
+        Type: PdfName.of("XObject"),
+        Subtype: PdfName.of("Image"),
+        Width: PdfNumber.of(info.width),
+        Height: PdfNumber.of(info.height),
+        ColorSpace: PdfName.of(info.colorSpace),
+        BitsPerComponent: PdfNumber.of(8),
+        Filter: PdfName.of("DCTDecode"),
+      },
+      bytes,
+    );
+
+    const ref = this.register(stream);
+
+    return new PDFImage(ref, info.width, info.height);
+  }
+
+  /**
+   * Embed a PNG image into the document.
+   *
+   * PNG images are decoded and re-encoded with FlateDecode filter.
+   * Alpha channels are separated into a soft mask (SMask) for
+   * proper transparency support.
+   *
+   * @param bytes - PNG file bytes
+   * @returns PDFImage that can be drawn with page.drawImage()
+   * @throws {Error} If not a valid PNG image or unsupported format
+   *
+   * @example
+   * ```typescript
+   * const logo = await pdf.embedPng(pngBytes);
+   * // Draw with transparency preserved
+   * page.drawImage(logo, { x: 100, y: 700, width: 150 });
+   * ```
+   */
+  async embedPng(bytes: Uint8Array): Promise<PDFImage> {
+    const data = parsePng(bytes);
+    const { info, pixels, alpha } = data;
+
+    // Compress pixel data with FlateDecode
+    const compressedPixels = deflate(pixels);
+
+    // Build XObject dictionary
+    const dictEntries: Record<string, PdfObject> = {
+      Type: PdfName.of("XObject"),
+      Subtype: PdfName.of("Image"),
+      Width: PdfNumber.of(info.width),
+      Height: PdfNumber.of(info.height),
+      ColorSpace: PdfName.of(info.colorSpace),
+      BitsPerComponent: PdfNumber.of(info.bitDepth > 8 ? 8 : info.bitDepth),
+      Filter: PdfName.of("FlateDecode"),
+    };
+
+    // If there's alpha, create a soft mask
+    if (alpha) {
+      const compressedAlpha = deflate(alpha);
+
+      const smaskStream = PdfStream.fromDict(
+        {
+          Type: PdfName.of("XObject"),
+          Subtype: PdfName.of("Image"),
+          Width: PdfNumber.of(info.width),
+          Height: PdfNumber.of(info.height),
+          ColorSpace: PdfName.of("DeviceGray"),
+          BitsPerComponent: PdfNumber.of(8),
+          Filter: PdfName.of("FlateDecode"),
+        },
+        compressedAlpha,
+      );
+
+      const smaskRef = this.register(smaskStream);
+      dictEntries.SMask = smaskRef;
+    }
+
+    const stream = PdfStream.fromDict(dictEntries, compressedPixels);
+    const ref = this.register(stream);
+
+    return new PDFImage(ref, info.width, info.height);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // Attachments
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1417,8 +1576,8 @@ export class PDF {
   private async saveInternal(
     options: SaveOptions = {},
   ): Promise<{ bytes: Uint8Array; xrefOffset: number }> {
-    // Prepare embedded fonts (creates PDF objects, subsets fonts)
-    await this.fonts.prepare();
+    // Finalize embedded fonts (creates PDF objects, optionally subsets)
+    await this.fonts.finalize(options.subsetFonts ?? false);
 
     const wantsIncremental = options.incremental ?? false;
     const blocker = this.canSaveIncrementally();

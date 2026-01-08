@@ -1370,6 +1370,10 @@ export class AppearanceGenerator {
    */
   private encodeTextForFont(text: string, font: FormFont): PdfString {
     if (isEmbeddedFont(font)) {
+      // Mark the font as used in a form field to prevent subsetting
+      // (users can type any character at runtime)
+      font.markUsedInForm();
+
       // For embedded fonts, encode and check
       if (!font.canEncode(text)) {
         const unencodable = (font as EmbeddedFont).getUnencodableCharacters(text);
@@ -1380,15 +1384,16 @@ export class AppearanceGenerator {
         );
       }
 
-      // Encode to character codes
-      const codes = font.encodeText(text);
+      // Encode to glyph IDs for PDF content stream
+      // With CIDToGIDMap /Identity, the content stream must contain GIDs
+      const gids = font.encodeTextToGids(text);
 
-      // For Identity-H encoding, codes are 16-bit
-      const bytes = new Uint8Array(codes.length * 2);
+      // For Identity-H encoding, GIDs are 16-bit
+      const bytes = new Uint8Array(gids.length * 2);
 
-      for (let i = 0; i < codes.length; i++) {
-        bytes[i * 2] = (codes[i] >> 8) & 0xff;
-        bytes[i * 2 + 1] = codes[i] & 0xff;
+      for (let i = 0; i < gids.length; i++) {
+        bytes[i * 2] = (gids[i] >> 8) & 0xff;
+        bytes[i * 2 + 1] = gids[i] & 0xff;
       }
 
       return PdfString.fromBytes(bytes);

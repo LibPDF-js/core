@@ -50,6 +50,10 @@ const tRNS = 0x74524e53;
 const IDAT = 0x49444154;
 const IEND = 0x49454e44;
 
+// Maximum allowed image dimensions to prevent memory bombs
+// 100 megapixels is generous but prevents absurd allocations
+const MAX_PIXELS = 100_000_000;
+
 /**
  * Parse a PNG file and extract image data.
  *
@@ -129,6 +133,18 @@ function parseIHDR(data: Uint8Array): PngInfo {
   const compressionMethod = data[10];
   const filterMethod = data[11];
   const interlaceMethod = data[12];
+
+  // Validate dimensions to prevent memory bombs
+  if (width === 0 || height === 0) {
+    throw new Error("Invalid PNG: zero dimension");
+  }
+
+  const totalPixels = width * height;
+  if (totalPixels > MAX_PIXELS) {
+    throw new Error(
+      `PNG image too large: ${width}x${height} (${totalPixels} pixels) exceeds limit of ${MAX_PIXELS} pixels`,
+    );
+  }
 
   if (compressionMethod !== 0) {
     throw new Error(`Unsupported PNG compression method: ${compressionMethod}`);

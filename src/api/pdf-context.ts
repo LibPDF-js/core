@@ -9,11 +9,18 @@
  */
 
 import type { ObjectRegistry } from "#src/document/object-registry";
+import type { EmbeddedFont } from "#src/fonts/embedded-font";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfObject } from "#src/objects/pdf-object";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import type { PDFCatalog } from "./pdf-catalog";
 import type { PDFPageTree } from "./pdf-page-tree";
+
+/**
+ * Function type for resolving embedded font references.
+ * Synchronous because refs are pre-allocated when fonts are embedded.
+ */
+export type FontRefResolver = (font: EmbeddedFont) => PdfRef;
 
 /**
  * Document metadata stored in the context.
@@ -51,6 +58,9 @@ export class PDFContext {
   /** Document metadata */
   readonly info: DocumentInfo;
 
+  /** Font reference resolver (set by PDF class) */
+  private fontRefResolver: FontRefResolver | null = null;
+
   constructor(
     registry: ObjectRegistry,
     catalog: PDFCatalog,
@@ -61,6 +71,28 @@ export class PDFContext {
     this.catalog = catalog;
     this.pages = pages;
     this.info = info;
+  }
+
+  /**
+   * Set the font reference resolver.
+   * @internal Called by PDF class to wire up font resolution.
+   */
+  setFontRefResolver(resolver: FontRefResolver): void {
+    this.fontRefResolver = resolver;
+  }
+
+  /**
+   * Get a font reference for an embedded font.
+   *
+   * The reference is available immediately because refs are pre-allocated
+   * when fonts are embedded. Actual font objects are created at save time.
+   */
+  getFontRef(font: EmbeddedFont): PdfRef {
+    if (!this.fontRefResolver) {
+      throw new Error("Font resolver not set. This is an internal error.");
+    }
+
+    return this.fontRefResolver(font);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

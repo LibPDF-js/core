@@ -15,14 +15,20 @@
  * const codes = font.encodeText("Hello World");
  * const width = font.getTextWidth("Hello World", 12);
  *
- * // Get font reference (available after prepare or save)
- * await pdf.fonts.prepare();
+ * // Font refs are available immediately
  * const fontRef = pdf.fonts.getRef(font);
+ *
+ * // Subsetting happens at save time
+ * await pdf.save({ subsetFonts: true });
  * ```
  */
 
 import { EmbeddedFont, type EmbedFontOptions } from "#src/fonts/embedded-font.ts";
-import { createFontObjects, registerFontObjects } from "#src/fonts/font-embedder.ts";
+import {
+  createFontObjects,
+  createFontObjectsFull,
+  registerFontObjects,
+} from "#src/fonts/font-embedder.ts";
 import type { PdfRef } from "#src/objects/pdf-ref.ts";
 import type { PDFContext } from "./pdf-context.ts";
 
@@ -30,8 +36,11 @@ import type { PDFContext } from "./pdf-context.ts";
  * PDFFonts manages font embedding for a PDF document.
  */
 export class PDFFonts {
-  /** Embedded fonts that need to be written on save */
-  private readonly embeddedFonts: Map<EmbeddedFont, PdfRef | null> = new Map();
+  /** Embedded fonts with pre-allocated refs */
+  private readonly embeddedFonts: Map<EmbeddedFont, PdfRef> = new Map();
+
+  /** Whether fonts have been finalized (PDF objects created) */
+  private finalized = false;
 
   /** PDF context */
   private readonly ctx: PDFContext;
@@ -43,9 +52,9 @@ export class PDFFonts {
   /**
    * Embed a font for use in the document.
    *
-   * The font is parsed and prepared for embedding. The actual PDF objects
-   * are created during save (or when `prepare()` is called), which allows
-   * subsetting to only include the glyphs that were actually used.
+   * The font is parsed immediately and a PDF reference is pre-allocated.
+   * Font objects are created during `save()`, which allows subsetting to
+   * only include glyphs that were actually used.
    *
    * @param data - Font data (TTF, OTF, or Type1)
    * @param options - Embedding options (variations for variable fonts)
@@ -56,16 +65,24 @@ export class PDFFonts {
    * const fontBytes = await fs.readFile("NotoSans-Regular.ttf");
    * const font = pdf.fonts.embed(fontBytes);
    *
-   * // Use the font
-   * const codes = font.encodeText("Hello World");
-   * const width = font.getTextWidth("Hello World", 12);
+   * // Use the font - ref is immediately available
+   * const fontRef = pdf.fonts.getRef(font);
+   *
+   * // Encode text and draw (sync)
+   * page.drawText("Hello World", { font });
+   *
+   * // Subsetting happens at save time
+   * await pdf.save({ subsetFonts: true });
    * ```
    */
   embed(data: Uint8Array, options?: EmbedFontOptions): EmbeddedFont {
     const font = EmbeddedFont.fromBytes(data, options);
 
-    // Track the font (ref will be assigned during prepare/save)
-    this.embeddedFonts.set(font, null);
+    // Pre-allocate a reference for the font
+    // This ref points to nothing until finalize() creates the actual objects
+    const ref = this.ctx.registry.allocateRef();
+
+    this.embeddedFonts.set(font, ref);
 
     return font;
   }
@@ -96,68 +113,68 @@ export class PDFFonts {
   /**
    * Get the PDF reference for an embedded font.
    *
-   * Note: The reference is only available after `prepare()` is called
-   * (which happens automatically during save). Before that, this returns null.
+   * The reference is available immediately after embedding.
    *
    * @param font - The embedded font to get a reference for
-   * @returns The PDF reference, or null if not yet prepared
+   * @returns The PDF reference
+   * @throws {Error} if font was not embedded via this PDFFonts instance
    */
-  getRef(font: EmbeddedFont): PdfRef | null {
-    return this.embeddedFonts.get(font) ?? null;
+  getRef(font: EmbeddedFont): PdfRef {
+    const ref = this.embeddedFonts.get(font);
+
+    if (!ref) {
+      throw new Error("Font was not embedded via this document's fonts API");
+    }
+
+    return ref;
   }
 
   /**
-   * Check if a font has been prepared (has a PDF reference).
-   *
-   * @param font - The embedded font to check
-   * @returns True if the font has been prepared
+   * Check if the fonts have been finalized.
    */
-  isPrepared(font: EmbeddedFont): boolean {
-    return this.embeddedFonts.get(font) !== null;
+  get isFinalized(): boolean {
+    return this.finalized;
   }
 
   /**
-   * Prepare all embedded fonts by creating their PDF objects.
+   * Finalize all embedded fonts by creating their PDF objects.
    *
-   * This is called automatically during `pdf.save()`, but can be called
-   * manually if you need the font references before saving (e.g., to add
-   * fonts to page resources).
+   * This is called automatically during `pdf.save()`. It creates the actual
+   * font objects (Type0, CIDFont, descriptor, font file, ToUnicode) and
+   * registers them with the pre-allocated references.
    *
-   * Fonts that have already been prepared are skipped.
-   *
-   * @example
-   * ```typescript
-   * const font = pdf.fonts.embed(fontBytes);
-   * font.encodeText("Hello"); // Track glyph usage
-   *
-   * // Prepare fonts to get references
-   * await pdf.fonts.prepare();
-   *
-   * // Now we can get the reference
-   * const fontRef = pdf.fonts.getRef(font);
-   *
-   * // Add to page resources
-   * const page = await pdf.getObject(pdf.getPage(0));
-   * const resources = page.get("Resources") ?? new PdfDict();
-   * const fonts = resources.get("Font") ?? new PdfDict();
-   * fonts.set("F1", fontRef);
-   * ```
+   * @param subsetFonts - Whether to subset fonts (only include used glyphs)
    */
-  async prepare(): Promise<void> {
-    for (const [font, existingRef] of this.embeddedFonts) {
-      // Skip if already prepared
-      if (existingRef !== null) {
-        continue;
-      }
+  async finalize(subsetFonts: boolean): Promise<void> {
+    if (this.finalized) {
+      return;
+    }
+
+    for (const [font, ref] of this.embeddedFonts) {
+      // Choose full or subset embedding based on option and font usage
+      const shouldSubset = subsetFonts && font.canSubset();
 
       // Create PDF objects for the font
-      const result = await createFontObjects(font);
+      const result = shouldSubset
+        ? await createFontObjects(font)
+        : await createFontObjectsFull(font);
 
-      // Register all objects and get the Type0 font reference
-      const fontRef = registerFontObjects(result, obj => this.ctx.register(obj));
-
-      // Store the reference
-      this.embeddedFonts.set(font, fontRef);
+      // Register all objects and link to the pre-allocated ref
+      registerFontObjects(
+        result,
+        obj => this.ctx.register(obj),
+        ref,
+        (allocatedRef, obj) => this.ctx.registry.registerAt(allocatedRef, obj),
+      );
     }
+
+    this.finalized = true;
+  }
+
+  /**
+   * @deprecated Use `finalize()` instead. This method exists for backwards compatibility.
+   */
+  async prepare(): Promise<void> {
+    return this.finalize(true);
   }
 }

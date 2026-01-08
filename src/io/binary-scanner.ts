@@ -143,10 +143,14 @@ export class BinaryScanner extends Scanner {
     return this.readBytes(n).slice();
   }
 
+  // Shared TextDecoder instance for ASCII (ISO-8859-1) decoding
+  // "iso-8859-1" is the standard name that all browsers/runtimes support
+  private static readonly textDecoder = new TextDecoder("iso-8859-1");
+
   /** Read ASCII string of given length and advance */
   readAscii(length: number): string {
     const bytes = this.readBytes(length);
-    return String.fromCharCode(...bytes);
+    return BinaryScanner.textDecoder.decode(bytes);
   }
 
   /** Read UTF-16BE string of given byte length and advance */
@@ -165,7 +169,7 @@ export class BinaryScanner extends Scanner {
     while (this.position < this.length && this.bytes[this.position] !== 0) {
       this.moveTo(this.position + 1);
     }
-    const str = String.fromCharCode(...this.bytes.subarray(start, this.position));
+    const str = BinaryScanner.textDecoder.decode(this.bytes.subarray(start, this.position));
     if (this.position < this.length) {
       this.moveTo(this.position + 1); // Skip null terminator
     }

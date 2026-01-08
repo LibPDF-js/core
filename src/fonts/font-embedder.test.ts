@@ -41,7 +41,9 @@ describe("createFontObjects", () => {
     // Check CIDFont dict
     expect(result.cidFontDict.getName("Type")?.value).toBe("Font");
     expect(result.cidFontDict.getName("Subtype")?.value).toBe("CIDFontType2");
-    expect(result.cidFontDict.getName("CIDToGIDMap")?.value).toBe("Identity");
+    // CIDToGIDMap is now a stream for subsetted TTF fonts (set during registration)
+    // So we check that the stream exists in the result
+    expect(result.cidToGidMapStream).toBeInstanceOf(PdfStream);
     expect(result.cidFontDict.has("W")).toBe(true);
 
     // Check CIDSystemInfo
@@ -128,11 +130,11 @@ describe("registerFontObjects", () => {
 
     const type0Ref = registerFontObjects(result, register);
 
-    // Should have registered 5 objects
-    expect(registeredObjects.length).toBe(5);
+    // Should have registered 6 objects (fontStream, toUnicode, cidToGidMap, descriptor, cidFont, type0)
+    expect(registeredObjects.length).toBe(6);
 
     // Type0 should be the last registered (highest object number)
-    expect(type0Ref.objectNumber).toBe(5);
+    expect(type0Ref.objectNumber).toBe(6);
 
     // Check that references were linked correctly
     // Type0 should have DescendantFonts array

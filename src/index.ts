@@ -58,13 +58,19 @@ export type {
 } from "./document/forms/fields";
 export type { FlattenOptions } from "./document/forms/form-flattener";
 export {
+  // Color presets
+  black,
+  blue,
   type CMYK,
   type Color,
   cmyk,
   type Grayscale,
   grayscale,
+  green,
   type RGB,
+  red,
   rgb,
+  white,
 } from "./helpers/colors";
 export { type Degrees, degrees } from "./helpers/rotations";
 
@@ -118,3 +124,47 @@ export type { PdfObject } from "./objects/pdf-object";
 export { PdfRef } from "./objects/pdf-ref";
 export { PdfStream } from "./objects/pdf-stream";
 export { PdfString } from "./objects/pdf-string";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fonts
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type { EmbeddedFont, EmbedFontOptions } from "./fonts/embedded-font";
+export { type Standard14FontName, StandardFonts } from "./fonts/standard-14";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Images
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { PDFImage } from "./images/pdf-image";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drawing API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  type DrawCircleOptions,
+  type DrawEllipseOptions,
+  type DrawImageOptions,
+  type DrawLineOptions,
+  type DrawRectangleOptions,
+  type DrawTextOptions,
+  type FontInput,
+  type LayoutResult,
+  // Types
+  type LineCap,
+  type LineJoin,
+  layoutJustifiedLine,
+  layoutText,
+  // Utilities
+  lineCapToNumber,
+  lineJoinToNumber,
+  // Text layout
+  measureText,
+  // Path builder
+  PathBuilder,
+  type PathOptions,
+  type PositionedWord,
+  type Rotation,
+  type TextLine,
+} from "./api/drawing";

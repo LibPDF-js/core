@@ -35,6 +35,35 @@ export const STANDARD_14_FONTS = [
 export type Standard14FontName = (typeof STANDARD_14_FONTS)[number];
 
 /**
+ * Standard 14 fonts enum for convenient access.
+ *
+ * @example
+ * ```typescript
+ * page.drawText("Hello", { font: StandardFonts.Helvetica });
+ * page.drawText("Bold", { font: StandardFonts.HelveticaBold });
+ * ```
+ */
+export const StandardFonts = {
+  Helvetica: "Helvetica",
+  HelveticaBold: "Helvetica-Bold",
+  HelveticaOblique: "Helvetica-Oblique",
+  HelveticaBoldOblique: "Helvetica-BoldOblique",
+
+  TimesRoman: "Times-Roman",
+  TimesBold: "Times-Bold",
+  TimesItalic: "Times-Italic",
+  TimesBoldItalic: "Times-BoldItalic",
+
+  Courier: "Courier",
+  CourierBold: "Courier-Bold",
+  CourierOblique: "Courier-Oblique",
+  CourierBoldOblique: "Courier-BoldOblique",
+
+  Symbol: "Symbol",
+  ZapfDingbats: "ZapfDingbats",
+} as const satisfies Record<string, Standard14FontName>;
+
+/**
  * Basic metrics for a font.
  */
 export interface FontBasicMetrics {

@@ -27,6 +27,63 @@
  */
 
 /**
+ * Build a ToUnicode CMap stream from a GID to code point mapping.
+ *
+ * With CIDToGIDMap /Identity, the content stream contains GIDs.
+ * The ToUnicode CMap maps these GIDs back to Unicode code points
+ * for text extraction (copy/paste, search).
+ *
+ * @param gidToCodePoint - Map from GID to Unicode code point
+ * @returns The ToUnicode CMap as a Uint8Array
+ */
+export function buildToUnicodeCMapFromGids(gidToCodePoint: Map<number, number>): Uint8Array {
+  const lines: string[] = [];
+
+  // CMap header
+  lines.push("/CIDInit /ProcSet findresource begin");
+  lines.push("12 dict begin");
+  lines.push("begincmap");
+  lines.push("/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def");
+  lines.push("/CMapName /Adobe-Identity-UCS def");
+  lines.push("/CMapType 2 def");
+
+  // Codespace range - cover all 2-byte codes
+  lines.push("1 begincodespacerange");
+  lines.push("<0000> <FFFF>");
+  lines.push("endcodespacerange");
+
+  // Build bfchar entries
+  // Group into chunks of 100 (PDF limit per section)
+  const entries = [...gidToCodePoint.entries()].sort((a, b) => a[0] - b[0]);
+
+  let i = 0;
+
+  while (i < entries.length) {
+    const chunk = entries.slice(i, i + 100);
+    lines.push(`${chunk.length} beginbfchar`);
+
+    for (const [gid, codePoint] of chunk) {
+      // Map GID (what's in content stream) → Unicode code point
+      const gidHex = toHex4(gid);
+      const unicodeHex = toUnicodeHex(codePoint);
+      lines.push(`<${gidHex}> <${unicodeHex}>`);
+    }
+
+    lines.push("endbfchar");
+    i += 100;
+  }
+
+  // CMap footer
+  lines.push("endcmap");
+  lines.push("CMapName currentdict /CMap defineresource pop");
+  lines.push("end");
+  lines.push("end");
+
+  return new TextEncoder().encode(lines.join("\n"));
+}
+
+/**
+ * @deprecated Use buildToUnicodeCMapFromGids instead.
  * Build a ToUnicode CMap stream from a code point to Unicode mapping.
  *
  * @param codePointToUnicode - Map from character codes (code points for Identity-H)
@@ -54,6 +111,7 @@ export function buildToUnicodeCMap(codePointToUnicode: Map<number, number>): Uin
   const entries = [...codePointToUnicode.entries()].sort((a, b) => a[0] - b[0]);
 
   let i = 0;
+
   while (i < entries.length) {
     const chunk = entries.slice(i, i + 100);
     lines.push(`${chunk.length} beginbfchar`);

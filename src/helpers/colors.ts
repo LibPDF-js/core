@@ -110,3 +110,22 @@ export function colorToArray(color: Color): number[] {
       return [color.cyan, color.magenta, color.yellow, color.black];
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Color Presets
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Black color (grayscale 0) */
+export const black: Grayscale = grayscale(0);
+
+/** White color (grayscale 1) */
+export const white: Grayscale = grayscale(1);
+
+/** Red color (RGB) */
+export const red: RGB = rgb(1, 0, 0);
+
+/** Green color (RGB) */
+export const green: RGB = rgb(0, 1, 0);
+
+/** Blue color (RGB) */
+export const blue: RGB = rgb(0, 0, 1);

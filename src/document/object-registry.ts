@@ -111,6 +111,33 @@ export class ObjectRegistry {
   }
 
   /**
+   * Allocate a reference without assigning an object.
+   *
+   * Used to pre-allocate refs for objects that will be created later
+   * (e.g., embedded fonts whose objects are created at save time).
+   *
+   * @returns The allocated reference
+   */
+  allocateRef(): PdfRef {
+    return PdfRef.of(this._nextObjNum++, 0);
+  }
+
+  /**
+   * Register an object at a pre-allocated reference.
+   *
+   * @param ref - The pre-allocated reference (from allocateRef)
+   * @param obj - The object to register
+   */
+  registerAt(ref: PdfRef, obj: PdfObject): void {
+    this.newObjects.set(ref, obj);
+
+    // Add to reverse map if it's an object type
+    if (obj !== null && typeof obj === "object") {
+      this.objectToRef.set(obj, ref);
+    }
+  }
+
+  /**
    * Get the reference for an object.
    *
    * @param obj - The object to look up

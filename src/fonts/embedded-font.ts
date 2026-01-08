@@ -65,6 +65,9 @@ export class EmbeddedFont extends PdfFont {
   /** Subset tag (generated during save) */
   private _subsetTag: string | null = null;
 
+  /** Whether this font is used in a form field (prevents subsetting) */
+  private _usedInForm = false;
+
   /** Cached descriptor */
   private _descriptor: FontDescriptor | null = null;
 
@@ -163,13 +166,37 @@ export class EmbeddedFont extends PdfFont {
   }
 
   /**
-   * Encode text to character codes.
-   * Uses Identity-H encoding (code = Unicode code point).
+   * Get mapping from GID to Unicode code point.
    *
-   * Also tracks glyph usage for subsetting.
+   * This is used for building the /W widths array and ToUnicode CMap.
+   * Since the content stream contains GIDs (with CIDToGIDMap /Identity),
+   * the /W array must be keyed by GID, and ToUnicode must map GID → Unicode.
+   *
+   * If multiple code points map to the same GID, returns the first one found.
    */
-  encodeText(text: string): number[] {
-    const codes: number[] = [];
+  getGidToCodePointMap(): Map<number, number> {
+    const result = new Map<number, number>();
+
+    for (const [gid, codePoints] of this.usedGlyphs) {
+      if (codePoints.size > 0) {
+        // Get the first code point (in case multiple map to same GID)
+        const firstCodePoint = codePoints.values().next().value;
+
+        if (firstCodePoint !== undefined) {
+          result.set(gid, firstCodePoint);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Iterate over text, tracking glyph usage and returning codePoint/GID pairs.
+   * This is the shared implementation for encodeText and encodeTextToGids.
+   */
+  private trackAndEncode(text: string): Array<{ codePoint: number; gid: number }> {
+    const result: Array<{ codePoint: number; gid: number }> = [];
 
     for (const char of text) {
       const codePoint = char.codePointAt(0);
@@ -189,19 +216,52 @@ export class EmbeddedFont extends PdfFont {
       this.usedGlyphs.get(gid)!.add(codePoint);
       this.usedCodePoints.set(codePoint, gid);
 
-      // Identity-H: code = code point
-      codes.push(codePoint);
+      result.push({ codePoint, gid });
     }
 
-    return codes;
+    return result;
   }
 
   /**
-   * Get width of a character code in glyph units (1000 = 1 em).
+   * Encode text to character codes.
    *
-   * For Identity-H encoding, the code is the Unicode code point.
+   * Returns Unicode code points, which is intuitive for users.
+   * The conversion to glyph IDs happens internally when writing to the PDF.
+   *
+   * Also tracks glyph usage for subsetting.
+   */
+  encodeText(text: string): number[] {
+    return this.trackAndEncode(text).map(e => e.codePoint);
+  }
+
+  /**
+   * Encode text to glyph IDs for PDF content stream.
+   *
+   * This is an internal method used when writing to the PDF.
+   * With CIDToGIDMap /Identity, the content stream must contain GIDs.
+   *
+   * @internal
+   */
+  encodeTextToGids(text: string): number[] {
+    return this.trackAndEncode(text).map(e => e.gid);
+  }
+
+  /**
+   * Convert a code point to its glyph ID.
+   *
+   * @internal
+   */
+  codePointToGid(codePoint: number): number {
+    return this.fontProgram.getGlyphId(codePoint);
+  }
+
+  /**
+   * Get width of a character in glyph units (1000 = 1 em).
+   *
+   * Takes a Unicode code point (user-friendly API).
    */
   getWidth(code: number): number {
+    // code is a Unicode code point - look up the GID to get the width
     const gid = this.fontProgram.getGlyphId(code);
     const width = this.fontProgram.getAdvanceWidth(gid);
 
@@ -210,9 +270,12 @@ export class EmbeddedFont extends PdfFont {
 
   /**
    * Decode character code to Unicode string.
-   * For Identity-H encoding, the code is the Unicode code point.
+   *
+   * For embedded fonts with Identity-H encoding, the code is the code point,
+   * so this just converts the code point back to a string.
    */
   toUnicode(code: number): string {
+    // code is a Unicode code point
     return String.fromCodePoint(code);
   }
 
@@ -267,6 +330,34 @@ export class EmbeddedFont extends PdfFont {
     this.usedCodePoints.clear();
 
     this._subsetTag = null;
+  }
+
+  /**
+   * Mark this font as used in a form field.
+   *
+   * Fonts used in form fields cannot be subsetted because users may type
+   * any character at runtime. This method is called automatically when
+   * an EmbeddedFont is used in form field appearances.
+   */
+  markUsedInForm(): void {
+    this._usedInForm = true;
+  }
+
+  /**
+   * Check if this font is used in a form field.
+   */
+  get usedInForm(): boolean {
+    return this._usedInForm;
+  }
+
+  /**
+   * Check if this font can be subsetted.
+   *
+   * Returns false if the font is used in a form field (since users can
+   * type any character at runtime).
+   */
+  canSubset(): boolean {
+    return !this._usedInForm;
   }
 
   /**

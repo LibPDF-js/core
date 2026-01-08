@@ -17,7 +17,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "style": {
+        "useBlockStatements": "error"
+      }
     }
   },
   "javascript": {
@@ -44,8 +47,12 @@
           "style": {
             "noNonNullAssertion": "off"
           },
+          "correctness": {
+            "noUnusedVariables": "off"
+          },
           "suspicious": {
-            "noApproximativeNumericConstant": "off"
+            "noApproximativeNumericConstant": "off",
+            "noExplicitAny": "off"
           }
         }
       }

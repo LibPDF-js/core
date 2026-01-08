@@ -19,6 +19,7 @@
  * ```
  */
 
+import type { Operator } from "#src/content/operators";
 import { AcroForm } from "#src/document/forms/acro-form";
 import { AppearanceGenerator } from "#src/document/forms/appearance-generator";
 import type {
@@ -30,12 +31,46 @@ import type {
   TextField,
 } from "#src/document/forms/fields";
 import { TerminalField } from "#src/document/forms/fields/base";
+import { EmbeddedFont } from "#src/fonts/embedded-font";
+import { isStandard14Font } from "#src/fonts/standard-14";
+import { black } from "#src/helpers/colors";
+import {
+  beginText,
+  concatMatrix,
+  endText,
+  popGraphicsState,
+  pushGraphicsState,
+  setFont,
+  setGraphicsState,
+  setTextMatrix,
+  showText,
+} from "#src/helpers/operators";
+import type { PDFImage } from "#src/images/pdf-image";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
+import { PdfString } from "#src/objects/pdf-string";
+import {
+  drawCircleOps,
+  drawEllipseOps,
+  drawLineOps,
+  drawRectangleOps,
+  setFillColor,
+} from "./drawing/operations";
+import { PathBuilder } from "./drawing/path-builder";
+import { layoutJustifiedLine, layoutText, measureText } from "./drawing/text-layout";
+import type {
+  DrawCircleOptions,
+  DrawEllipseOptions,
+  DrawImageOptions,
+  DrawLineOptions,
+  DrawRectangleOptions,
+  DrawTextOptions,
+  FontInput,
+} from "./drawing/types";
 import type { PDFContext } from "./pdf-context";
 import type { PDFEmbeddedPage } from "./pdf-embedded-page";
 
@@ -665,6 +700,468 @@ export class PDFPage {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // Shape Drawing
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Draw a rectangle on the page.
+   *
+   * @example
+   * ```typescript
+   * // Filled rectangle
+   * page.drawRectangle({
+   *   x: 50, y: 500, width: 200, height: 100,
+   *   color: rgb(0.95, 0.95, 0.95),
+   * });
+   *
+   * // Stroked rectangle with rounded corners
+   * page.drawRectangle({
+   *   x: 50, y: 500, width: 200, height: 100,
+   *   borderColor: rgb(0, 0, 0),
+   *   borderWidth: 2,
+   *   cornerRadius: 10,
+   * });
+   * ```
+   */
+  drawRectangle(options: DrawRectangleOptions): void {
+    // Register graphics state for opacity if needed
+    let gsName: string | null = null;
+
+    if (options.opacity !== undefined || options.borderOpacity !== undefined) {
+      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+    }
+
+    // Calculate rotation center if rotating
+    let rotate: { angle: number; originX: number; originY: number } | undefined;
+
+    if (options.rotate) {
+      const originX = options.rotate.origin?.x ?? options.x + options.width / 2;
+      const originY = options.rotate.origin?.y ?? options.y + options.height / 2;
+      rotate = { angle: options.rotate.angle, originX, originY };
+    }
+
+    const ops = drawRectangleOps({
+      x: options.x,
+      y: options.y,
+      width: options.width,
+      height: options.height,
+      fillColor: options.color,
+      strokeColor: options.borderColor,
+      strokeWidth: options.borderWidth,
+      dashArray: options.borderDashArray,
+      dashPhase: options.borderDashPhase,
+      cornerRadius: options.cornerRadius,
+      graphicsStateName: gsName ?? undefined,
+      rotate,
+    });
+
+    this.appendOperators(ops);
+  }
+
+  /**
+   * Draw a line on the page.
+   *
+   * @example
+   * ```typescript
+   * page.drawLine({
+   *   start: { x: 50, y: 500 },
+   *   end: { x: 550, y: 500 },
+   *   color: rgb(0, 0, 0),
+   *   thickness: 1,
+   * });
+   *
+   * // Dashed line
+   * page.drawLine({
+   *   start: { x: 50, y: 450 },
+   *   end: { x: 550, y: 450 },
+   *   color: rgb(0, 0, 0),
+   *   dashArray: [5, 3],
+   * });
+   * ```
+   */
+  drawLine(options: DrawLineOptions): void {
+    // Register graphics state for opacity if needed
+    let gsName: string | null = null;
+
+    if (options.opacity !== undefined) {
+      gsName = this.registerGraphicsStateForOpacity(undefined, options.opacity);
+    }
+
+    const ops = drawLineOps({
+      startX: options.start.x,
+      startY: options.start.y,
+      endX: options.end.x,
+      endY: options.end.y,
+      color: options.color ?? black,
+      thickness: options.thickness,
+      dashArray: options.dashArray,
+      dashPhase: options.dashPhase,
+      lineCap: options.lineCap,
+      graphicsStateName: gsName ?? undefined,
+    });
+
+    this.appendOperators(ops);
+  }
+
+  /**
+   * Draw a circle on the page.
+   *
+   * @example
+   * ```typescript
+   * page.drawCircle({
+   *   x: 300, y: 400,
+   *   radius: 50,
+   *   color: rgb(1, 0, 0),
+   *   borderColor: rgb(0, 0, 0),
+   *   borderWidth: 2,
+   * });
+   * ```
+   */
+  drawCircle(options: DrawCircleOptions): void {
+    // Register graphics state for opacity if needed
+    let gsName: string | null = null;
+
+    if (options.opacity !== undefined || options.borderOpacity !== undefined) {
+      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+    }
+
+    const ops = drawCircleOps({
+      cx: options.x,
+      cy: options.y,
+      radius: options.radius,
+      fillColor: options.color,
+      strokeColor: options.borderColor,
+      strokeWidth: options.borderWidth,
+      graphicsStateName: gsName ?? undefined,
+    });
+
+    this.appendOperators(ops);
+  }
+
+  /**
+   * Draw an ellipse on the page.
+   *
+   * @example
+   * ```typescript
+   * page.drawEllipse({
+   *   x: 300, y: 400,
+   *   xRadius: 100,
+   *   yRadius: 50,
+   *   color: rgb(0, 0, 1),
+   * });
+   * ```
+   */
+  drawEllipse(options: DrawEllipseOptions): void {
+    // Register graphics state for opacity if needed
+    let gsName: string | null = null;
+
+    if (options.opacity !== undefined || options.borderOpacity !== undefined) {
+      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+    }
+
+    // Calculate rotation center if rotating
+    let rotate: { angle: number; originX: number; originY: number } | undefined;
+
+    if (options.rotate) {
+      const originX = options.rotate.origin?.x ?? options.x;
+      const originY = options.rotate.origin?.y ?? options.y;
+      rotate = { angle: options.rotate.angle, originX, originY };
+    }
+
+    const ops = drawEllipseOps({
+      cx: options.x,
+      cy: options.y,
+      rx: options.xRadius,
+      ry: options.yRadius,
+      fillColor: options.color,
+      strokeColor: options.borderColor,
+      strokeWidth: options.borderWidth,
+      graphicsStateName: gsName ?? undefined,
+      rotate,
+    });
+
+    this.appendOperators(ops);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Text Drawing
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Draw text on the page.
+   *
+   * For multiline text, set `maxWidth` to enable word wrapping.
+   * Text containing `\n` will always create line breaks.
+   *
+   * @example
+   * ```typescript
+   * // Simple text
+   * page.drawText("Hello, World!", {
+   *   x: 50,
+   *   y: 700,
+   *   size: 24,
+   *   color: rgb(0, 0, 0),
+   * });
+   *
+   * // With a different font
+   * page.drawText("Bold Title", {
+   *   x: 50,
+   *   y: 650,
+   *   font: StandardFonts.TimesBold,
+   *   size: 18,
+   * });
+   *
+   * // Multiline with wrapping
+   * page.drawText(longText, {
+   *   x: 50,
+   *   y: 600,
+   *   maxWidth: 500,
+   *   lineHeight: 18,
+   *   alignment: "justify",
+   * });
+   * ```
+   */
+  drawText(text: string, options: DrawTextOptions = {}): void {
+    const x = options.x ?? 0;
+    const y = options.y ?? 0;
+    const font = options.font ?? "Helvetica";
+    const fontSize = options.size ?? 12;
+    const color = options.color ?? black;
+    const lineHeight = options.lineHeight ?? fontSize * 1.2;
+    const alignment = options.alignment ?? "left";
+
+    // Register font and get its name
+    const fontName = this.addFontResource(font);
+
+    // Register graphics state for opacity if needed
+    let gsName: string | null = null;
+
+    if (options.opacity !== undefined && options.opacity < 1) {
+      gsName = this.registerGraphicsStateForOpacity(options.opacity, undefined);
+    }
+
+    // Layout the text if multiline
+    let lines: { text: string; width: number }[];
+
+    if (options.maxWidth !== undefined) {
+      const layout = layoutText(text, font, fontSize, options.maxWidth, lineHeight);
+      lines = layout.lines;
+    } else {
+      // Split on explicit line breaks only
+      lines = text.split(/\r\n|\r|\n/).map(line => ({
+        text: line,
+        width: measureText(line, font, fontSize),
+      }));
+    }
+
+    // Build operators
+    const ops: Operator[] = [pushGraphicsState()];
+
+    if (gsName) {
+      ops.push(setGraphicsState(gsName));
+    }
+
+    // Apply rotation if specified
+    if (options.rotate) {
+      const originX = options.rotate.origin?.x ?? x;
+      const originY = options.rotate.origin?.y ?? y;
+      const rad = (options.rotate.angle * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      ops.push(concatMatrix(1, 0, 0, 1, originX, originY));
+      ops.push(concatMatrix(cos, sin, -sin, cos, 0, 0));
+      ops.push(concatMatrix(1, 0, 0, 1, -originX, -originY));
+    }
+
+    // Set fill color for text
+    ops.push(setFillColor(color));
+
+    ops.push(beginText());
+    ops.push(setFont(`/${fontName}`, fontSize));
+
+    // Draw each line
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineY = y - i * lineHeight;
+
+      if (line.text === "") {
+        continue; // Skip empty lines (they still contribute to height)
+      }
+
+      // Calculate x position based on alignment
+      let lineX = x;
+
+      if (alignment === "center" && options.maxWidth !== undefined) {
+        lineX = x + (options.maxWidth - line.width) / 2;
+      } else if (alignment === "right" && options.maxWidth !== undefined) {
+        lineX = x + options.maxWidth - line.width;
+      }
+
+      if (alignment === "justify" && options.maxWidth !== undefined && i < lines.length - 1) {
+        // Justified text - draw each word separately
+        const words = line.text.split(/\s+/).filter(w => w.length > 0);
+
+        if (words.length > 1) {
+          const positioned = layoutJustifiedLine(words, font, fontSize, options.maxWidth);
+
+          for (const pw of positioned) {
+            ops.push(setTextMatrix(1, 0, 0, 1, x + pw.x, lineY));
+            ops.push(showText(this.encodeTextForFont(pw.word, font)));
+          }
+
+          continue;
+        }
+      }
+
+      // Normal line drawing
+      ops.push(setTextMatrix(1, 0, 0, 1, lineX, lineY));
+      ops.push(showText(this.encodeTextForFont(line.text, font)));
+    }
+
+    ops.push(endText());
+    ops.push(popGraphicsState());
+
+    this.appendOperators(ops);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Image Drawing
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Draw an image on the page.
+   *
+   * If only width or height is specified, aspect ratio is preserved.
+   * If neither is specified, image is drawn at natural size (in points).
+   *
+   * @example
+   * ```typescript
+   * const image = await pdf.embedImage(jpegBytes);
+   *
+   * // Draw at natural size
+   * page.drawImage(image, { x: 50, y: 500 });
+   *
+   * // Scale to width, preserving aspect ratio
+   * page.drawImage(image, { x: 50, y: 400, width: 200 });
+   *
+   * // With rotation
+   * page.drawImage(image, {
+   *   x: 300, y: 400,
+   *   width: 100, height: 100,
+   *   rotate: { angle: 45 },
+   * });
+   * ```
+   */
+  drawImage(image: PDFImage, options: DrawImageOptions = {}): void {
+    const x = options.x ?? 0;
+    const y = options.y ?? 0;
+
+    // Calculate dimensions
+    let width: number;
+    let height: number;
+
+    if (options.width !== undefined && options.height !== undefined) {
+      // Both specified - use as is (may distort)
+      width = options.width;
+      height = options.height;
+    } else if (options.width !== undefined) {
+      // Width specified - calculate height from aspect ratio
+      width = options.width;
+      height = width / image.aspectRatio;
+    } else if (options.height !== undefined) {
+      // Height specified - calculate width from aspect ratio
+      height = options.height;
+      width = height * image.aspectRatio;
+    } else {
+      // Neither specified - use natural size in points
+      width = image.widthInPoints;
+      height = image.heightInPoints;
+    }
+
+    // Add image XObject to resources
+    const imageName = this.addXObjectResource(image.ref);
+
+    // Build operators
+    const ops: string[] = [];
+    ops.push("q"); // Save graphics state
+
+    // Apply opacity if needed
+    if (options.opacity !== undefined && options.opacity < 1) {
+      const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
+      ops.push(`/${gsName} gs`);
+    }
+
+    // Apply rotation if specified
+    if (options.rotate) {
+      const originX = options.rotate.origin?.x ?? x + width / 2;
+      const originY = options.rotate.origin?.y ?? y + height / 2;
+      const rad = (options.rotate.angle * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      // Translate to origin, rotate, translate back
+      ops.push(`1 0 0 1 ${this.formatNumber(originX)} ${this.formatNumber(originY)} cm`);
+      ops.push(
+        `${this.formatNumber(cos)} ${this.formatNumber(sin)} ${this.formatNumber(-sin)} ${this.formatNumber(cos)} 0 0 cm`,
+      );
+      ops.push(`1 0 0 1 ${this.formatNumber(-originX)} ${this.formatNumber(-originY)} cm`);
+    }
+
+    // Apply transformation matrix to scale and position
+    // Image XObjects are 1x1 unit, so we scale to desired size
+    ops.push(
+      `${this.formatNumber(width)} 0 0 ${this.formatNumber(height)} ${this.formatNumber(x)} ${this.formatNumber(y)} cm`,
+    );
+
+    // Draw the image
+    ops.push(`/${imageName} Do`);
+
+    ops.push("Q"); // Restore graphics state
+
+    this.appendContent(ops.join("\n"));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Path Drawing
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Start building a custom path.
+   *
+   * Returns a PathBuilder with a fluent API for constructing paths.
+   * The path is drawn when you call stroke(), fill(), or fillAndStroke().
+   *
+   * @example
+   * ```typescript
+   * // Triangle
+   * page.drawPath()
+   *   .moveTo(100, 100)
+   *   .lineTo(200, 100)
+   *   .lineTo(150, 200)
+   *   .close()
+   *   .fill({ color: rgb(1, 0, 0) });
+   *
+   * // Complex shape
+   * page.drawPath()
+   *   .moveTo(50, 50)
+   *   .curveTo(100, 100, 150, 100, 200, 50)
+   *   .lineTo(200, 150)
+   *   .close()
+   *   .fillAndStroke({
+   *     color: rgb(0.9, 0.9, 1),
+   *     borderColor: rgb(0, 0, 1),
+   *   });
+   * ```
+   */
+  drawPath(): PathBuilder {
+    return new PathBuilder(
+      content => this.appendContent(content),
+      (fillOpacity, strokeOpacity) =>
+        this.registerGraphicsStateForOpacity(fillOpacity, strokeOpacity),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // Internal Helpers
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -839,5 +1336,132 @@ export class PDFPage {
       x2: x2.value,
       y2: y2.value,
     };
+  }
+
+  /**
+   * Register a graphics state for opacity and return its name.
+   * Returns null if no opacity is needed.
+   */
+  private registerGraphicsStateForOpacity(
+    fillOpacity?: number,
+    strokeOpacity?: number,
+  ): string | null {
+    if (fillOpacity === undefined && strokeOpacity === undefined) {
+      return null;
+    }
+
+    const params: { ca?: number; CA?: number } = {};
+
+    if (fillOpacity !== undefined) {
+      params.CA = Math.max(0, Math.min(1, fillOpacity)); // Fill opacity
+    }
+
+    if (strokeOpacity !== undefined) {
+      params.ca = Math.max(0, Math.min(1, strokeOpacity)); // Stroke opacity
+    }
+
+    return this.addGraphicsState(params);
+  }
+
+  /**
+   * Append operators to the page content stream.
+   */
+  private appendOperators(ops: Operator[]): void {
+    const content = ops.map(op => op.toString()).join("\n");
+    this.appendContent(content);
+  }
+
+  /**
+   * Add a font resource to the page and return its name.
+   */
+  private addFontResource(font: FontInput): string {
+    const resources = this.getResources();
+    let fonts = resources.get("Font");
+
+    if (!(fonts instanceof PdfDict)) {
+      fonts = new PdfDict();
+      resources.set("Font", fonts);
+    }
+
+    if (typeof font === "string") {
+      // Standard 14 font - create inline font dict
+      if (!isStandard14Font(font)) {
+        throw new Error(`Unknown Standard 14 font: ${font}`);
+      }
+
+      // Check if we already have this font
+      for (const [existingName, value] of fonts) {
+        if (value instanceof PdfDict) {
+          const baseFont = value.get("BaseFont");
+
+          if (baseFont instanceof PdfName && baseFont.value === font) {
+            return existingName.value;
+          }
+        }
+      }
+
+      // Create new font dict
+      const fontDict = PdfDict.of({
+        Type: PdfName.of("Font"),
+        Subtype: PdfName.of("Type1"),
+        BaseFont: PdfName.of(font),
+      });
+
+      const fontName = this.generateUniqueName(fonts, "F");
+      fonts.set(fontName, fontDict);
+
+      return fontName;
+    }
+
+    // Embedded font - get reference from PDFFonts
+    if (font instanceof EmbeddedFont) {
+      if (!this.ctx) {
+        throw new Error("Cannot use embedded fonts without document context");
+      }
+
+      const fontRef = this.ctx.getFontRef(font);
+
+      // Check if we already have this font reference
+      for (const [existingName, value] of fonts) {
+        if (
+          value instanceof PdfRef &&
+          value.objectNumber === fontRef.objectNumber &&
+          value.generation === fontRef.generation
+        ) {
+          return existingName.value;
+        }
+      }
+
+      // Add font reference to page resources
+      const fontName = this.generateUniqueName(fonts, "F");
+      fonts.set(fontName, fontRef);
+
+      return fontName;
+    }
+
+    throw new Error("Unknown font type");
+  }
+
+  /**
+   * Encode text to a PDF string for the given font.
+   */
+  private encodeTextForFont(text: string, font: FontInput): PdfString {
+    if (typeof font === "string") {
+      // Standard 14 font - use WinAnsi encoding (Latin-1 subset)
+      return PdfString.fromString(text);
+    }
+
+    // Embedded font - use Identity-H encoding with GIDs
+    // With CIDToGIDMap /Identity, the content stream must contain glyph IDs
+    const gids = font.encodeTextToGids(text);
+    const bytes = new Uint8Array(gids.length * 2);
+
+    for (let i = 0; i < gids.length; i++) {
+      const gid = gids[i];
+      bytes[i * 2] = (gid >> 8) & 0xff;
+      bytes[i * 2 + 1] = gid & 0xff;
+    }
+
+    return PdfString.fromBytes(bytes);
   }
 }

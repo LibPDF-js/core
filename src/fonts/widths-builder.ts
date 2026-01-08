@@ -10,6 +10,8 @@
  *   CIDs 100-200 = 500
  */
 
+import { PdfArray } from "#src/objects/pdf-array.ts";
+import { PdfNumber } from "#src/objects/pdf-number.ts";
 import type { FontProgram } from "./font-program/index.ts";
 
 /**
@@ -22,6 +24,34 @@ export type WidthEntry =
 /**
  * Build a /W array for a CID font from used glyphs.
  *
+ * With CIDToGIDMap /Identity, the content stream contains GIDs.
+ * Therefore the /W array must be keyed by GID.
+ *
+ * @param gidToCodePoint - Map of GIDs to code points that are used
+ * @param fontProgram - The font program to get widths from
+ * @returns Array of width entries keyed by GID
+ */
+export function buildWidthsArrayFromGids(
+  gidToCodePoint: Map<number, number>,
+  fontProgram: FontProgram,
+): WidthEntry[] {
+  // Build widths keyed by GID (since content stream contains GIDs)
+  const gidWidths = new Map<number, number>();
+
+  for (const [gid, _codePoint] of gidToCodePoint) {
+    const advanceWidth = fontProgram.getAdvanceWidth(gid);
+    // Scale to 1000 units per em
+    const width = Math.round((advanceWidth * 1000) / fontProgram.unitsPerEm);
+    gidWidths.set(gid, width);
+  }
+
+  return optimizeWidthsArray(gidWidths);
+}
+
+/**
+ * @deprecated Use buildWidthsArrayFromGids instead.
+ * Build a /W array for a CID font from used glyphs.
+ *
  * @param usedCodePoints - Map of code points to GIDs that are used
  * @param fontProgram - The font program to get widths from
  * @returns Array of width entries
@@ -30,7 +60,7 @@ export function buildWidthsArray(
   usedCodePoints: Map<number, number>,
   fontProgram: FontProgram,
 ): WidthEntry[] {
-  // For Identity-H encoding, CID = code point
+  // For Identity-H encoding, CID = code point (LEGACY - incorrect with CIDToGIDMap /Identity)
   // Get widths for each used code point
   const cidWidths = new Map<number, number>();
 
@@ -80,7 +110,9 @@ export function optimizeWidthsArray(cidWidths: Map<number, number>): WidthEntry[
     // Check if all widths in this group are the same
     const firstWidth = cidWidths.get(startCid);
 
-    if (!firstWidth) {
+    if (firstWidth === undefined) {
+      // Should not happen, but skip this group if it does
+      groupStart = groupEnd + 1;
       continue;
     }
 
@@ -126,6 +158,7 @@ export function optimizeWidthsArray(cidWidths: Map<number, number>): WidthEntry[
 /**
  * Serialize width entries to a PDF array string.
  *
+ * @deprecated Use widthEntriesToPdfArray instead for better performance.
  * @param entries - Width entries from buildWidthsArray
  * @returns String representation for PDF (e.g., "[1 [500 600] 100 200 500]")
  */
@@ -145,6 +178,33 @@ export function serializeWidthsArray(entries: WidthEntry[]): string {
   }
 
   return `[${parts.join(" ")}]`;
+}
+
+/**
+ * Convert width entries directly to a PdfArray.
+ *
+ * This avoids the unnecessary string serialization/parsing round-trip.
+ *
+ * @param entries - Width entries from buildWidthsArray
+ * @returns PdfArray for the /W entry
+ */
+export function widthEntriesToPdfArray(entries: WidthEntry[]): PdfArray {
+  const result: (PdfNumber | PdfArray)[] = [];
+
+  for (const entry of entries) {
+    if (entry.type === "individual") {
+      // Format: startCid [w1 w2 w3 ...]
+      result.push(PdfNumber.of(entry.startCid));
+      result.push(new PdfArray(entry.widths.map(w => PdfNumber.of(w))));
+    } else {
+      // Format: startCid endCid width
+      result.push(PdfNumber.of(entry.startCid));
+      result.push(PdfNumber.of(entry.endCid));
+      result.push(PdfNumber.of(entry.width));
+    }
+  }
+
+  return new PdfArray(result);
 }
 
 /**

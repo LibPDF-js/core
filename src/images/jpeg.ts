@@ -144,6 +144,15 @@ export function parseJpegHeader(bytes: Uint8Array): JpegInfo {
     }
 
     const segmentLength = (bytes[offset] << 8) | bytes[offset + 1];
+
+    // Segment length includes the 2-byte length field itself, so must be >= 2
+    // A value of 0 or 1 would cause an infinite loop or go backwards
+    if (segmentLength < 2) {
+      throw new Error(
+        `Invalid JPEG: segment length ${segmentLength} is too small at offset ${offset}`,
+      );
+    }
+
     offset += segmentLength;
   }
 

@@ -38,15 +38,16 @@ describe("PDF font embedding", () => {
     expect(usedGlyphs).toContain(0); // .notdef always included
   });
 
-  it("should create font reference on save", async () => {
+  it("should create font reference immediately on embed", async () => {
     const pdfBytes = await loadFixture("basic", "document.pdf");
     const pdf = await PDF.load(pdfBytes);
 
     const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
     const font = pdf.embedFont(fontBytes);
 
-    // Before save, no reference
-    expect(pdf.getFontRef(font)).toBeNull();
+    // Reference is now immediately available (pre-allocated)
+    const fontRef = pdf.getFontRef(font);
+    expect(fontRef).toBeInstanceOf(PdfRef);
 
     // Encode text so the font has glyphs
     font.encodeText("Test");
@@ -54,9 +55,8 @@ describe("PDF font embedding", () => {
     // Save the PDF
     const savedBytes = await pdf.save();
 
-    // After save, should have reference
-    const fontRef = pdf.getFontRef(font);
-    expect(fontRef).toBeInstanceOf(PdfRef);
+    // After save, reference should still be the same
+    expect(pdf.getFontRef(font)).toBe(fontRef);
 
     // Verify the saved PDF can be loaded
     const reloadedPdf = await PDF.load(savedBytes);
@@ -90,7 +90,7 @@ describe("PDF font embedding", () => {
     // Encode some text
     const codes = font.encodeText("Hello World!");
 
-    // Codes should be Unicode code points
+    // encodeText returns Unicode code points (user-friendly API)
     expect(codes[0]).toBe(72); // 'H'
     expect(codes[1]).toBe(101); // 'e'
 
@@ -267,5 +267,142 @@ describe("PDF.embedFont edge cases", () => {
       const unencodable = font.getUnencodableCharacters(text);
       expect(unencodable.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("Font subsetting options", () => {
+  it("should subset fonts when subsetFonts: true", async () => {
+    const pdfBytes = await loadFixture("basic", "document.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
+    const font = pdf.embedFont(fontBytes);
+
+    // Encode just a few characters
+    font.encodeText("ABC");
+
+    // Save with subsetting
+    const subsetBytes = await pdf.save({ subsetFonts: true });
+
+    // Font should have a subset tag
+    expect(font.subsetTag).toMatch(/^[A-Z]{6}$/);
+    expect(font.baseFontName).toContain("+");
+
+    // The PDF should be valid
+    const reloaded = await PDF.load(subsetBytes);
+    expect(reloaded.getPageCount()).toBeGreaterThan(0);
+  });
+
+  it("should embed full font when subsetFonts: false (default)", async () => {
+    const pdfBytes = await loadFixture("basic", "document.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
+    const font = pdf.embedFont(fontBytes);
+
+    // Encode just a few characters
+    font.encodeText("ABC");
+
+    // Save without subsetting (default)
+    const fullBytes = await pdf.save({ subsetFonts: false });
+
+    // The PDF should be valid
+    const reloaded = await PDF.load(fullBytes);
+    expect(reloaded.getPageCount()).toBeGreaterThan(0);
+  });
+
+  it("should create larger files with full embedding vs subset", async () => {
+    const pdfBytes = await loadFixture("basic", "document.pdf");
+
+    // Create two PDFs with same font
+    const pdf1 = await PDF.load(pdfBytes);
+    const pdf2 = await PDF.load(pdfBytes);
+
+    const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
+    const font1 = pdf1.embedFont(fontBytes);
+    const font2 = pdf2.embedFont(fontBytes);
+
+    // Encode just a few characters in both
+    font1.encodeText("ABC");
+    font2.encodeText("ABC");
+
+    // Save both ways
+    const subsetBytes = await pdf1.save({ subsetFonts: true });
+    const fullBytes = await pdf2.save({ subsetFonts: false });
+
+    // Full embedding should create a larger file
+    expect(fullBytes.length).toBeGreaterThan(subsetBytes.length);
+  });
+
+  it("should not subset fonts marked for form use even with subsetFonts: true", async () => {
+    const pdfBytes = await loadFixture("basic", "document.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
+    const font = pdf.embedFont(fontBytes);
+
+    // Mark font as used in form
+    font.markUsedInForm();
+
+    // Encode some characters
+    font.encodeText("ABC");
+
+    // canSubset should return false
+    expect(font.canSubset()).toBe(false);
+
+    // Save with subsetting enabled
+    const savedBytes = await pdf.save({ subsetFonts: true });
+
+    // The PDF should be valid
+    const reloaded = await PDF.load(savedBytes);
+    expect(reloaded.getPageCount()).toBeGreaterThan(0);
+  });
+});
+
+describe("PDFFonts API", () => {
+  it("should throw when getting ref for non-embedded font", async () => {
+    const pdfBytes = await loadFixture("basic", "document.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    // Create a font from another document
+    const pdfBytes2 = await loadFixture("basic", "document.pdf");
+    const pdf2 = await PDF.load(pdfBytes2);
+    const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
+    const otherFont = pdf2.embedFont(fontBytes);
+
+    // Trying to get ref for font from another doc should throw
+    expect(() => pdf.fonts.getRef(otherFont)).toThrow();
+  });
+
+  it("should track finalized state", async () => {
+    const pdfBytes = await loadFixture("basic", "document.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
+    const font = pdf.embedFont(fontBytes);
+    font.encodeText("Test");
+
+    expect(pdf.fonts.isFinalized).toBe(false);
+
+    await pdf.save();
+
+    expect(pdf.fonts.isFinalized).toBe(true);
+  });
+
+  it("should not finalize twice", async () => {
+    const pdfBytes = await loadFixture("basic", "document.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    const fontBytes = await loadFixture("fonts", "ttf/LiberationSans-Regular.ttf");
+    const font = pdf.embedFont(fontBytes);
+    font.encodeText("Test");
+
+    // First save
+    await pdf.save();
+    const firstFinalizedState = pdf.fonts.isFinalized;
+
+    // Second save should not try to finalize again
+    await pdf.save();
+    expect(pdf.fonts.isFinalized).toBe(firstFinalizedState);
   });
 });
