@@ -885,7 +885,7 @@ describe("Drawing API Integration", () => {
 
       // Title
       page.drawText("You're Invited!", {
-        x: 306,
+        x: 150,
         y: 620,
         font: pacifico,
         size: 48,
@@ -895,7 +895,7 @@ describe("Drawing API Integration", () => {
 
       // Subtitle
       page.drawText("to celebrate", {
-        x: 306,
+        x: 150,
         y: 560,
         font: josefin,
         size: 20,
@@ -905,7 +905,7 @@ describe("Drawing API Integration", () => {
 
       // Event name
       page.drawText("Sarah's Birthday Party", {
-        x: 306,
+        x: 150,
         y: 510,
         font: caveat,
         size: 36,
@@ -922,7 +922,7 @@ describe("Drawing API Integration", () => {
       });
 
       page.drawText("When", {
-        x: 100,
+        x: 150,
         y: 400,
         font: josefin,
         size: 14,
@@ -930,7 +930,7 @@ describe("Drawing API Integration", () => {
       });
 
       page.drawText("Saturday, March 15th at 7:00 PM", {
-        x: 100,
+        x: 150,
         y: 375,
         font: caveat,
         size: 22,
@@ -938,7 +938,7 @@ describe("Drawing API Integration", () => {
       });
 
       page.drawText("Where", {
-        x: 100,
+        x: 150,
         y: 330,
         font: josefin,
         size: 14,
@@ -946,7 +946,7 @@ describe("Drawing API Integration", () => {
       });
 
       page.drawText("The Garden Pavilion", {
-        x: 100,
+        x: 150,
         y: 305,
         font: caveat,
         size: 22,
@@ -954,7 +954,7 @@ describe("Drawing API Integration", () => {
       });
 
       page.drawText("123 Celebration Lane, Party City", {
-        x: 100,
+        x: 150,
         y: 280,
         font: josefin,
         size: 14,
@@ -971,7 +971,7 @@ describe("Drawing API Integration", () => {
 
       // RSVP
       page.drawText("RSVP", {
-        x: 306,
+        x: 150,
         y: 180,
         font: pacifico,
         size: 28,
@@ -980,7 +980,7 @@ describe("Drawing API Integration", () => {
       });
 
       page.drawText("sarah@example.com  |  (555) 123-4567", {
-        x: 306,
+        x: 150,
         y: 145,
         font: josefin,
         size: 14,
@@ -990,7 +990,7 @@ describe("Drawing API Integration", () => {
 
       // Bottom flourish
       page.drawText("We hope to see you there!", {
-        x: 306,
+        x: 150,
         y: 80,
         font: caveat,
         size: 20,
