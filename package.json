@@ -2,12 +2,29 @@
   "name": "@libpdf/core",
   "version": "0.0.1",
   "description": "A modern PDF library for TypeScript - parsing and generation",
-  "module": "src/index.ts",
   "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "imports": {
     "#src/*": "./src/*"
   },
   "scripts": {
+    "build": "tsdown",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -17,6 +34,7 @@
     "format": "biome format --write .",
     "examples": "bun run examples/run-all.ts",
     "examples:quiet": "bun run examples/run-all.ts --quiet",
+    "prepublishOnly": "bun run build",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -25,6 +43,7 @@
     "@types/pako": "^2.0.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "tsdown": "^0.18.4",
     "vitest": "^4.0.16"
   },
   "peerDependencies": {
