@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { PdfName } from "./pdf-name";
 
 describe("PdfName", () => {
+  afterEach(() => {
+    // Clear cache between tests to avoid interference
+    PdfName.clearCache();
+  });
+
   it("has type 'name'", () => {
     expect(PdfName.of("Type").type).toBe("name");
   });
@@ -42,5 +47,27 @@ describe("PdfName", () => {
 
     expect(empty.value).toBe("");
     expect(PdfName.of("")).toBe(empty);
+  });
+
+  describe("LRU cache", () => {
+    it("clearCache clears non-permanent names", () => {
+      const custom = PdfName.of("CustomName");
+      expect(PdfName.cacheSize).toBeGreaterThan(0);
+
+      PdfName.clearCache();
+
+      // Common names should still work
+      expect(PdfName.of("Type")).toBe(PdfName.Type);
+      // But cache size should be 0
+      expect(PdfName.cacheSize).toBe(0);
+    });
+
+    it("permanent names survive clearCache", () => {
+      PdfName.clearCache();
+
+      // Common names should still be retrievable and be the same instance
+      expect(PdfName.of("Type")).toBe(PdfName.Type);
+      expect(PdfName.of("Page")).toBe(PdfName.Page);
+    });
   });
 });

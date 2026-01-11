@@ -4,7 +4,7 @@
  * Creates the appropriate field type based on /FT and /Ff values.
  */
 
-import type { PdfDict } from "#src/objects/pdf-dict";
+import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import type { ObjectRegistry } from "../../object-registry";
@@ -92,7 +92,9 @@ function getInheritableFieldName(
       break;
     }
 
-    current = registry.getObject(parentRef) as PdfDict | null;
+    const obj = registry.getObject(parentRef);
+
+    current = obj instanceof PdfDict ? obj : null;
   }
 
   return null;

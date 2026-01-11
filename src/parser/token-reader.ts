@@ -37,6 +37,12 @@ import type {
 } from "./token";
 
 /**
+ * Shared TextDecoder instance to avoid creating new ones in hot paths.
+ * TextDecoder is stateless when not using streaming mode, so it's safe to share.
+ */
+const sharedTextDecoder = new TextDecoder();
+
+/**
  * On-demand tokenizer for PDF syntax.
  *
  * Reads tokens one at a time from a Scanner, handling whitespace,
@@ -320,7 +326,7 @@ export class TokenReader {
       bytes.push(byte);
     }
 
-    const value = new TextDecoder().decode(new Uint8Array(bytes));
+    const value = sharedTextDecoder.decode(new Uint8Array(bytes));
 
     return { type: "name", value, position };
   }
@@ -559,6 +565,6 @@ export class TokenReader {
   private extractText(start: number, end: number): string {
     const bytes = this.scanner.bytes.subarray(start, end);
 
-    return new TextDecoder().decode(bytes);
+    return sharedTextDecoder.decode(bytes);
   }
 }

@@ -27,7 +27,7 @@ export class FlateFilter implements Filter {
     let decompressed: Uint8Array;
 
     try {
-      if (hasNativeDecompression()) {
+      if (!hasNativeDecompression()) {
         throw new Error("Native decompression not available, falling back to pako");
       }
 

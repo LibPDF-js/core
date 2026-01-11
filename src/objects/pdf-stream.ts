@@ -18,6 +18,22 @@ import type { PdfObject } from "./pdf-object";
  * ```
  *
  * Extends PdfDict with attached data.
+ *
+ * ## Data State
+ *
+ * The `_data` field can contain either encoded (compressed) or decoded
+ * (uncompressed) bytes, depending on how the stream was created:
+ *
+ * - **After parsing**: `_data` contains the raw bytes from the PDF file,
+ *   which are typically encoded/compressed. Use `getDecodedData()` to
+ *   decompress them.
+ *
+ * - **After setData()**: `_data` contains uncompressed bytes. The /Filter
+ *   entries are cleared. The stream will be written as-is (or re-compressed
+ *   if `compressStreams` is enabled during save).
+ *
+ * This asymmetry is intentional for efficiency (avoid decompressing during
+ * parse if not needed) but users should be aware of it.
  */
 export class PdfStream extends PdfDict {
   override get type(): "stream" {
@@ -26,10 +42,23 @@ export class PdfStream extends PdfDict {
 
   private _data: Uint8Array;
 
+  /**
+   * Create a new PdfStream.
+   *
+   * @param dict - Either a PdfDict to copy entries from, or an iterable of
+   *               [key, value] pairs. When passing a PdfDict, all its entries
+   *               are copied to the new stream.
+   * @param data - The stream data (default: empty). After parsing, this is
+   *               the raw (possibly encoded) bytes. After setData(), this is
+   *               the decoded bytes.
+   */
   constructor(
     dict?: PdfDict | Iterable<[PdfName | string, PdfObject]>,
     data: Uint8Array = new Uint8Array(0),
   ) {
+    // PdfDict's [Symbol.iterator] yields [PdfName, PdfObject] pairs,
+    // so we can pass it directly to super() when dict is a PdfDict.
+    // The super constructor will iterate over the entries.
     super(dict);
 
     this._data = data;
@@ -94,6 +123,21 @@ export class PdfStream extends PdfDict {
     return FilterPipeline.decode(this._data, filterSpecs);
   }
 
+  /**
+   * Get the encoded (compressed) stream data.
+   *
+   * **Important:** This method assumes `_data` contains *decoded* bytes
+   * and applies the filters specified in /Filter to encode them.
+   *
+   * This is typically used after `setData()` has been called with
+   * uncompressed content, and you need to get the compressed form.
+   *
+   * If the stream was just parsed and hasn't been modified, `_data`
+   * is already encoded - calling this would double-encode! In that
+   * case, just use the `.data` property directly.
+   *
+   * @returns Encoded data (compressed if filters are specified)
+   */
   async getEncodedData(): Promise<Uint8Array> {
     const filterEntry = this.get("Filter");
 

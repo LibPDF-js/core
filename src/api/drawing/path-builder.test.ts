@@ -44,6 +44,36 @@ describe("PathBuilder", () => {
       expect(content).toContain("10 20 30 40 50 60 c");
     });
 
+    it("quadraticCurveTo converts to cubic Bezier correctly", () => {
+      const { builder, appendContent } = createBuilder();
+
+      // Start at (0, 0), control point at (50, 100), end at (100, 0)
+      builder.moveTo(0, 0).quadraticCurveTo(50, 100, 100, 0).stroke();
+
+      const content = appendContent.mock.calls[0][0];
+      // Quadratic to cubic conversion:
+      // CP1 = P0 + 2/3 * (QCP - P0) = (0,0) + 2/3 * (50,100) = (33.333, 66.667)
+      // CP2 = P  + 2/3 * (QCP - P)  = (100,0) + 2/3 * (50-100, 100-0) = (100,0) + 2/3 * (-50, 100) = (66.667, 66.667)
+      expect(content).toContain("0 0 m");
+      // Check for curve operator with approximately correct values
+      expect(content).toMatch(/33\.333.*66\.666.*66\.666.*66\.666.*100 0 c/);
+    });
+
+    it("quadraticCurveTo tracks current point correctly", () => {
+      const { builder, appendContent } = createBuilder();
+
+      // Chain two quadratic curves - the second should use end of first as start
+      builder
+        .moveTo(0, 0)
+        .quadraticCurveTo(25, 50, 50, 0) // First curve: (0,0) -> (50,0)
+        .quadraticCurveTo(75, 50, 100, 0) // Second curve: (50,0) -> (100,0)
+        .stroke();
+
+      const content = appendContent.mock.calls[0][0];
+      // Should have two curve operators
+      expect((content.match(/ c\n/g) || []).length).toBe(2);
+    });
+
     it("close adds close-path operator", () => {
       const { builder, appendContent } = createBuilder();
 

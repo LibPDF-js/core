@@ -90,16 +90,23 @@ export class ContentTokenizer {
   }
 
   private readNext(): ContentOrOperatorToken | null {
-    const token = this.reader.nextToken();
+    while (true) {
+      const token = this.reader.nextToken();
 
-    if (token.type === "eof") {
-      return null;
+      if (token.type === "eof") {
+        return null;
+      }
+
+      const result = this.convertToken(token);
+
+      // If convertToken returns null (skipped token), try the next one
+      if (result !== null) {
+        return result;
+      }
     }
-
-    return this.convertToken(token);
   }
 
-  private convertToken(token: Token): ContentOrOperatorToken {
+  private convertToken(token: Token): ContentOrOperatorToken | null {
     switch (token.type) {
       case "number":
         return { type: "number", value: token.value };
@@ -142,7 +149,7 @@ export class ContentTokenizer {
     return { type: "operator", name: value };
   }
 
-  private handleDelimiter(value: string): ContentToken {
+  private handleDelimiter(value: string): ContentToken | null {
     if (value === "[") {
       return this.readArray();
     }
@@ -152,7 +159,11 @@ export class ContentTokenizer {
     }
 
     // Unexpected delimiters (], >>) - shouldn't happen in valid content stream
-    throw new Error(`Unexpected delimiter: ${value}`);
+    // Be lenient: warn and skip the token rather than throwing
+    console.warn(
+      `ContentTokenizer: Unexpected delimiter '${value}' at position ${this.scanner.position} - skipping`,
+    );
+    return null;
   }
 
   private readArray(): ArrayToken {

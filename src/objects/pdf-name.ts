@@ -1,4 +1,5 @@
 import { CHAR_HASH, DELIMITERS, WHITESPACE } from "#src/helpers/chars";
+import { LRUCache } from "#src/helpers/lru-cache";
 import type { ByteWriter } from "#src/io/byte-writer";
 import type { PdfPrimitive } from "./pdf-primitive";
 
@@ -6,6 +7,12 @@ import type { PdfPrimitive } from "./pdf-primitive";
 // These are: whitespace, delimiters (), <>, [], {}, /, %, #
 // Plus anything outside printable ASCII (33-126)
 const NAME_NEEDS_ESCAPE = new Set([...WHITESPACE, ...DELIMITERS, CHAR_HASH]);
+
+/**
+ * Default cache size for PdfName interning.
+ * Can be overridden via PdfName.setCacheSize().
+ */
+const DEFAULT_NAME_CACHE_SIZE = 10000;
 
 /**
  * Escape a PDF name for serialization.
@@ -38,15 +45,39 @@ function escapeName(name: string): string {
  *
  * In PDF: `/Type`, `/Page`, `/Length`
  *
- * Names are interned — `PdfName.of("Type") === PdfName.of("Type")`.
+ * Names are interned using an LRU cache to prevent unbounded memory growth.
+ * `PdfName.of("Type") === PdfName.of("Type")` as long as both are in cache.
  * Use `.of()` to get or create instances.
+ *
+ * Common PDF names (Type, Page, etc.) are pre-cached and always available.
  */
 export class PdfName implements PdfPrimitive {
   get type(): "name" {
     return "name";
   }
 
-  private static cache = new Map<string, PdfName>();
+  private static cache = new LRUCache<string, PdfName>(DEFAULT_NAME_CACHE_SIZE);
+
+  /**
+   * Pre-cached common names that should never be evicted.
+   * These are stored separately from the LRU cache.
+   */
+  private static readonly permanentCache = new Map<string, PdfName>();
+
+  // Common PDF names (pre-cached in permanent cache)
+  static readonly Type = PdfName.createPermanent("Type");
+  static readonly Page = PdfName.createPermanent("Page");
+  static readonly Pages = PdfName.createPermanent("Pages");
+  static readonly Catalog = PdfName.createPermanent("Catalog");
+  static readonly Count = PdfName.createPermanent("Count");
+  static readonly Kids = PdfName.createPermanent("Kids");
+  static readonly Parent = PdfName.createPermanent("Parent");
+  static readonly MediaBox = PdfName.createPermanent("MediaBox");
+  static readonly Resources = PdfName.createPermanent("Resources");
+  static readonly Contents = PdfName.createPermanent("Contents");
+  static readonly Length = PdfName.createPermanent("Length");
+  static readonly Filter = PdfName.createPermanent("Filter");
+  static readonly FlateDecode = PdfName.createPermanent("FlateDecode");
 
   private constructor(readonly value: string) {}
 
@@ -55,33 +86,55 @@ export class PdfName implements PdfPrimitive {
    * The leading `/` should NOT be included.
    */
   static of(name: string): PdfName {
+    // Check permanent cache first (common names)
+    const permanent = PdfName.permanentCache.get(name);
+    if (permanent) {
+      return permanent;
+    }
+
+    // Check LRU cache
     let cached = PdfName.cache.get(name);
 
     if (!cached) {
       cached = new PdfName(name);
-
       PdfName.cache.set(name, cached);
     }
 
     return cached;
   }
 
+  /**
+   * Clear the name cache.
+   *
+   * Useful for long-running applications that process many PDFs
+   * and want to reclaim memory between documents.
+   *
+   * Note: Common names (Type, Page, etc.) are not cleared.
+   */
+  static clearCache(): void {
+    PdfName.cache.clear();
+  }
+
+  /**
+   * Get the current size of the LRU cache.
+   */
+  static get cacheSize(): number {
+    return PdfName.cache.size;
+  }
+
   toBytes(writer: ByteWriter): void {
     writer.writeAscii(`/${escapeName(this.value)}`);
   }
 
-  // Common PDF names (pre-cached)
-  static readonly Type = PdfName.of("Type");
-  static readonly Page = PdfName.of("Page");
-  static readonly Pages = PdfName.of("Pages");
-  static readonly Catalog = PdfName.of("Catalog");
-  static readonly Count = PdfName.of("Count");
-  static readonly Kids = PdfName.of("Kids");
-  static readonly Parent = PdfName.of("Parent");
-  static readonly MediaBox = PdfName.of("MediaBox");
-  static readonly Resources = PdfName.of("Resources");
-  static readonly Contents = PdfName.of("Contents");
-  static readonly Length = PdfName.of("Length");
-  static readonly Filter = PdfName.of("Filter");
-  static readonly FlateDecode = PdfName.of("FlateDecode");
+  /**
+   * Create a permanent (non-evictable) name.
+   * Used for common PDF names that should always be cached.
+   */
+  private static createPermanent(name: string): PdfName {
+    const instance = new PdfName(name);
+
+    PdfName.permanentCache.set(name, instance);
+
+    return instance;
+  }
 }

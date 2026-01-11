@@ -206,6 +206,25 @@ export class XRefParser {
     const w1 = w0 instanceof PdfNumber ? w0.value : 0; // Type field width
     const w2 = w1Val instanceof PdfNumber ? w1Val.value : 0; // Offset field width
     const w3 = w2Val instanceof PdfNumber ? w2Val.value : 0; // Generation field width
+
+    // Validate field widths to prevent integer overflow during parsing.
+    // JavaScript safely handles integers up to 2^53-1, but bitwise operations
+    // are limited to 32 bits. Fields wider than 6 bytes (48 bits) could cause
+    // issues with shift operations. Most PDFs use 1-4 byte widths.
+    const MAX_FIELD_WIDTH = 6;
+
+    if (w1 < 0 || w1 > MAX_FIELD_WIDTH) {
+      throw new XRefParseError(`Invalid XRef stream field width w1=${w1} (max ${MAX_FIELD_WIDTH})`);
+    }
+
+    if (w2 < 0 || w2 > MAX_FIELD_WIDTH) {
+      throw new XRefParseError(`Invalid XRef stream field width w2=${w2} (max ${MAX_FIELD_WIDTH})`);
+    }
+
+    if (w3 < 0 || w3 > MAX_FIELD_WIDTH) {
+      throw new XRefParseError(`Invalid XRef stream field width w3=${w3} (max ${MAX_FIELD_WIDTH})`);
+    }
+
     const entrySize = w1 + w2 + w3;
 
     // Get /Size (total object count)
@@ -250,21 +269,22 @@ export class XRefParser {
         }
 
         // Read type field (default to 1 if width is 0)
+        // Use multiplication instead of bitwise shift to avoid 32-bit overflow
         let entryType = w1 === 0 ? 1 : 0;
         for (let j = 0; j < w1; j++) {
-          entryType = (entryType << 8) | decodedData[dataOffset++];
+          entryType = entryType * 256 + decodedData[dataOffset++];
         }
 
         // Read field 2 (offset or object stream number)
         let field2 = 0;
         for (let j = 0; j < w2; j++) {
-          field2 = (field2 << 8) | decodedData[dataOffset++];
+          field2 = field2 * 256 + decodedData[dataOffset++];
         }
 
         // Read field 3 (generation or index in object stream)
         let field3 = 0;
         for (let j = 0; j < w3; j++) {
-          field3 = (field3 << 8) | decodedData[dataOffset++];
+          field3 = field3 * 256 + decodedData[dataOffset++];
         }
 
         // Create entry based on type

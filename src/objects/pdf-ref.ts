@@ -1,12 +1,20 @@
+import { LRUCache } from "#src/helpers/lru-cache";
 import type { ByteWriter } from "#src/io/byte-writer";
 import type { PdfPrimitive } from "./pdf-primitive";
+
+/**
+ * Default cache size for PdfRef interning.
+ * Object references tend to be more numerous than names in typical PDFs.
+ */
+const DEFAULT_REF_CACHE_SIZE = 20000;
 
 /**
  * PDF indirect reference (interned).
  *
  * In PDF: `1 0 R`, `42 0 R`
  *
- * References are interned — `PdfRef.of(1, 0) === PdfRef.of(1, 0)`.
+ * References are interned using an LRU cache to prevent unbounded memory growth.
+ * `PdfRef.of(1, 0) === PdfRef.of(1, 0)` as long as both are in cache.
  * Use `.of()` to get or create instances.
  */
 export class PdfRef implements PdfPrimitive {
@@ -14,7 +22,7 @@ export class PdfRef implements PdfPrimitive {
     return "ref";
   }
 
-  private static cache = new Map<string, PdfRef>();
+  private static cache = new LRUCache<string, PdfRef>(DEFAULT_REF_CACHE_SIZE);
 
   private constructor(
     readonly objectNumber: number,
@@ -31,11 +39,27 @@ export class PdfRef implements PdfPrimitive {
 
     if (!cached) {
       cached = new PdfRef(objectNumber, generation);
-
       PdfRef.cache.set(key, cached);
     }
 
     return cached;
+  }
+
+  /**
+   * Clear the reference cache.
+   *
+   * Useful for long-running applications that process many PDFs
+   * and want to reclaim memory between documents.
+   */
+  static clearCache(): void {
+    PdfRef.cache.clear();
+  }
+
+  /**
+   * Get the current size of the LRU cache.
+   */
+  static get cacheSize(): number {
+    return PdfRef.cache.size;
   }
 
   /**

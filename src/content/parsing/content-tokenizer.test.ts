@@ -216,6 +216,24 @@ describe("ContentTokenizer", () => {
     });
   });
 
+  describe("lenient parsing", () => {
+    it("skips unexpected closing bracket and continues", () => {
+      const tokenizer = new ContentTokenizer(encode("] q Q"));
+
+      // Should skip the ] and return q
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "q" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "Q" });
+    });
+
+    it("skips unexpected >> and continues", () => {
+      const tokenizer = new ContentTokenizer(encode(">> 42 m"));
+
+      // Should skip the >> and return 42
+      expect(tokenizer.nextToken()).toEqual({ type: "number", value: 42 });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "m" });
+    });
+  });
+
   describe("peek and eof", () => {
     it("peek returns same token until consumed", () => {
       const tokenizer = new ContentTokenizer(encode("q Q"));

@@ -9,7 +9,7 @@
  */
 
 import type { EmbeddedFont } from "#src/fonts/embedded-font";
-import type { SimpleFont } from "#src/fonts/simple-font";
+import { parseSimpleFont, type SimpleFont } from "#src/fonts/simple-font";
 import {
   FONT_BASIC_METRICS,
   getStandard14DefaultWidth,
@@ -17,8 +17,10 @@ import {
   isStandard14Font,
 } from "#src/fonts/standard-14";
 import { unicodeToGlyphName } from "#src/helpers/unicode";
-import type { PdfDict } from "#src/objects/pdf-dict";
-import type { PdfRef } from "#src/objects/pdf-ref";
+import { PdfArray } from "#src/objects/pdf-array";
+import { PdfDict } from "#src/objects/pdf-dict";
+import { PdfRef } from "#src/objects/pdf-ref";
+import { PdfStream } from "#src/objects/pdf-stream";
 import type { ObjectRegistry } from "../object-registry";
 
 /**
@@ -239,16 +241,20 @@ export function parseExistingFont(
       // Parse as SimpleFont for accurate metrics
       try {
         const resolveRef = (r: unknown) => {
-          if (r && typeof r === "object" && "type" in r && r.type === "ref") {
-            return registry.getObject(r as PdfRef);
+          if (r instanceof PdfRef) {
+            const obj = registry.getObject(r);
+
+            if (obj instanceof PdfDict || obj instanceof PdfArray || obj instanceof PdfStream) {
+              return obj;
+            }
           }
 
           return null;
         };
 
-        const { parseSimpleFont } = require("#src/fonts/simple-font");
-        simpleFont = parseSimpleFont(resolved, { resolveRef }) as SimpleFont;
-      } catch {
+        simpleFont = parseSimpleFont(resolved, { resolveRef });
+      } catch (err) {
+        console.warn(err);
         // Ignore parsing errors for existing fonts
       }
     }

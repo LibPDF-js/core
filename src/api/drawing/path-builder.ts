@@ -47,6 +47,14 @@ export class PathBuilder {
   private readonly appendContent: ContentAppender;
   private readonly registerGraphicsState: GraphicsStateRegistrar;
 
+  /** Current point for quadratic-to-cubic conversion */
+  private currentX = 0;
+  private currentY = 0;
+
+  /** Start point of current subpath (for close operations) */
+  private subpathStartX = 0;
+  private subpathStartY = 0;
+
   constructor(appendContent: ContentAppender, registerGraphicsState: GraphicsStateRegistrar) {
     this.appendContent = appendContent;
     this.registerGraphicsState = registerGraphicsState;
@@ -62,6 +70,11 @@ export class PathBuilder {
   moveTo(x: number, y: number): this {
     this.pathOps.push(moveTo(x, y));
 
+    this.currentX = x;
+    this.currentY = y;
+    this.subpathStartX = x;
+    this.subpathStartY = y;
+
     return this;
   }
 
@@ -70,6 +83,9 @@ export class PathBuilder {
    */
   lineTo(x: number, y: number): this {
     this.pathOps.push(lineTo(x, y));
+
+    this.currentX = x;
+    this.currentY = y;
 
     return this;
   }
@@ -87,13 +103,22 @@ export class PathBuilder {
   curveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): this {
     this.pathOps.push(curveTo(cp1x, cp1y, cp2x, cp2y, x, y));
 
+    this.currentX = x;
+    this.currentY = y;
+
     return this;
   }
 
   /**
    * Draw a quadratic Bezier curve from the current point to (x, y).
    *
-   * Converted internally to a cubic Bezier curve.
+   * Converted internally to a cubic Bezier curve using the standard
+   * quadratic-to-cubic conversion formula:
+   * - CP1 = P0 + 2/3 * (QCP - P0)
+   * - CP2 = P  + 2/3 * (QCP - P)
+   *
+   * Where P0 is the current point, QCP is the quadratic control point,
+   * and P is the end point.
    *
    * @param cpx - Control point X
    * @param cpy - Control point Y
@@ -101,13 +126,18 @@ export class PathBuilder {
    * @param y - End point Y
    */
   quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): this {
-    // Quadratic to cubic conversion requires current point
-    // For simplicity, we approximate by using the control point for both control points
-    // This is a rough approximation - proper conversion needs current point tracking
-    // cp1 = p0 + 2/3 * (cp - p0)
-    // cp2 = p  + 2/3 * (cp - p)
-    // For now, use the control point as both (less accurate but functional)
-    this.pathOps.push(curveTo(cpx, cpy, cpx, cpy, x, y));
+    // Quadratic to cubic conversion:
+    // CP1 = P0 + 2/3 * (QCP - P0) = P0 * 1/3 + QCP * 2/3
+    // CP2 = P  + 2/3 * (QCP - P)  = P  * 1/3 + QCP * 2/3
+    const cp1x = this.currentX + (2 / 3) * (cpx - this.currentX);
+    const cp1y = this.currentY + (2 / 3) * (cpy - this.currentY);
+    const cp2x = x + (2 / 3) * (cpx - x);
+    const cp2y = y + (2 / 3) * (cpy - y);
+
+    this.pathOps.push(curveTo(cp1x, cp1y, cp2x, cp2y, x, y));
+
+    this.currentX = x;
+    this.currentY = y;
 
     return this;
   }
@@ -117,6 +147,9 @@ export class PathBuilder {
    */
   close(): this {
     this.pathOps.push(closePath());
+    // After close, the current point returns to the subpath start
+    this.currentX = this.subpathStartX;
+    this.currentY = this.subpathStartY;
 
     return this;
   }
@@ -129,13 +162,12 @@ export class PathBuilder {
    * Add a rectangle to the current path.
    */
   rectangle(x: number, y: number, width: number, height: number): this {
-    this.pathOps.push(moveTo(x, y));
-    this.pathOps.push(lineTo(x + width, y));
-    this.pathOps.push(lineTo(x + width, y + height));
-    this.pathOps.push(lineTo(x, y + height));
-    this.pathOps.push(closePath());
-
-    return this;
+    // Use fluent methods to ensure current point is tracked
+    return this.moveTo(x, y)
+      .lineTo(x + width, y)
+      .lineTo(x + width, y + height)
+      .lineTo(x, y + height)
+      .close();
   }
 
   /**
@@ -152,14 +184,13 @@ export class PathBuilder {
     const kx = rx * KAPPA;
     const ky = ry * KAPPA;
 
-    this.pathOps.push(moveTo(cx - rx, cy));
-    this.pathOps.push(curveTo(cx - rx, cy + ky, cx - kx, cy + ry, cx, cy + ry));
-    this.pathOps.push(curveTo(cx + kx, cy + ry, cx + rx, cy + ky, cx + rx, cy));
-    this.pathOps.push(curveTo(cx + rx, cy - ky, cx + kx, cy - ry, cx, cy - ry));
-    this.pathOps.push(curveTo(cx - kx, cy - ry, cx - rx, cy - ky, cx - rx, cy));
-    this.pathOps.push(closePath());
-
-    return this;
+    // Use fluent methods to ensure current point is tracked
+    return this.moveTo(cx - rx, cy)
+      .curveTo(cx - rx, cy + ky, cx - kx, cy + ry, cx, cy + ry)
+      .curveTo(cx + kx, cy + ry, cx + rx, cy + ky, cx + rx, cy)
+      .curveTo(cx + rx, cy - ky, cx + kx, cy - ry, cx, cy - ry)
+      .curveTo(cx - kx, cy - ry, cx - rx, cy - ky, cx - rx, cy)
+      .close();
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -175,6 +206,7 @@ export class PathBuilder {
       borderColor: options.borderColor ?? options.color,
       color: undefined, // Don't fill
     };
+
     this.paint(effectiveOptions);
   }
 
@@ -186,6 +218,7 @@ export class PathBuilder {
       ...options,
       borderColor: undefined, // Don't stroke
     };
+
     this.paint(effectiveOptions);
   }
 
@@ -253,6 +286,7 @@ export class PathBuilder {
    */
   private emitOps(ops: Operator[]): void {
     const content = ops.map(op => op.toString()).join("\n");
+
     this.appendContent(content);
   }
 }
