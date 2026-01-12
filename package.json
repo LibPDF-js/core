@@ -58,7 +58,8 @@
     "docs:dev": "bun run --cwd apps/docs dev",
     "docs:build": "bun run --cwd apps/docs build",
     "prepublishOnly": "bun run build",
-    "prepare": "husky"
+    "prepare": "husky",
+    "release": "./scripts/release.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.10",
