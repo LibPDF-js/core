@@ -6,12 +6,7 @@
  */
 
 // Operations (for advanced users building custom content streams)
-export {
-  drawCircleOps,
-  drawEllipseOps,
-  drawLineOps,
-  drawRectangleOps,
-} from "./operations";
+export { drawCircleOps, drawEllipseOps, drawLineOps, drawRectangleOps } from "./operations";
 // Path builder
 export { PathBuilder } from "./path-builder";
 export type { LayoutResult, PositionedWord, TextLine } from "./text-layout";

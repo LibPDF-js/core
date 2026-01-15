@@ -9,9 +9,9 @@
  * Output PDFs are saved to test-output/text-bbox/ for manual verification.
  */
 
-import { describe, expect, it } from "vitest";
 import { PDF, rgb } from "#src/index";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
 
 describe("Text Extraction Bounding Boxes", () => {
   describe("Character-level highlighting", () => {

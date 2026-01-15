@@ -1,7 +1,7 @@
-import { formatSponsorLink, sponsors } from '@/lib/sponsors';
-import clsx from 'clsx';
-import { highlight } from 'fumadocs-core/highlight';
-import { CodeBlock, Pre } from 'fumadocs-ui/components/codeblock';
+import { formatSponsorLink, sponsors } from "@/lib/sponsors";
+import clsx from "clsx";
+import { highlight } from "fumadocs-core/highlight";
+import { CodeBlock, Pre } from "fumadocs-ui/components/codeblock";
 import {
   ArrowRight,
   Check,
@@ -15,15 +15,16 @@ import {
   Paperclip,
   PenTool,
   Scissors,
-  Terminal
-} from 'lucide-react';
-import Link from 'next/link';
-import { CopyButton } from './copy-button';
+  Terminal,
+} from "lucide-react";
+import Link from "next/link";
+
+import { CopyButton } from "./copy-button";
 
 // Shared padding classes for full-bleed sections
-const CONTAINER_PADDING = 'px-4 md:px-6';
-const BLEED_NEGATIVE_MARGIN = '-mx-4 md:-mx-6';
-const BLEED_PADDING = 'px-4 md:px-6';
+const CONTAINER_PADDING = "px-4 md:px-6";
+const BLEED_NEGATIVE_MARGIN = "-mx-4 md:-mx-6";
+const BLEED_PADDING = "px-4 md:px-6";
 
 function GridPattern() {
   return (
@@ -33,7 +34,7 @@ function GridPattern() {
         style={{
           backgroundImage: `linear-gradient(var(--foreground) 1px, transparent 1px),
                            linear-gradient(90deg, var(--foreground) 1px, transparent 1px)`,
-          backgroundSize: '64px 64px',
+          backgroundSize: "64px 64px",
         }}
       />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-gradient-to-b from-primary/5 to-transparent rounded-full blur-3xl" />
@@ -43,7 +44,7 @@ function GridPattern() {
 
 function Hero() {
   return (
-    <section className={clsx('relative py-24 md:py-40', BLEED_NEGATIVE_MARGIN, BLEED_PADDING)}>
+    <section className={clsx("relative py-24 md:py-40", BLEED_NEGATIVE_MARGIN, BLEED_PADDING)}>
       <GridPattern />
       <div className="max-w-5xl mx-auto text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 mb-8 text-xs font-medium tracking-wide uppercase border border-border rounded-full bg-muted/50">
@@ -110,7 +111,13 @@ function Hero() {
 
 function InstallBlock() {
   return (
-    <section className={clsx('py-12 border-y border-border bg-muted/30', BLEED_NEGATIVE_MARGIN, BLEED_PADDING)}>
+    <section
+      className={clsx(
+        "py-12 border-y border-border bg-muted/30",
+        BLEED_NEGATIVE_MARGIN,
+        BLEED_PADDING,
+      )}
+    >
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
           <div className="group flex items-center gap-3 pl-5 pr-3 py-3 rounded-lg bg-background border border-border font-mono text-sm">
@@ -135,43 +142,45 @@ function InstallBlock() {
 const features = [
   {
     icon: Layers,
-    title: 'Incremental Updates',
-    description: 'Append changes without rewriting the entire file. Preserves existing digital signatures.',
+    title: "Incremental Updates",
+    description:
+      "Append changes without rewriting the entire file. Preserves existing digital signatures.",
   },
   {
     icon: PenTool,
-    title: 'Digital Signatures',
-    description: 'PAdES B-B through B-LTA with long-term validation. OCSP and CRL embedding.',
+    title: "Digital Signatures",
+    description: "PAdES B-B through B-LTA with long-term validation. OCSP and CRL embedding.",
   },
   {
     icon: Lock,
-    title: 'Encryption',
-    description: 'AES-256 and RC4 password protection. Decrypt on load, encrypt on save.',
+    title: "Encryption",
+    description: "AES-256 and RC4 password protection. Decrypt on load, encrypt on save.",
   },
   {
     icon: FileCheck,
-    title: 'Form Filling',
-    description: 'Fill and flatten text fields, checkboxes, radio buttons, and dropdowns.',
+    title: "Form Filling",
+    description: "Fill and flatten text fields, checkboxes, radio buttons, and dropdowns.",
   },
   {
     icon: FileSearch,
-    title: 'Text Extraction',
-    description: 'Extract text content from pages with position and formatting information.',
+    title: "Text Extraction",
+    description: "Extract text content from pages with position and formatting information.",
   },
   {
     icon: Scissors,
-    title: 'Merge & Split',
-    description: 'Combine multiple documents, extract page ranges, and embed pages as XObjects.',
+    title: "Merge & Split",
+    description: "Combine multiple documents, extract page ranges, and embed pages as XObjects.",
   },
   {
     icon: Paperclip,
-    title: 'Attachments',
-    description: 'Embed and extract file attachments with full EmbeddedFiles support.',
+    title: "Attachments",
+    description: "Embed and extract file attachments with full EmbeddedFiles support.",
   },
   {
     icon: FileText,
-    title: 'Content Drawing',
-    description: 'Draw text and images on pages. TrueType font embedding with automatic subsetting.',
+    title: "Content Drawing",
+    description:
+      "Draw text and images on pages. TrueType font embedding with automatic subsetting.",
   },
 ];
 
@@ -189,7 +198,7 @@ function Features() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border rounded-xl overflow-hidden">
-          {features.map((feature) => (
+          {features.map(feature => (
             <div
               key={feature.title}
               className="p-8 bg-background hover:bg-muted/30 transition-colors"
@@ -198,9 +207,7 @@ function Features() {
                 <feature.icon className="w-5 h-5" />
               </div>
               <h3 className="font-semibold mb-2 tracking-tight">{feature.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {feature.description}
-              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
             </div>
           ))}
         </div>
@@ -225,13 +232,13 @@ const { bytes: signed } = await pdf.sign({ signer });`;
 
 async function CodeExample() {
   const highlighted = await highlight(exampleCode, {
-    lang: 'typescript',
+    lang: "typescript",
     themes: {
-      light: 'github-light',
-      dark: 'github-dark',
+      light: "github-light",
+      dark: "github-dark",
     },
     components: {
-      pre: (props) => (
+      pre: props => (
         <CodeBlock className="my-0 border-0 rounded-none">
           <Pre className="p-6 max-h-none wrap">{props.children}</Pre>
         </CodeBlock>
@@ -240,7 +247,13 @@ async function CodeExample() {
   });
 
   return (
-    <section className={clsx('py-24 md:py-32 border-t border-border', BLEED_NEGATIVE_MARGIN, BLEED_PADDING)}>
+    <section
+      className={clsx(
+        "py-24 md:py-32 border-t border-border",
+        BLEED_NEGATIVE_MARGIN,
+        BLEED_PADDING,
+      )}
+    >
       <div className="max-w-5xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
@@ -251,15 +264,15 @@ async function CodeExample() {
               An API that makes sense
             </h2>
             <p className="text-muted-foreground leading-relaxed mb-6">
-              No wrestling with low-level PDF internals. Load documents, manipulate
-              them with intuitive methods, and save. The complexity is handled for you.
+              No wrestling with low-level PDF internals. Load documents, manipulate them with
+              intuitive methods, and save. The complexity is handled for you.
             </p>
             <ul className="space-y-3">
               {[
-                'Familiar API patterns from pdf-lib',
-                'Robust malformed PDF parsing from pdf.js',
-                'Incremental saves that preserve signatures',
-              ].map((item) => (
+                "Familiar API patterns from pdf-lib",
+                "Robust malformed PDF parsing from pdf.js",
+                "Incremental saves that preserve signatures",
+              ].map(item => (
                 <li key={item} className="flex items-center gap-3 text-sm">
                   <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
                     <Check className="w-3 h-3" />
@@ -275,9 +288,7 @@ async function CodeExample() {
               <span className="w-3 h-3 rounded-full bg-red-500/60" />
               <span className="w-3 h-3 rounded-full bg-yellow-500/60" />
               <span className="w-3 h-3 rounded-full bg-green-500/60" />
-              <span className="ml-3 text-xs text-muted-foreground font-mono">
-                sign-document.ts
-              </span>
+              <span className="ml-3 text-xs text-muted-foreground font-mono">sign-document.ts</span>
             </div>
             {highlighted}
           </div>
@@ -288,22 +299,28 @@ async function CodeExample() {
 }
 
 const comparisons = [
-  { feature: 'Incremental saves', libpdf: true, pdflib: false, pdfjs: false },
-  { feature: 'Digital signatures', libpdf: true, pdflib: false, pdfjs: false },
-  { feature: 'Encrypted PDFs', libpdf: true, pdflib: false, pdfjs: true },
-  { feature: 'Parse existing PDFs', libpdf: true, pdflib: 'partial', pdfjs: true },
-  { feature: 'Modify existing PDFs', libpdf: true, pdflib: 'partial', pdfjs: false },
-  { feature: 'Generate new PDFs', libpdf: true, pdflib: true, pdfjs: false },
-  { feature: 'Text extraction', libpdf: true, pdflib: false, pdfjs: true },
-  { feature: 'Form filling', libpdf: true, pdflib: true, pdfjs: false },
-  { feature: 'Merge documents', libpdf: true, pdflib: true, pdfjs: false },
-  { feature: 'Render to image', libpdf: 'planned', pdflib: false, pdfjs: true },
-  { feature: 'TypeScript-first', libpdf: true, pdflib: true, pdfjs: 'partial' },
+  { feature: "Incremental saves", libpdf: true, pdflib: false, pdfjs: false },
+  { feature: "Digital signatures", libpdf: true, pdflib: false, pdfjs: false },
+  { feature: "Encrypted PDFs", libpdf: true, pdflib: false, pdfjs: true },
+  { feature: "Parse existing PDFs", libpdf: true, pdflib: "partial", pdfjs: true },
+  { feature: "Modify existing PDFs", libpdf: true, pdflib: "partial", pdfjs: false },
+  { feature: "Generate new PDFs", libpdf: true, pdflib: true, pdfjs: false },
+  { feature: "Text extraction", libpdf: true, pdflib: false, pdfjs: true },
+  { feature: "Form filling", libpdf: true, pdflib: true, pdfjs: false },
+  { feature: "Merge documents", libpdf: true, pdflib: true, pdfjs: false },
+  { feature: "Render to image", libpdf: "planned", pdflib: false, pdfjs: true },
+  { feature: "TypeScript-first", libpdf: true, pdflib: true, pdfjs: "partial" },
 ];
 
 function Comparison() {
   return (
-    <section className={clsx('py-24 md:py-32 border-t border-border', BLEED_NEGATIVE_MARGIN, BLEED_PADDING)}>
+    <section
+      className={clsx(
+        "py-24 md:py-32 border-t border-border",
+        BLEED_NEGATIVE_MARGIN,
+        BLEED_PADDING,
+      )}
+    >
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <p className="text-sm font-medium tracking-wide uppercase text-muted-foreground mb-3">
@@ -313,8 +330,8 @@ function Comparison() {
             The best of both worlds
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            pdf.js excels at parsing. pdf-lib excels at generation. LibPDF does both,
-            plus incremental updates and digital signatures.
+            pdf.js excels at parsing. pdf-lib excels at generation. LibPDF does both, plus
+            incremental updates and digital signatures.
           </p>
         </div>
 
@@ -351,16 +368,14 @@ function Comparison() {
               <tr className="bg-muted/50 border-b border-border">
                 <th className="text-left p-4 font-medium text-muted-foreground" />
                 <th className="p-4 font-semibold text-center">
-                  <span className="inline-flex items-center justify-center">
-                    LibPDF
-                  </span>
+                  <span className="inline-flex items-center justify-center">LibPDF</span>
                 </th>
                 <th className="p-4 font-medium text-center text-muted-foreground">pdf-lib</th>
                 <th className="p-4 font-medium text-center text-muted-foreground">pdf.js</th>
               </tr>
             </thead>
             <tbody>
-              {comparisons.map((row) => (
+              {comparisons.map(row => (
                 <tr key={row.feature} className="border-b border-border last:border-0">
                   <td className="p-4 font-medium">{row.feature}</td>
                   <td className="p-4 text-center">
@@ -377,7 +392,6 @@ function Comparison() {
             </tbody>
           </table>
         </div>
-
       </div>
     </section>
   );
@@ -387,7 +401,7 @@ function StatusIcon({ value, highlight }: { value: boolean | string; highlight?:
   if (value === true) {
     return (
       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/10">
-        <Check className={`w-3.5 h-3.5 ${highlight ? 'text-green-500' : 'text-green-500/70'}`} />
+        <Check className={`w-3.5 h-3.5 ${highlight ? "text-green-500" : "text-green-500/70"}`} />
       </span>
     );
   }
@@ -398,7 +412,7 @@ function StatusIcon({ value, highlight }: { value: boolean | string; highlight?:
       </span>
     );
   }
-  if (value === 'planned') {
+  if (value === "planned") {
     return (
       <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/10">
         <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -420,7 +434,7 @@ function SponsorsSection() {
           Sponsored by
         </p>
         <div className="grid grid-cols-4 gap-4 mb-6">
-          {sponsors.map((sponsor) => (
+          {sponsors.map(sponsor => (
             <a
               key={sponsor.name}
               href={formatSponsorLink(sponsor.href)}
@@ -431,7 +445,7 @@ function SponsorsSection() {
               <img
                 src={sponsor.logo}
                 alt={sponsor.name}
-                className={`object-contain h-7 ${sponsor.invertDark ? 'dark:invert' : ''}`}
+                className={`object-contain h-7 ${sponsor.invertDark ? "dark:invert" : ""}`}
               />
             </a>
           ))}
@@ -454,7 +468,13 @@ function SponsorsSection() {
 
 function CTA() {
   return (
-    <section className={clsx('py-24 md:py-32 border-t border-border relative overflow-hidden', BLEED_NEGATIVE_MARGIN, BLEED_PADDING)}>
+    <section
+      className={clsx(
+        "py-24 md:py-32 border-t border-border relative overflow-hidden",
+        BLEED_NEGATIVE_MARGIN,
+        BLEED_PADDING,
+      )}
+    >
       <div className="absolute inset-0 -z-10">
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-gradient-to-t from-primary/5 to-transparent rounded-full blur-3xl" />
       </div>
@@ -487,7 +507,7 @@ function CTA() {
 
 export default async function HomePage() {
   return (
-    <main className={clsx('flex-1 overflow-x-hidden', CONTAINER_PADDING)}>
+    <main className={clsx("flex-1 overflow-x-hidden", CONTAINER_PADDING)}>
       <Hero />
       <InstallBlock />
       <SponsorsSection />

@@ -7,9 +7,10 @@
  * RFC 5280: Section 4.2.2.1 - Authority Information Access
  */
 
+import { bytesToHex, toArrayBuffer } from "#src/helpers/buffer.ts";
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
-import { bytesToHex, toArrayBuffer } from "#src/helpers/buffer.ts";
+
 import { OID_AD_CA_ISSUERS, OID_AUTHORITY_INFO_ACCESS } from "./oids";
 import { CertificateChainError } from "./types";
 
@@ -220,7 +221,10 @@ function getCaIssuersUrl(cert: pkijs.Certificate): string | null {
     for (const desc of infoAccess.accessDescriptions) {
       // CA Issuers OID: 1.3.6.1.5.5.7.48.2
       if (desc.accessMethod === OID_AD_CA_ISSUERS) {
-        const location = desc.accessLocation as { type?: number; value?: string };
+        const location = desc.accessLocation as {
+          type?: number;
+          value?: string;
+        };
         // type 6 = uniformResourceIdentifier
         if (location.type === 6 && location.value) {
           return location.value;
@@ -268,7 +272,7 @@ async function fetchCertificate(
     clearTimeout(timeoutId);
 
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Request timed out after ${timeout}ms`);
+      throw new Error(`Request timed out after ${timeout}ms`, { cause: error });
     }
 
     throw error;

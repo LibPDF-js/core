@@ -34,13 +34,13 @@ setValue(value: string): void {
   }
 
   // Truncate if maxLength set
-  const finalValue = this.maxLength > 0 
-    ? value.slice(0, this.maxLength) 
+  const finalValue = this.maxLength > 0
+    ? value.slice(0, this.maxLength)
     : value;
 
   // Set /V on field dict
   this.dict.set("V", PdfString.fromText(finalValue));
-  
+
   // Mark dirty for appearance regeneration
   this.dirty = true;
 }
@@ -193,7 +193,7 @@ setValue(values: string[]): void {
       .map(v => options.findIndex(o => o.value === v))
       .filter(i => i >= 0)
       .sort((a, b) => a - b);
-    
+
     if (indices.length > 0) {
       this.dict.set("I", PdfArray.of(indices.map(PdfNumber.of)));
     } else {
@@ -232,14 +232,14 @@ setNormalAppearance(stream: PdfStream, state?: string): void {
     // Stateful: AP.N is a dict of state -> stream
     let n = ap.get("N");
     let nDict: PdfDict;
-    
+
     if (n instanceof PdfDict) {
       nDict = n;
     } else {
       nDict = new PdfDict();
       ap.set("N", nDict);
     }
-    
+
     const streamRef = this.registry.register(stream);
     nDict.set(state, streamRef);
   } else {
@@ -257,12 +257,20 @@ setNormalAppearance(stream: PdfStream, state?: string): void {
 
 import {
   ContentStreamBuilder,
-  beginMarkedContent, endMarkedContent,
-  pushGraphicsState, popGraphicsState,
-  rectangle, clip, endPath,
-  beginText, endText,
-  setFont, moveText, showText,
-  setNonStrokingGray, setNonStrokingRGB,
+  beginMarkedContent,
+  endMarkedContent,
+  pushGraphicsState,
+  popGraphicsState,
+  rectangle,
+  clip,
+  endPath,
+  beginText,
+  endText,
+  setFont,
+  moveText,
+  showText,
+  setNonStrokingGray,
+  setNonStrokingRGB,
 } from "../content";
 
 export class AppearanceGenerator {
@@ -280,10 +288,10 @@ export class AppearanceGenerator {
   generateTextAppearance(field: TextField, widget: WidgetAnnotation): PdfStream {
     const value = field.getValue();
     const { width, height } = widget;
-    
+
     // Parse default appearance
     const da = this.parseDefaultAppearance(field);
-    
+
     // Calculate font size (auto-size if 0)
     let fontSize = da.fontSize;
     if (fontSize === 0) {
@@ -291,9 +299,7 @@ export class AppearanceGenerator {
     }
 
     // Calculate text position
-    const { x, y } = this.calculateTextPosition(
-      value, width, height, fontSize, field.alignment
-    );
+    const { x, y } = this.calculateTextPosition(value, width, height, fontSize, field.alignment);
 
     // Build content stream
     const content = new ContentStreamBuilder()
@@ -314,18 +320,15 @@ export class AppearanceGenerator {
       .add(endMarkedContent());
 
     // Create Form XObject
-    return content.toFormXObject(
-      [0, 0, width, height],
-      this.buildResources(da.fontName)
-    );
+    return content.toFormXObject([0, 0, width, height], this.buildResources(da.fontName));
   }
 
   /**
    * Parse /DA string into components.
    */
   private parseDefaultAppearance(field: FormField): ParsedDA {
-    const da = field.getInheritable<PdfString>("DA")?.decodeText()
-      ?? this.acroForm.defaultAppearance;
+    const da =
+      field.getInheritable<PdfString>("DA")?.decodeText() ?? this.acroForm.defaultAppearance;
 
     return parseDAString(da);
   }
@@ -333,23 +336,17 @@ export class AppearanceGenerator {
   /**
    * Calculate font size to fit text in field.
    */
-  private calculateAutoFontSize(
-    text: string,
-    width: number,
-    height: number
-  ): number {
+  private calculateAutoFontSize(text: string, width: number, height: number): number {
     const padding = 4;
-    
+
     // Height-based: fit vertically
     const heightBased = (height - padding) * 0.7;
-    
+
     // Width-based: approximate (proper would need font metrics)
     // Assume average char width ~0.5 * fontSize
     const avgCharWidth = 0.5;
     const textWidth = text.length * avgCharWidth;
-    const widthBased = textWidth > 0 
-      ? (width - padding) / text.length / avgCharWidth
-      : heightBased;
+    const widthBased = textWidth > 0 ? (width - padding) / text.length / avgCharWidth : heightBased;
 
     // Use smaller, with min/max bounds
     return Math.max(4, Math.min(heightBased, widthBased, 14));
@@ -363,10 +360,10 @@ export class AppearanceGenerator {
     width: number,
     height: number,
     fontSize: number,
-    alignment: number
+    alignment: number,
   ): { x: number; y: number } {
     const padding = 2;
-    
+
     // Approximate text width (proper would need font metrics)
     const textWidth = text.length * fontSize * 0.5;
 
@@ -398,10 +395,9 @@ export class AppearanceGenerator {
       case "rg":
         return [setNonStrokingRGB(da.colorArgs[0], da.colorArgs[1], da.colorArgs[2])];
       case "k":
-        return [setNonStrokingCMYK(
-          da.colorArgs[0], da.colorArgs[1], 
-          da.colorArgs[2], da.colorArgs[3]
-        )];
+        return [
+          setNonStrokingCMYK(da.colorArgs[0], da.colorArgs[1], da.colorArgs[2], da.colorArgs[3]),
+        ];
       default:
         return [setNonStrokingGray(0)];
     }
@@ -461,11 +457,7 @@ function parseDAString(da: string): ParsedDA {
   const rgbMatch = da.match(/([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg\s*$/);
   if (rgbMatch) {
     result.colorOp = "rg";
-    result.colorArgs = [
-      parseFloat(rgbMatch[1]),
-      parseFloat(rgbMatch[2]),
-      parseFloat(rgbMatch[3]),
-    ];
+    result.colorArgs = [parseFloat(rgbMatch[1]), parseFloat(rgbMatch[2]), parseFloat(rgbMatch[3])];
     return result;
   }
 
@@ -607,6 +599,7 @@ src/document/
 ### Value Setting
 
 #### TextField
+
 1. Set simple string value
 2. Set value with special characters (Unicode)
 3. Set value on read-only field (throws)
@@ -614,6 +607,7 @@ src/document/
 5. Reset to default value
 
 #### CheckboxField
+
 1. check() sets to on-value
 2. uncheck() sets to "Off"
 3. setValue("Off") unchecks
@@ -622,6 +616,7 @@ src/document/
 6. Grouped checkbox: setValue selects correct widget
 
 #### RadioField
+
 1. setValue(option) selects option
 2. setValue(null) deselects (if allowed)
 3. setValue(null) throws if noToggleToOff
@@ -629,11 +624,13 @@ src/document/
 5. Updates all widget /AS correctly
 
 #### DropdownField
+
 1. setValue(validOption) works
 2. setValue(invalidOption) throws (non-editable)
 3. setValue(customValue) works (editable)
 
 #### ListBoxField
+
 1. setValue([single]) works
 2. setValue([multiple]) works (multi-select)
 3. setValue([multiple]) throws (single-select)
@@ -643,6 +640,7 @@ src/document/
 ### Appearance Generation
 
 #### Text Field
+
 1. Simple text renders correctly
 2. Empty value renders empty field
 3. Auto-sizing calculates reasonable size
@@ -651,17 +649,20 @@ src/document/
 6. Clipping to field bounds
 
 #### Widget Updates
+
 1. setAppearanceState changes /AS
 2. setNormalAppearance updates /AP.N (stateless)
 3. setNormalAppearance updates /AP.N.state (stateful)
 
 ### Dirty Tracking
+
 1. setValue marks dirty
 2. updateAppearances clears dirty
 3. Only dirty fields regenerated
 4. markAllDirty marks all fields
 
 ### Round-Trip
+
 1. Fill form → save → reload → values preserved
 2. Fill form → updateAppearances → save → appearances correct
 3. Multiple edits → single updateAppearances
@@ -678,7 +679,7 @@ src/document/
 ## Limitations (Out of Scope)
 
 1. **Multiline text** - Word wrapping not implemented
-2. **Comb fields** - Character spacing not implemented  
+2. **Comb fields** - Character spacing not implemented
 3. **Rich text** - RTF rendering not implemented
 4. **Font metrics** - Using approximations
 5. **Font embedding** - Characters must exist in font

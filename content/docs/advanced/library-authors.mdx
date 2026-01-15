@@ -28,6 +28,7 @@ If you're building a wrapper or extension library, use a peer dependency:
 ```
 
 **Benefits:**
+
 - Users control which version they use
 - Avoids duplicate copies in the bundle
 - Version conflicts are caught at install time
@@ -46,6 +47,7 @@ If LibPDF is an implementation detail not exposed to users:
 ```
 
 **Benefits:**
+
 - You control the exact version
 - Simpler for end users
 - Good for applications (not libraries)
@@ -94,12 +96,7 @@ Let users catch specific error types:
 
 ```typescript
 // my-library/index.ts
-export { 
-  SecurityError, 
-  PermissionDeniedError,
-  SignatureError,
-  SignerError 
-} from "@libpdf/core";
+export { SecurityError, PermissionDeniedError, SignatureError, SignerError } from "@libpdf/core";
 
 // Or re-export everything
 export * from "@libpdf/core";
@@ -114,7 +111,7 @@ import { PDF, SecurityError } from "@libpdf/core";
 
 export class MyLibraryError extends Error {
   cause?: Error;
-  
+
   constructor(message: string, cause?: Error) {
     super(message);
     this.cause = cause;
@@ -127,10 +124,7 @@ export async function processSecureDocument(bytes: Uint8Array) {
     // ... process
   } catch (error) {
     if (error instanceof SecurityError) {
-      throw new MyLibraryError(
-        `Failed to process secure document: ${error.message}`,
-        error
-      );
+      throw new MyLibraryError(`Failed to process secure document: ${error.message}`, error);
     }
     throw error;
   }
@@ -210,7 +204,7 @@ For large files, consider memory usage:
 // Process pages one at a time for large documents
 async function extractAllText(pdf: PDF): Promise<string[]> {
   const results: string[] = [];
-  
+
   for (let i = 0; i < pdf.getPageCount(); i++) {
     const page = await pdf.getPage(i);
     if (page) {
@@ -219,7 +213,7 @@ async function extractAllText(pdf: PDF): Promise<string[]> {
     }
     // Page can be garbage collected after processing
   }
-  
+
   return results;
 }
 ```
@@ -335,19 +329,17 @@ import { SecurityError } from "@libpdf/core";
 describe("Error handling", () => {
   it("handles missing password", async () => {
     const encryptedBytes = await loadFixture("encrypted.pdf");
-    
+
     // Documents requiring a password throw SecurityError when no password provided
-    await expect(myWrapper.process(encryptedBytes))
-      .rejects
-      .toThrow(SecurityError);
+    await expect(myWrapper.process(encryptedBytes)).rejects.toThrow(SecurityError);
   });
-  
+
   it("handles wrong password", async () => {
     const encryptedBytes = await loadFixture("encrypted.pdf");
-    
-    await expect(myWrapper.process(encryptedBytes, { password: "wrong" }))
-      .rejects
-      .toThrow(SecurityError);
+
+    await expect(myWrapper.process(encryptedBytes, { password: "wrong" })).rejects.toThrow(
+      SecurityError,
+    );
   });
 });
 ```
@@ -370,12 +362,12 @@ import { P12Signer } from "@libpdf/core";
 
 Some features have larger dependencies:
 
-| Feature | Impact |
-|---------|--------|
-| Basic parsing | Minimal |
-| Text extraction | Moderate (font parsing) |
-| Digital signatures | Larger (crypto, ASN.1) |
-| Font embedding | Moderate (font parsing) |
+| Feature            | Impact                  |
+| ------------------ | ----------------------- |
+| Basic parsing      | Minimal                 |
+| Text extraction    | Moderate (font parsing) |
+| Digital signatures | Larger (crypto, ASN.1)  |
+| Font embedding     | Moderate (font parsing) |
 
 Structure your code to allow tree-shaking:
 
@@ -415,6 +407,7 @@ if (version.startsWith("1.")) {
 ### Changelog Monitoring
 
 Subscribe to releases:
+
 - Watch the GitHub repository
 - Check the changelog before updating
 - Test your integration after updates
@@ -439,11 +432,11 @@ export interface TextRedaction {
 export async function redactText(
   bytes: Uint8Array,
   redactions: TextRedaction[],
-  options: RedactionOptions = {}
+  options: RedactionOptions = {},
 ): Promise<Uint8Array> {
   const pdf = await PDF.load(bytes);
   const color = options.color ?? rgb(0, 0, 0);
-  
+
   // Group redactions by page
   const byPage = new Map<number, string[]>();
   for (const r of redactions) {
@@ -451,12 +444,12 @@ export async function redactText(
     texts.push(r.text);
     byPage.set(r.page, texts);
   }
-  
+
   // Process each page with redactions
   for (const [pageIndex, texts] of byPage) {
     const page = await pdf.getPage(pageIndex);
     if (!page) continue;
-    
+
     for (const text of texts) {
       const matches = await page.findText(text);
       for (const match of matches) {
@@ -471,19 +464,19 @@ export async function redactText(
       }
     }
   }
-  
+
   return pdf.save();
 }
 ```
 
 ## Summary
 
-| Topic | Recommendation |
-|-------|----------------|
+| Topic        | Recommendation                                 |
+| ------------ | ---------------------------------------------- |
 | Dependencies | Peer dependency for libraries, direct for apps |
-| Types | Preserve generics, don't upcast |
-| Errors | Re-export error types, add context |
-| Async | Batch operations, consider memory |
-| Low-level | Use sparingly, document version requirements |
-| Testing | Test with real PDFs, cover error cases |
-| Bundles | Import only what you need |
+| Types        | Preserve generics, don't upcast                |
+| Errors       | Re-export error types, add context             |
+| Async        | Batch operations, consider memory              |
+| Low-level    | Use sparingly, document version requirements   |
+| Testing      | Test with real PDFs, cover error cases         |
+| Bundles      | Import only what you need                      |

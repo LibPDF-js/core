@@ -9,6 +9,7 @@
  */
 
 import { BinaryWriter } from "#src/io/binary-writer.ts";
+
 import type { CFFCIDFont, CFFType1Font, PrivateDict } from "./parser.ts";
 import { getStandardString, STANDARD_STRINGS_COUNT } from "./standard-strings.ts";
 

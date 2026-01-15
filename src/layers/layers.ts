@@ -12,6 +12,7 @@ import { PdfName } from "#src/objects/pdf-name";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+
 import type { FlattenLayersResult, LayerInfo } from "./types";
 
 /**

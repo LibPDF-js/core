@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { describe, expect, it } from "vitest";
+
 import { CIDFont, CIDWidthMap, parseCIDWidths } from "./cid-font";
 
 describe("CIDWidthMap", () => {

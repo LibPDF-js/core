@@ -35,6 +35,7 @@ import {
 } from "#src/helpers/operators";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfNumber } from "#src/objects/pdf-number";
+
 import { type LineCap, type LineJoin, lineCapToNumber, lineJoinToNumber } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────

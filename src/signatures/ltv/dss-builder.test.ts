@@ -4,13 +4,14 @@
  * Tests DSS dictionary creation, VRI entries, and merging scenarios.
  */
 
-import { describe, expect, it } from "vitest";
 import { ObjectRegistry } from "#src/document/object-registry.ts";
 import { PdfArray } from "#src/objects/pdf-array.ts";
 import { PdfDict } from "#src/objects/pdf-dict.ts";
 import { PdfName } from "#src/objects/pdf-name.ts";
 import { PdfRef } from "#src/objects/pdf-ref.ts";
 import { PdfStream } from "#src/objects/pdf-stream.ts";
+import { describe, expect, it } from "vitest";
+
 import { DSSBuilder } from "./dss-builder";
 import type { LtvData } from "./gatherer";
 import { computeSha1Hex, computeVriKey } from "./vri";

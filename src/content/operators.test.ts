@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   beginMarkedContent,
   beginMarkedContentProps,
@@ -61,6 +60,8 @@ import { PdfArray } from "#src/objects/pdf-array";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it } from "vitest";
+
 import { Op, Operator } from "./operators";
 
 describe("Operator", () => {

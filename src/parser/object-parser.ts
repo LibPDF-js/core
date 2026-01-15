@@ -7,6 +7,7 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+
 import { ObjectParseError } from "./errors";
 import type { Token } from "./token";
 import type { TokenReader } from "./token-reader";

@@ -12,12 +12,14 @@ Rewrite `src/fonts` to unify font reading (Plan 019) and font embedding (Plan 02
 ## Current State
 
 ### src/fonts/ (PDF-level)
+
 - Parses PDF font dictionaries (`/Font` objects)
 - Handles PDF encodings (WinAnsi, MacRoman, Standard, etc.)
 - Works with PDF structures: `/Widths`, `/ToUnicode`, `/FontDescriptor`
 - **Gap**: Doesn't parse embedded font programs (`/FontFile`, `/FontFile2`, `/FontFile3`)
 
 ### src/fontbox/ (Font file-level)
+
 - Parses raw font files (TTF, OTF, CFF, Type1, AFM)
 - Has `TTFSubsetter` for font subsetting
 - Supports variable fonts (fvar, stat, avar)
@@ -34,6 +36,7 @@ Rewrite `src/fonts` to unify font reading (Plan 019) and font embedding (Plan 02
 ## Scope
 
 **In scope:**
+
 - Integrate fontbox with PDF font parsing
 - Parse `/FontFile` (Type1), `/FontFile2` (TTF), `/FontFile3` (CFF)
 - Font embedding API (`pdf.embedFont()`)
@@ -42,6 +45,7 @@ Rewrite `src/fonts` to unify font reading (Plan 019) and font embedding (Plan 02
 - Variable font flattening to static instance
 
 **Out of scope:**
+
 - Full text shaping (HarfBuzz integration) - defer to later
 - Font collections (.ttc) - single font only
 - CFF2 variable fonts
@@ -100,16 +104,16 @@ const page = pdf.getPage(0);
 const font = page.getFont("F1");
 
 // Access font properties
-console.log(font.baseFontName);           // "ABCDEF+Helvetica"
-console.log(font.subtype);                 // "TrueType"
-console.log(font.descriptor?.ascent);      // 718
+console.log(font.baseFontName); // "ABCDEF+Helvetica"
+console.log(font.subtype); // "TrueType"
+console.log(font.descriptor?.ascent); // 718
 
 // Width measurement
-const width = font.getWidth(65);           // Width of 'A'
+const width = font.getWidth(65); // Width of 'A'
 const textWidth = font.getTextWidth("Hello", 12);
 
 // Text extraction
-const unicode = font.toUnicode(65);        // "A"
+const unicode = font.toUnicode(65); // "A"
 
 // Check encoding capability
 if (font.canEncode("Hello")) {
@@ -140,7 +144,7 @@ const font = await pdf.embedFont(fontBytes);
 const form = pdf.getForm();
 const field = form.getTextField("name");
 field.setFont(font);
-field.setValue("Hello ");  // Mixed scripts
+field.setValue("Hello "); // Mixed scripts
 
 // Check encoding capability
 if (!font.canEncode("")) {
@@ -159,12 +163,12 @@ const output = await pdf.save();
 ```typescript
 // Embed variable font with specific axis values
 const font = await pdf.embedFont(variableFontBytes, {
-  variations: { wght: 700, wdth: 100 }  // Bold, normal width
+  variations: { wght: 700, wdth: 100 }, // Bold, normal width
 });
 
 // Or use a named instance
 const font = await pdf.embedFont(variableFontBytes, {
-  instance: "Bold"  // Use named instance from fvar
+  instance: "Bold", // Use named instance from fvar
 });
 
 // Default: use font's default axis values
@@ -242,22 +246,22 @@ export type FontProgramType = "truetype" | "cff" | "type1";
 
 export interface FontProgram {
   readonly type: FontProgramType;
-  
+
   /** Number of glyphs in the font */
   readonly numGlyphs: number;
-  
+
   /** Units per em */
   readonly unitsPerEm: number;
-  
+
   /** Get glyph ID for Unicode code point */
   getGlyphId(codePoint: number): number;
-  
+
   /** Get advance width for glyph ID */
   getAdvanceWidth(glyphId: number): number;
-  
+
   /** Check if font has glyph for code point */
   hasGlyph(codePoint: number): boolean;
-  
+
   /** Get raw font data */
   getData(): Uint8Array;
 }
@@ -266,22 +270,26 @@ export interface FontProgram {
 export class TrueTypeFontProgram implements FontProgram {
   readonly type = "truetype" as const;
   constructor(readonly font: TrueTypeFont) {}
-  
-  get numGlyphs(): number { return this.font.numGlyphs; }
-  get unitsPerEm(): number { return this.font.unitsPerEm; }
-  
+
+  get numGlyphs(): number {
+    return this.font.numGlyphs;
+  }
+  get unitsPerEm(): number {
+    return this.font.unitsPerEm;
+  }
+
   getGlyphId(codePoint: number): number {
     return this.font.getGlyphId(codePoint);
   }
-  
+
   getAdvanceWidth(glyphId: number): number {
     return this.font.getAdvanceWidth(glyphId);
   }
-  
+
   hasGlyph(codePoint: number): boolean {
     return this.font.hasGlyph(codePoint);
   }
-  
+
   getData(): Uint8Array {
     return this.font.data.bytes;
   }
@@ -303,9 +311,8 @@ import { parseType1 } from "#src/fontbox/type1/parser.ts";
 
 export function parseEmbeddedProgram(
   descriptor: PdfDict,
-  options: { decodeStream: (stream: unknown) => Uint8Array | null }
+  options: { decodeStream: (stream: unknown) => Uint8Array | null },
 ): FontProgram | null {
-  
   // Try FontFile2 (TrueType)
   const fontFile2 = descriptor.get("FontFile2");
   if (fontFile2) {
@@ -315,7 +322,7 @@ export function parseEmbeddedProgram(
       return new TrueTypeFontProgram(ttf);
     }
   }
-  
+
   // Try FontFile3 (CFF or OpenType with CFF)
   const fontFile3 = descriptor.get("FontFile3");
   if (fontFile3) {
@@ -333,7 +340,7 @@ export function parseEmbeddedProgram(
       }
     }
   }
-  
+
   // Try FontFile (Type1)
   const fontFile = descriptor.get("FontFile");
   if (fontFile) {
@@ -343,7 +350,7 @@ export function parseEmbeddedProgram(
       return new Type1Program(t1);
     }
   }
-  
+
   return null;
 }
 ```
@@ -357,10 +364,10 @@ Use embedded program when available:
 
 export class SimpleFont extends PdfFont {
   // ... existing properties ...
-  
+
   /** Embedded font program (if available) */
   private readonly embeddedProgram: FontProgram | null;
-  
+
   constructor(options: {
     // ... existing options ...
     embeddedProgram?: FontProgram | null;
@@ -368,17 +375,17 @@ export class SimpleFont extends PdfFont {
     // ...
     this.embeddedProgram = options.embeddedProgram ?? null;
   }
-  
+
   /** Check if embedded font program is available */
   get hasEmbeddedProgram(): boolean {
     return this.embeddedProgram !== null;
   }
-  
+
   /** Get embedded font program */
   getEmbeddedProgram(): FontProgram | null {
     return this.embeddedProgram;
   }
-  
+
   /**
    * Enhanced toUnicode with embedded font fallback.
    */
@@ -387,23 +394,23 @@ export class SimpleFont extends PdfFont {
     if (this.toUnicodeMap?.has(code)) {
       return this.toUnicodeMap.get(code)!;
     }
-    
+
     // 2. Try encoding
     const fromEncoding = this.encoding.decode(code);
     if (fromEncoding) {
       return fromEncoding;
     }
-    
+
     // 3. Try embedded font's cmap (reverse lookup)
     if (this.embeddedProgram) {
       // For embedded fonts, the code might be a GID
       // Try to find Unicode via post table or cmap reverse
       // This is complex - defer for now
     }
-    
+
     return "";
   }
-  
+
   /**
    * Enhanced getWidth with embedded font fallback.
    */
@@ -415,12 +422,12 @@ export class SimpleFont extends PdfFont {
         return width;
       }
     }
-    
+
     // For Standard 14 fonts, use built-in metrics
     if (this.isStandard14) {
       // ... existing Standard 14 logic ...
     }
-    
+
     // Try embedded font program
     if (this.embeddedProgram) {
       // Map code to GID, get width
@@ -431,7 +438,7 @@ export class SimpleFont extends PdfFont {
         return (width * 1000) / this.embeddedProgram.unitsPerEm;
       }
     }
-    
+
     return this._descriptor?.missingWidth ?? 0;
   }
 }
@@ -446,58 +453,58 @@ User-facing API for embedding fonts:
 
 export class EmbeddedFont extends PdfFont {
   readonly subtype = "Type0" as const;
-  
+
   /** Underlying font program */
   private readonly fontProgram: TrueTypeFontProgram;
-  
+
   /** Track used glyphs for subsetting */
   private readonly usedGlyphs: Set<number> = new Set([0]); // Always include .notdef
-  
+
   /** Track used code points for ToUnicode */
   private readonly usedCodePoints: Map<number, number> = new Map(); // codePoint -> GID
-  
+
   /** Font name with subset tag */
   private subsetTag: string | null = null;
-  
+
   constructor(fontProgram: TrueTypeFontProgram, options?: EmbedOptions) {
     super();
     this.fontProgram = fontProgram;
     // Apply variable font options if provided
   }
-  
+
   get baseFontName(): string {
     // Return subset-tagged name after save
     const name = this.fontProgram.font.name?.getPostScriptName() ?? "Unknown";
     return this.subsetTag ? `${this.subsetTag}+${name}` : name;
   }
-  
+
   get descriptor(): FontDescriptor | null {
     // Build from font program metrics
     return this.buildDescriptor();
   }
-  
+
   /**
    * Encode text to character codes.
    * Uses Identity-H encoding (code = Unicode code point).
    */
   encodeText(text: string): number[] {
     const codes: number[] = [];
-    
+
     for (const char of text) {
       const codePoint = char.codePointAt(0)!;
       const gid = this.fontProgram.getGlyphId(codePoint);
-      
+
       // Track usage for subsetting
       this.usedGlyphs.add(gid);
       this.usedCodePoints.set(codePoint, gid);
-      
+
       // Identity-H: code = code point
       codes.push(codePoint);
     }
-    
+
     return codes;
   }
-  
+
   /**
    * Get width in glyph units (1000 = 1 em).
    */
@@ -506,12 +513,12 @@ export class EmbeddedFont extends PdfFont {
     const width = this.fontProgram.getAdvanceWidth(gid);
     return (width * 1000) / this.fontProgram.unitsPerEm;
   }
-  
+
   toUnicode(code: number): string {
     // For Identity-H, code is the Unicode code point
     return String.fromCodePoint(code);
   }
-  
+
   canEncode(text: string): boolean {
     for (const char of text) {
       const codePoint = char.codePointAt(0)!;
@@ -521,7 +528,7 @@ export class EmbeddedFont extends PdfFont {
     }
     return true;
   }
-  
+
   /**
    * Build PDF objects for this font.
    * Called during PDF save.
@@ -529,20 +536,20 @@ export class EmbeddedFont extends PdfFont {
   buildPdfObjects(context: WriteContext): PdfFontObjects {
     // Generate subset tag
     this.subsetTag = generateSubsetTag();
-    
+
     // Subset the font
     const subsetter = new TTFSubsetter(this.fontProgram.font);
     for (const gid of this.usedGlyphs) {
       subsetter.addGlyph(gid);
     }
     const subsetData = subsetter.subset();
-    
+
     // Build ToUnicode CMap
     const toUnicode = buildToUnicodeCMap(this.usedCodePoints);
-    
+
     // Build widths array
     const widths = buildWidthsArray(this.usedCodePoints, this.fontProgram);
-    
+
     // Create PDF dictionaries
     return {
       type0Dict: this.buildType0Dict(toUnicode),
@@ -564,19 +571,19 @@ Create PDF objects from EmbeddedFont:
 
 export function createFontObjects(
   embeddedFont: EmbeddedFont,
-  context: WriteContext
+  context: WriteContext,
 ): PdfFontObjects {
   const program = embeddedFont.fontProgram;
   const subsetTag = generateSubsetTag();
   const fontName = `${subsetTag}+${program.getPostScriptName()}`;
-  
+
   // 1. Subset the font
   const subsetter = new TTFSubsetter(program.font);
   for (const gid of embeddedFont.usedGlyphs) {
     subsetter.addGlyph(gid);
   }
   const subsetData = subsetter.subset();
-  
+
   // 2. Build font stream
   const fontStream = new PdfStream({
     data: subsetData,
@@ -584,7 +591,7 @@ export function createFontObjects(
       Length1: subsetData.length,
     }),
   });
-  
+
   // 3. Build FontDescriptor
   const descriptorDict = new PdfDict({
     Type: new PdfName("FontDescriptor"),
@@ -598,7 +605,7 @@ export function createFontObjects(
     StemV: 80, // Estimate
     FontFile2: fontStream.ref,
   });
-  
+
   // 4. Build CIDFont
   const cidFontDict = new PdfDict({
     Type: new PdfName("Font"),
@@ -613,10 +620,10 @@ export function createFontObjects(
     W: buildWidthsArray(embeddedFont.usedCodePoints, program),
     CIDToGIDMap: new PdfName("Identity"),
   });
-  
+
   // 5. Build ToUnicode CMap
   const toUnicodeStream = buildToUnicodeCMap(embeddedFont.usedCodePoints);
-  
+
   // 6. Build Type0 font
   const type0Dict = new PdfDict({
     Type: new PdfName("Font"),
@@ -626,7 +633,7 @@ export function createFontObjects(
     DescendantFonts: new PdfArray([cidFontDict.ref]),
     ToUnicode: toUnicodeStream.ref,
   });
-  
+
   return { type0Dict, cidFontDict, descriptorDict, fontStream, toUnicodeStream };
 }
 ```
@@ -653,6 +660,7 @@ export function createFontObjects(
 ## Test Plan
 
 ### Embedded Program Parsing
+
 - Parse FontFile2 (TrueType) from PDF
 - Parse FontFile3/CIDFontType0C (CFF) from PDF
 - Parse FontFile3/OpenType from PDF
@@ -661,11 +669,13 @@ export function createFontObjects(
 - Get metrics from embedded font
 
 ### Enhanced Font Reading
+
 - Use embedded font metrics when /Widths is missing
 - Use embedded font cmap for toUnicode fallback
 - Prefer explicit PDF data over embedded font
 
 ### Font Embedding
+
 - Embed TTF font
 - Embed OTF font (TrueType outlines)
 - Track used glyphs correctly
@@ -678,6 +688,7 @@ export function createFontObjects(
 - Variable font: use named instance
 
 ### Integration
+
 - Embed font -> save -> load -> text renders
 - Embed font -> save -> load -> text extractable
 - Embed CJK font with many glyphs
@@ -685,6 +696,7 @@ export function createFontObjects(
 - Round-trip: load PDF with embedded font, save, load again
 
 ### Edge Cases
+
 - Font with no OS/2 table
 - Font with no post table
 - Composite glyphs during subsetting

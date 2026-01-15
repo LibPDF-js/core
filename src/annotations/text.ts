@@ -14,6 +14,7 @@ import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfString } from "#src/objects/pdf-string";
+
 import { rectToArray } from "./base";
 import { PDFMarkupAnnotation } from "./markup";
 import type { TextAnnotationIcon, TextAnnotationOptions } from "./types";

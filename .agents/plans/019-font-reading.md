@@ -21,6 +21,7 @@ Implemented with 107 tests passing. All core font reading functionality is compl
 ## Overview
 
 Implement parsing of PDF font dictionaries to extract font metadata, glyph widths, and encoding information. This enables:
+
 - Accurate text width measurement for form field layout
 - Text extraction (via ToUnicode maps)
 - Understanding existing fonts before embedding new ones
@@ -28,6 +29,7 @@ Implement parsing of PDF font dictionaries to extract font metadata, glyph width
 ## Scope
 
 **In scope:**
+
 - Parse font dictionary structure (Type0, TrueType, Type1)
 - Extract glyph widths from `/Widths` and `/W` arrays
 - Parse FontDescriptor for metrics (ascent, descent, etc.)
@@ -36,6 +38,7 @@ Implement parsing of PDF font dictionaries to extract font metadata, glyph width
 - Basic CMap parsing for Type0 fonts
 
 **Out of scope:**
+
 - Embedding new fonts (see Plan 020)
 - Font subsetting
 - Parsing embedded font programs (TrueType/CFF data)
@@ -43,14 +46,14 @@ Implement parsing of PDF font dictionaries to extract font metadata, glyph width
 
 ## Font Types in PDF
 
-| Subtype | Description | Encoding | Use Case |
-|---------|-------------|----------|----------|
-| Type1 | PostScript Type 1 | Single-byte | Legacy |
-| TrueType | TrueType font | Single-byte | Common |
-| Type0 | Composite (CID) | Multi-byte via CMap | **CJK, Unicode** |
-| Type3 | User-defined glyphs | Single-byte | Special |
-| CIDFontType0 | CFF-based CIDFont | N/A (descendant) | CJK |
-| CIDFontType2 | TrueType-based CIDFont | N/A (descendant) | CJK |
+| Subtype      | Description            | Encoding            | Use Case         |
+| ------------ | ---------------------- | ------------------- | ---------------- |
+| Type1        | PostScript Type 1      | Single-byte         | Legacy           |
+| TrueType     | TrueType font          | Single-byte         | Common           |
+| Type0        | Composite (CID)        | Multi-byte via CMap | **CJK, Unicode** |
+| Type3        | User-defined glyphs    | Single-byte         | Special          |
+| CIDFontType0 | CFF-based CIDFont      | N/A (descendant)    | CJK              |
+| CIDFontType2 | TrueType-based CIDFont | N/A (descendant)    | CJK              |
 
 ## Font Dictionary Structures
 
@@ -182,7 +185,7 @@ export abstract class PdfFont {
 
 export class SimpleFont extends PdfFont {
   readonly subtype: "TrueType" | "Type1" | "Type3";
-  
+
   private readonly firstChar: number;
   private readonly lastChar: number;
   private readonly widths: number[];
@@ -232,7 +235,7 @@ export class SimpleFont extends PdfFont {
 
 export class CompositeFont extends PdfFont {
   readonly subtype = "Type0";
-  
+
   private readonly cidFont: CIDFont;
   private readonly cmap: CMap;
   private readonly toUnicodeMap: Map<number, string> | null;
@@ -286,7 +289,7 @@ export class CompositeFont extends PdfFont {
 export class CIDFont {
   readonly subtype: "CIDFontType0" | "CIDFontType2";
   readonly descriptor: FontDescriptor | null;
-  
+
   private readonly defaultWidth: number;
   private readonly widths: CIDWidthMap;
   private readonly cidToGidMap: Uint16Array | "Identity" | null;
@@ -329,11 +332,11 @@ class CIDWidthMap {
   static parse(wArray: PdfArray, registry: ObjectRegistry): CIDWidthMap {
     const map = new CIDWidthMap();
     let i = 0;
-    
+
     while (i < wArray.length) {
       const first = (wArray.get(i) as PdfNumber).value;
       const second = registry.resolve(wArray.get(i + 1));
-      
+
       if (second instanceof PdfArray) {
         // Individual widths: cid [w1 w2 w3 ...]
         for (let j = 0; j < second.length; j++) {
@@ -349,7 +352,7 @@ class CIDWidthMap {
         i += 3;
       }
     }
-    
+
     return map;
   }
 }
@@ -431,7 +434,7 @@ const FontFlags = {
 export interface FontEncoding {
   /** Encode text to character codes */
   encode(text: string): number[];
-  
+
   /** Decode character code to Unicode */
   decode(code: number): string;
 }
@@ -484,7 +487,7 @@ export class DifferencesEncoding implements FontEncoding {
 export class CMap {
   readonly name: string;
   readonly isIdentity: boolean;
-  
+
   private readonly codespaceRanges: CodespaceRange[];
   private readonly charMappings: Map<number, number>;
   private readonly rangeMappings: CMapRange[];
@@ -494,19 +497,19 @@ export class CMap {
    */
   lookup(code: number): number {
     if (this.isIdentity) return code;
-    
+
     // Check direct mappings
     if (this.charMappings.has(code)) {
       return this.charMappings.get(code)!;
     }
-    
+
     // Check ranges
     for (const range of this.rangeMappings) {
       if (code >= range.start && code <= range.end) {
         return range.baseCID + (code - range.start);
       }
     }
-    
+
     return 0; // .notdef
   }
 

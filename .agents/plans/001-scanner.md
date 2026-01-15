@@ -5,6 +5,7 @@ The scanner is the lowest layer — it reads bytes and provides primitives for t
 ## Goal
 
 Create a `Scanner` that wraps a `Uint8Array` and provides:
+
 - Position tracking with save/restore for backtracking
 - Peeking and advancing through bytes
 - Minimal API — lexer builds higher-level patterns on top
@@ -62,6 +63,7 @@ class Scanner {
 ## Design Decisions
 
 ### EOF Handling: -1 Sentinel
+
 `peek()` and `advance()` return -1 at end of input. This is the classic C-style approach — simple to check and avoids undefined/null complexity.
 
 ```typescript
@@ -71,30 +73,35 @@ while (scanner.peek() !== -1) {
 ```
 
 ### Backtracking: Save/Restore Position
+
 Following pdf-lib's pattern, backtracking is done by saving and restoring `position`:
 
 ```typescript
 const mark = scanner.position;
 // try to parse something
 if (failed) {
-  scanner.moveTo(mark);  // restore
+  scanner.moveTo(mark); // restore
 }
 ```
 
 No mark stack or dedicated mark/reset API — just use the position property directly.
 
 ### Boundary: Bytes Only
+
 Scanner handles only byte-level operations. PDF-specific concepts (whitespace, delimiters, tokens) belong in the lexer. This keeps Scanner simple and reusable.
 
 ### Newlines: No Normalization
+
 Scanner sees raw bytes. CR (0x0D), LF (0x0A), and CRLF sequences are passed through unchanged. The lexer handles newline semantics.
 
 ### Error Behavior: Return Indicators
+
 - `advance()` returns -1 if at end (does not advance)
 - `moveTo()` clamps to valid range instead of throwing
 - Matches lenient parsing philosophy — don't crash on edge cases
 
 ### No slice()
+
 YAGNI. If the lexer needs a byte range, it can use `scanner.bytes.subarray(start, end)` directly.
 
 ## Usage Example
@@ -103,13 +110,15 @@ YAGNI. If the lexer needs a byte range, it can use `scanner.bytes.subarray(start
 const scanner = new Scanner(bytes);
 
 // Read PDF header: %PDF-1.x
-if (scanner.match(0x25)) {  // %
+if (scanner.match(0x25)) {
+  // %
   const mark = scanner.position;
 
-  if (scanner.match(0x50) && scanner.match(0x44) && scanner.match(0x46)) {  // PDF
+  if (scanner.match(0x50) && scanner.match(0x44) && scanner.match(0x46)) {
+    // PDF
     // valid header start
   } else {
-    scanner.moveTo(mark);  // backtrack
+    scanner.moveTo(mark); // backtrack
   }
 }
 
@@ -141,5 +150,6 @@ const header = scanner.bytes.subarray(0, 8);
 ## Next Steps
 
 After scanner is complete:
+
 1. Build lexer on top — `nextToken()` returns typed tokens
 2. Token types: Number, Name, String, HexString, Keyword, Delimiter, Comment, EOF

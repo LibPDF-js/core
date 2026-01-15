@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { Scanner } from "#src/io/scanner";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -7,6 +6,8 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { DocumentParser } from "#src/parser/document-parser";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { CompositeFont } from "./composite-font";
 import { FontFactory, isCompositeFont, isSimpleFont, parseFont } from "./font-factory";
 import { SimpleFont } from "./simple-font";

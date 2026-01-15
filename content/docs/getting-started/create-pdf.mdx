@@ -35,19 +35,19 @@ const a4Page = pdf.addPage({ size: "a4" });
 const legalPage = pdf.addPage({ size: "legal" });
 
 // Custom size in points (1 inch = 72 points)
-const customPage = pdf.addPage({ 
-  width: 400, 
+const customPage = pdf.addPage({
+  width: 400,
   height: 600,
 });
 ```
 
 Available predefined sizes:
 
-| Size | Dimensions (points) |
-|------|---------------------|
-| `"letter"` | 612 × 792 |
-| `"a4"` | 595 × 842 |
-| `"legal"` | 612 × 1008 |
+| Size       | Dimensions (points) |
+| ---------- | ------------------- |
+| `"letter"` | 612 × 792           |
+| `"a4"`     | 595 × 842           |
+| `"legal"`  | 612 × 1008          |
 
 ### Landscape Orientation
 
@@ -79,9 +79,9 @@ page.drawText("Styled Text", {
   x: 50,
   y: 650,
   size: 16,
-  color: rgb(0.2, 0.4, 0.8),  // Blue
+  color: rgb(0.2, 0.4, 0.8), // Blue
   lineHeight: 1.5,
-  maxWidth: 200,              // Word wrap
+  maxWidth: 200, // Word wrap
 });
 ```
 
@@ -114,8 +114,8 @@ page.drawRectangle({
   y: 500,
   width: 200,
   height: 100,
-  color: rgb(0.9, 0.9, 0.9),      // Fill color
-  borderColor: rgb(0, 0, 0),      // Stroke color
+  color: rgb(0.9, 0.9, 0.9), // Fill color
+  borderColor: rgb(0, 0, 0), // Stroke color
   borderWidth: 1,
 });
 ```
@@ -124,8 +124,8 @@ page.drawRectangle({
 
 ```ts
 page.drawCircle({
-  x: 150,   // Center X
-  y: 400,   // Center Y
+  x: 150, // Center X
+  y: 400, // Center Y
   radius: 50,
   color: rgb(1, 0.8, 0.8),
   borderColor: rgb(0.8, 0, 0),

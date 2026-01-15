@@ -20,6 +20,7 @@ import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
 import type { StandardSecurityHandler } from "#src/security/standard-handler";
+
 import { writeXRefStream, writeXRefTable, type XRefWriteEntry } from "./xref-writer";
 
 /**

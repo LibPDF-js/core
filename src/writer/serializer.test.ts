@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfBool } from "#src/objects/pdf-bool";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -8,6 +7,8 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it } from "vitest";
+
 import { serializeIndirectObject, serializeObject } from "./serializer";
 
 /**

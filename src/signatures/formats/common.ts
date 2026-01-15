@@ -4,6 +4,7 @@
 
 import { Constructed, fromBER, Null, ObjectIdentifier, Sequence } from "asn1js";
 import * as pkijs from "pkijs";
+
 import { toArrayBuffer } from "../../helpers/buffer";
 import {
   OID_CMS_ALGORITHM_PROTECTION,

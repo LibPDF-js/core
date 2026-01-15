@@ -47,7 +47,7 @@ const MAX_DEPTH = 10;
 export class NameTree {
   constructor(
     private root: PdfDict,
-    private resolver: Resolver
+    private resolver: Resolver,
   ) {}
 
   /**
@@ -138,7 +138,7 @@ function getFilename(fileSpec: PdfDict): string;
 async function parseFileSpec(
   fileSpec: PdfDict,
   name: string,
-  resolver: Resolver
+  resolver: Resolver,
 ): Promise<AttachmentInfo | null>;
 
 /**
@@ -147,7 +147,7 @@ async function parseFileSpec(
  */
 async function getEmbeddedFileStream(
   fileSpec: PdfDict,
-  resolver: Resolver
+  resolver: Resolver,
 ): Promise<PdfStream | null>;
 
 /**
@@ -156,17 +156,14 @@ async function getEmbeddedFileStream(
 function createFileSpec(
   filename: string,
   embeddedFileRef: PdfRef,
-  options: AddAttachmentOptions
+  options: AddAttachmentOptions,
 ): PdfDict;
 
 /**
  * Create an embedded file stream.
  * Compression is handled by the writer's compressStreams option.
  */
-function createEmbeddedFileStream(
-  data: Uint8Array,
-  options: AddAttachmentOptions
-): PdfStream;
+function createEmbeddedFileStream(data: Uint8Array, options: AddAttachmentOptions): PdfStream;
 ```
 
 ### 4. PDF API Methods (`src/api/pdf.ts`)
@@ -213,6 +210,7 @@ async removeAttachment(name: string): Promise<boolean>;
 ## Implementation Order
 
 ### Phase 1: Name Tree Infrastructure
+
 1. Create `src/document/name-tree.ts`
 2. Implement `NameTree` class with:
    - `get()` with binary search using `/Limits`
@@ -222,6 +220,7 @@ async removeAttachment(name: string): Promise<boolean>;
 4. Add tests with mock name tree structures (flat + hierarchical)
 
 ### Phase 2: Reading Attachments
+
 1. Create `src/attachments/types.ts` with interfaces
 2. Create `src/attachments/file-spec.ts` with:
    - `getFilename()` with fallback chain
@@ -233,6 +232,7 @@ async removeAttachment(name: string): Promise<boolean>;
 6. Test with real PDFs containing attachments
 
 ### Phase 3: Writing Attachments
+
 1. Add `createFileSpec()` and `createEmbeddedFileStream()` helpers
 2. Add `addAttachment()` to PDF class with:
    - Duplicate name detection (throw unless `overwrite: true`)
@@ -242,6 +242,7 @@ async removeAttachment(name: string): Promise<boolean>;
 4. Test round-trip: add attachment, save, reload, extract
 
 ### Phase 4: Polish
+
 1. Add MIME type auto-detection from file extension
 2. Parse PDF dates into JS Date objects
 3. Add checksum verification (optional)
@@ -276,19 +277,19 @@ src/
 
 ## Edge Cases & Handling
 
-| Case | Handling |
-|------|----------|
-| No `/Names` dictionary | Return empty map |
-| No `/EmbeddedFiles` in `/Names` | Return empty map |
-| Hierarchical name tree | Walk `/Kids` with cycle detection |
-| Missing `/EF` in FileSpec | External file reference → skip + warn |
-| Circular refs in tree | Cycle detection via visited Set |
-| Very deep tree | Stop at MAX_DEPTH (10) + warn |
-| Duplicate name on add | Throw error unless `overwrite: true` |
-| Unicode filenames | Prefer `/UF`, fall back through chain |
-| Platform-specific names | Check: `/UF` → `/F` → `/Unix` → `/Mac` → `/DOS` |
-| Compressed streams | Handled by `PdfStream.getDecodedData()` |
-| Encrypted attachments | Handled by security layer |
+| Case                            | Handling                                        |
+| ------------------------------- | ----------------------------------------------- |
+| No `/Names` dictionary          | Return empty map                                |
+| No `/EmbeddedFiles` in `/Names` | Return empty map                                |
+| Hierarchical name tree          | Walk `/Kids` with cycle detection               |
+| Missing `/EF` in FileSpec       | External file reference → skip + warn           |
+| Circular refs in tree           | Cycle detection via visited Set                 |
+| Very deep tree                  | Stop at MAX_DEPTH (10) + warn                   |
+| Duplicate name on add           | Throw error unless `overwrite: true`            |
+| Unicode filenames               | Prefer `/UF`, fall back through chain           |
+| Platform-specific names         | Check: `/UF` → `/F` → `/Unix` → `/Mac` → `/DOS` |
+| Compressed streams              | Handled by `PdfStream.getDecodedData()`         |
+| Encrypted attachments           | Handled by security layer                       |
 
 ## MIME Type Detection
 

@@ -27,6 +27,7 @@ import {
   WHITESPACE,
 } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
+
 import type {
   DelimiterToken,
   KeywordToken,

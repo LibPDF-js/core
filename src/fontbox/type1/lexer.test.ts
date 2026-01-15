@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { DamagedFontError, Type1Lexer } from "./lexer.ts";
 import { type Token, TokenKind } from "./token.ts";
 

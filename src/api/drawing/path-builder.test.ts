@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
 import { rgb } from "#src/helpers/colors";
+import { describe, expect, it, vi } from "vitest";
+
 import { PathBuilder } from "./path-builder";
 
 describe("PathBuilder", () => {

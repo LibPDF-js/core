@@ -1,6 +1,7 @@
 import type { FilterSpec } from "#src/filters/filter";
 import { FilterPipeline } from "#src/filters/filter-pipeline";
 import type { ByteWriter } from "#src/io/byte-writer";
+
 import { PdfArray } from "./pdf-array";
 import { PdfDict } from "./pdf-dict";
 import { PdfName } from "./pdf-name";

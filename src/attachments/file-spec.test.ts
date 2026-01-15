@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format.ts";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
@@ -7,6 +6,8 @@ import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it } from "vitest";
+
 import {
   createEmbeddedFileStream,
   createFileSpec,

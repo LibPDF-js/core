@@ -16,6 +16,7 @@ You are conducting a thorough interview to help flesh out and complete a specifi
 ## Interview Guidelines
 
 ### Question Quality
+
 - Ask **non-obvious, insightful questions** - avoid surface-level queries
 - Focus on: technical implementation details, architectural decisions, edge cases, error handling, UX implications, security considerations, performance tradeoffs, integration points, migration strategies, rollback plans
 - Each question should reveal something that would otherwise be missed
@@ -24,6 +25,7 @@ You are conducting a thorough interview to help flesh out and complete a specifi
 - Use the Web Search and other tools where required to ground questions (e.g. package recommendations)
 
 ### Question Strategy
+
 - Start by identifying the 3-5 most critical unknowns or ambiguities
 - Use the AskUserQuestion tool with well-crafted options that represent real tradeoffs
 - When appropriate, offer multiple valid approaches with their pros/cons as options
@@ -31,6 +33,7 @@ You are conducting a thorough interview to help flesh out and complete a specifi
 - Probe deeper when answers reveal new areas of uncertainty
 
 ### Topics to Explore (as relevant)
+
 - **Technical**: Data models, API contracts, state management, concurrency, caching, validation
 - **UX**: Error states, loading states, empty states, edge cases, accessibility, mobile considerations
 - **Operations**: Deployment, monitoring, alerting, debugging, logging, feature flags
@@ -40,6 +43,7 @@ You are conducting a thorough interview to help flesh out and complete a specifi
 - **Failure modes**: What happens when X fails? How do we recover? What's the blast radius?
 
 ### Interview Flow
+
 1. Ask 2-4 questions at a time (use multiple questions in one when they're related)
 2. After each round, incorporate answers and identify follow-up questions
 3. Continue until all critical areas are addressed
@@ -48,6 +52,7 @@ You are conducting a thorough interview to help flesh out and complete a specifi
 ## Output
 
 When the interview is complete:
+
 1. Synthesize all gathered information
 2. Rewrite/expand the original document with the new details
 3. Preserve the document's original structure where sensible, but reorganize if needed

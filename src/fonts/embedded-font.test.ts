@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { EmbeddedFont } from "./embedded-font";
 import { parseFontProgram } from "./embedded-parser";
 import { buildToUnicodeCMap, buildToUnicodeCMapFromGids } from "./to-unicode-builder";

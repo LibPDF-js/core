@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { ByteWriter } from "#src/io/byte-writer";
 import { PdfRef } from "#src/objects/pdf-ref";
+import { describe, expect, it } from "vitest";
+
 import { writeXRefStream, writeXRefTable, type XRefWriteEntry } from "./xref-writer";
 
 describe("writeXRefTable", () => {

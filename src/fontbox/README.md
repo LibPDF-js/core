@@ -10,14 +10,14 @@ We retain TypeScript idiomaticness while following fontbox's proven patterns and
 
 ## Scope
 
-| Module | Status | Description |
-|--------|--------|-------------|
-| **ttf/** | Planned | TrueType/OpenType parsing and subsetting |
-| **cff/** | Planned | Compact Font Format (PostScript outlines in OTF) |
-| **type1/** | Planned | Type 1 PostScript fonts |
-| **afm/** | Planned | Adobe Font Metrics |
-| **cmap/** | Planned | CMap parsing for CID-keyed fonts |
-| **pfb/** | Planned | PostScript Font Binary |
+| Module     | Status  | Description                                      |
+| ---------- | ------- | ------------------------------------------------ |
+| **ttf/**   | Planned | TrueType/OpenType parsing and subsetting         |
+| **cff/**   | Planned | Compact Font Format (PostScript outlines in OTF) |
+| **type1/** | Planned | Type 1 PostScript fonts                          |
+| **afm/**   | Planned | Adobe Font Metrics                               |
+| **cmap/**  | Planned | CMap parsing for CID-keyed fonts                 |
+| **pfb/**   | Planned | PostScript Font Binary                           |
 
 ## Design Principles
 
@@ -40,15 +40,15 @@ This is a **heavily inspired port**, not a line-by-line translation. We:
 
 ### Differences from Java Original
 
-| Java (fontbox) | TypeScript (this port) |
-|----------------|------------------------|
-| `TTFDataStream` abstract class | `BinaryScanner` extends `Scanner` |
-| `RandomAccessRead` interface | `Uint8Array` input |
-| Checked exceptions | Return types / thrown errors |
-| Synchronized blocks | Not needed (single-threaded) |
-| Class inheritance hierarchies | Composition, interfaces |
-| Getter/setter methods | Properties or readonly fields |
-| `GeneralPath` for glyph outlines | Path data arrays or SVG-style |
+| Java (fontbox)                   | TypeScript (this port)            |
+| -------------------------------- | --------------------------------- |
+| `TTFDataStream` abstract class   | `BinaryScanner` extends `Scanner` |
+| `RandomAccessRead` interface     | `Uint8Array` input                |
+| Checked exceptions               | Return types / thrown errors      |
+| Synchronized blocks              | Not needed (single-threaded)      |
+| Class inheritance hierarchies    | Composition, interfaces           |
+| Getter/setter methods            | Properties or readonly fields     |
+| `GeneralPath` for glyph outlines | Path data arrays or SVG-style     |
 
 ### What We're Adding
 
@@ -62,8 +62,8 @@ import { TTFParser, TTFSubsetter } from "#src/fontbox";
 
 // Parse a font
 const font = TTFParser.parse(fontBytes);
-console.log(font.familyName);  // "Noto Sans"
-console.log(font.unitsPerEm);  // 2048
+console.log(font.familyName); // "Noto Sans"
+console.log(font.unitsPerEm); // 2048
 
 // Check character support
 const glyphId = font.getGlyphId(0x4e2d); // 中

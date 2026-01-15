@@ -96,8 +96,8 @@ for (const match of placeholders) {
 ```typescript
 /** Rectangle in PDF coordinates (origin at bottom-left) */
 interface BoundingBox {
-  x: number;      // Left edge
-  y: number;      // Bottom edge
+  x: number; // Left edge
+  y: number; // Bottom edge
   width: number;
   height: number;
 }
@@ -134,7 +134,7 @@ interface PageText {
   width: number;
   height: number;
   lines: TextLine[];
-  text: string;  // Plain text (lines joined with \n)
+  text: string; // Plain text (lines joined with \n)
 }
 
 /** Search match */
@@ -142,7 +142,7 @@ interface TextMatch {
   text: string;
   bbox: BoundingBox;
   pageIndex: number;
-  charBoxes: BoundingBox[];  // Per-character boxes for highlighting
+  charBoxes: BoundingBox[]; // Per-character boxes for highlighting
 }
 
 /** Extraction options */
@@ -197,23 +197,23 @@ Tracks text-related graphics state during content stream processing:
 
 ### Text Operators to Handle
 
-| Operator | Description |
-|----------|-------------|
-| BT/ET | Begin/end text object |
-| Tf | Set font and size |
-| Tm | Set text matrix |
-| Td | Move to next line (relative) |
-| TD | Move and set leading |
-| T* | Move to next line (using TL) |
-| Tc | Set character spacing |
-| Tw | Set word spacing |
-| Tz | Set horizontal scaling |
-| TL | Set leading |
-| Ts | Set text rise |
-| Tj | Show string |
-| TJ | Show strings with positioning |
-| ' | Move to next line and show string |
-| " | Set spacing, move, and show string |
+| Operator | Description                        |
+| -------- | ---------------------------------- |
+| BT/ET    | Begin/end text object              |
+| Tf       | Set font and size                  |
+| Tm       | Set text matrix                    |
+| Td       | Move to next line (relative)       |
+| TD       | Move and set leading               |
+| T\*      | Move to next line (using TL)       |
+| Tc       | Set character spacing              |
+| Tw       | Set word spacing                   |
+| Tz       | Set horizontal scaling             |
+| TL       | Set leading                        |
+| Ts       | Set text rise                      |
+| Tj       | Show string                        |
+| TJ       | Show strings with positioning      |
+| '        | Move to next line and show string  |
+| "        | Set spacing, move, and show string |
 
 ### Coordinate Transformation
 
@@ -233,6 +233,7 @@ Final position = CTM × Tm × glyph_position
 4. Join characters into text strings, inferring spaces from gaps
 
 Space detection heuristic:
+
 - If gap between characters > 0.3 × font size, insert space
 - Configurable threshold for different PDF generators
 
@@ -259,7 +260,7 @@ Space detection heuristic:
 ### Fixtures Needed
 
 - `fixtures/text/simple.pdf` — Basic text content
-- `fixtures/text/multiline.pdf` — Multiple lines and paragraphs  
+- `fixtures/text/multiline.pdf` — Multiple lines and paragraphs
 - `fixtures/text/fonts.pdf` — Multiple fonts and sizes
 - `fixtures/text/rotated.pdf` — Rotated page content
 - `fixtures/text/positioned.pdf` — Text with TJ positioning adjustments
@@ -267,17 +268,17 @@ Space detection heuristic:
 
 ## Open Questions
 
-1. **Reading order**: Should we attempt to detect multi-column layouts, or just use raw position order? 
-   - *Initial approach*: Position order (left-to-right, top-to-bottom). Complex layout analysis is out of scope.
+1. **Reading order**: Should we attempt to detect multi-column layouts, or just use raw position order?
+   - _Initial approach_: Position order (left-to-right, top-to-bottom). Complex layout analysis is out of scope.
 
 2. **Whitespace handling**: How to handle multiple spaces, tabs, and form feeds?
-   - *Initial approach*: Normalize to single spaces. Provide `preserveWhitespace` option if needed.
+   - _Initial approach_: Normalize to single spaces. Provide `preserveWhitespace` option if needed.
 
 3. **Ligatures**: How to handle fi, fl ligatures in glyph names?
-   - *Initial approach*: Map via ToUnicode if available, otherwise return ligature character.
+   - _Initial approach_: Map via ToUnicode if available, otherwise return ligature character.
 
 4. **CID fonts without ToUnicode**: Some PDFs have CID fonts without ToUnicode CMaps.
-   - *Initial approach*: Return replacement character or empty string. Log warning.
+   - _Initial approach_: Return replacement character or empty string. Log warning.
 
 ## Risks
 
@@ -288,21 +289,25 @@ Space detection heuristic:
 ## Implementation Phases
 
 ### Phase 1: Core Extraction
+
 - TextState class
 - Process text operators
 - Character-level extraction with positions
 
 ### Phase 2: Grouping
+
 - Line grouping by baseline
 - Span grouping by font
 - Space detection
 
 ### Phase 3: Search
+
 - String search with bbox
 - Regex search
 - Document-wide search API
 
 ### Phase 4: API Integration
+
 - `PDFPage.extractText()`
 - `PDFPage.findText()`
 - `PDF.findText()` (document-wide)

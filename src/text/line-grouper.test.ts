@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { getPlainText, groupCharsIntoLines } from "./line-grouper";
 import type { ExtractedChar } from "./types";
 

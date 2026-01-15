@@ -44,9 +44,9 @@ for (const line of lines) {
   for (const span of line.spans) {
     console.log({
       text: span.text,
-      x: span.bbox.x,           // Left edge in points
-      y: span.bbox.y,           // Bottom edge in points
-      width: span.bbox.width,   // Bounding box width
+      x: span.bbox.x, // Left edge in points
+      y: span.bbox.y, // Bottom edge in points
+      width: span.bbox.width, // Bounding box width
       height: span.bbox.height, // Bounding box height
       fontSize: span.fontSize,
     });
@@ -57,6 +57,7 @@ for (const line of lines) {
 ### Coordinate System
 
 PDF coordinates start from the **bottom-left** corner:
+
 - `x` increases going right
 - `y` increases going up
 
@@ -104,10 +105,10 @@ Each result includes:
 
 ```ts
 interface TextMatch {
-  text: string;      // The matched text
+  text: string; // The matched text
   bbox: {
-    x: number;       // Left edge
-    y: number;       // Bottom edge
+    x: number; // Left edge
+    y: number; // Bottom edge
     width: number;
     height: number;
   };
@@ -121,12 +122,12 @@ interface TextMatch {
 ```ts
 async function searchDocument(pdf: PDF, pattern: string | RegExp) {
   const results: TextMatch[] = [];
-  
+
   for (const page of await pdf.getPages()) {
     const pageResults = await page.findText(pattern);
     results.push(...pageResults);
   }
-  
+
   return results;
 }
 
@@ -144,11 +145,12 @@ const { lines } = await page.extractText();
 // Define region (in points from bottom-left)
 const region = { x: 50, y: 700, width: 200, height: 50 };
 
-const inRegion = lines.filter(line => 
-  line.bbox.x >= region.x &&
-  line.bbox.x + line.bbox.width <= region.x + region.width &&
-  line.bbox.y >= region.y &&
-  line.bbox.y + line.bbox.height <= region.y + region.height
+const inRegion = lines.filter(
+  line =>
+    line.bbox.x >= region.x &&
+    line.bbox.x + line.bbox.width <= region.x + region.width &&
+    line.bbox.y >= region.y &&
+    line.bbox.y + line.bbox.height <= region.y + region.height,
 );
 
 const regionText = inRegion.map(line => line.text).join(" ");
@@ -164,7 +166,7 @@ const { lines } = await page.extractText();
 // Lines are already sorted top-to-bottom
 for (const line of lines) {
   console.log(`Line at y=${line.baseline}: "${line.text}"`);
-  
+
   // Access individual spans within the line
   for (const span of line.spans) {
     console.log(`  Span: "${span.text}" (font: ${span.fontName}, size: ${span.fontSize})`);
@@ -188,12 +190,12 @@ if (text.includes("\uFFFD") || text.length === 0) {
 
 ### Known Limitations
 
-| Issue | Cause | Workaround |
-|-------|-------|------------|
-| Garbled text | Missing ToUnicode map | None - PDF must include mapping |
-| Empty extraction | Text is actually images | Use OCR (external tool) |
-| Wrong order | Complex layouts | Use position data to reorder |
-| Missing CJK text | Predefined CMap | Only Identity-H/V supported |
+| Issue            | Cause                   | Workaround                      |
+| ---------------- | ----------------------- | ------------------------------- |
+| Garbled text     | Missing ToUnicode map   | None - PDF must include mapping |
+| Empty extraction | Text is actually images | Use OCR (external tool)         |
+| Wrong order      | Complex layouts         | Use position data to reorder    |
+| Missing CJK text | Predefined CMap         | Only Identity-H/V supported     |
 
 ## Performance Tips
 
@@ -204,10 +206,10 @@ For large documents:
 for (let i = 0; i < pdf.getPageCount(); i++) {
   const page = await pdf.getPage(i);
   const { text } = await page.extractText();
-  
+
   // Process text immediately
   await processPageText(i, text);
-  
+
   // Text data can now be garbage collected
 }
 ```

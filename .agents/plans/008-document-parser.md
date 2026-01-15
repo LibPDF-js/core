@@ -87,18 +87,18 @@ interface ParsedDocument {
  * Main document parser.
  */
 class DocumentParser {
-  constructor(bytes: Uint8Array, options?: ParseOptions)
+  constructor(bytes: Uint8Array, options?: ParseOptions);
 
   /**
    * Parse the PDF document.
    * Returns structured document for further processing.
    */
-  parse(): ParsedDocument
+  parse(): ParsedDocument;
 
   /**
    * Parse and return just the catalog (for quick access).
    */
-  parseCatalog(): PdfDict
+  parseCatalog(): PdfDict;
 }
 ```
 
@@ -117,6 +117,7 @@ Read the PDF version from the header:
 3. Optionally check for binary marker on line 2
 
 **Lenient handling**:
+
 - Accept `%PDF-` not at byte 0 (scan first 1024 bytes)
 - Accept version with extra characters
 - Accept missing binary marker
@@ -137,6 +138,7 @@ startxref
 4. Store offset for xref parsing
 
 **Lenient handling**:
+
 - Accept `startxref` not immediately before `%%EOF`
 - Accept extra whitespace
 - Accept missing `%%EOF`
@@ -257,18 +259,19 @@ private parseWithRecovery(): ParsedDocument {
 
 The trailer contains critical document metadata:
 
-| Key | Type | Description |
-|-----|------|-------------|
-| `/Size` | integer | Total number of objects |
-| `/Root` | reference | Catalog dictionary |
-| `/Encrypt` | dictionary | Encryption settings |
-| `/Info` | reference | Document information |
-| `/ID` | array | File identifiers |
-| `/Prev` | integer | Previous xref offset |
+| Key        | Type       | Description             |
+| ---------- | ---------- | ----------------------- |
+| `/Size`    | integer    | Total number of objects |
+| `/Root`    | reference  | Catalog dictionary      |
+| `/Encrypt` | dictionary | Encryption settings     |
+| `/Info`    | reference  | Document information    |
+| `/ID`      | array      | File identifiers        |
+| `/Prev`    | integer    | Previous xref offset    |
 
 ### Merged Trailer
 
 With incremental updates, trailers are merged:
+
 - Later trailers override earlier values
 - `/Prev` chain is followed but not kept in final trailer
 
@@ -287,47 +290,53 @@ With incremental updates, trailers are merged:
 
 ## Lenient Parsing Summary
 
-| Component | Strict | Lenient |
-|-----------|--------|---------|
-| Header | Must be at byte 0 | Search first 1024 bytes |
-| Version | Valid format only | Accept malformed |
-| startxref | Must exist | Use brute-force if missing |
-| XRef | Valid format | Accept spacing issues |
-| Object offsets | Exact | Scan for `obj` keyword |
-| endobj | Required | Accept missing |
-| Stream length | Exact | Scan for `endstream` |
+| Component      | Strict            | Lenient                    |
+| -------------- | ----------------- | -------------------------- |
+| Header         | Must be at byte 0 | Search first 1024 bytes    |
+| Version        | Valid format only | Accept malformed           |
+| startxref      | Must exist        | Use brute-force if missing |
+| XRef           | Valid format      | Accept spacing issues      |
+| Object offsets | Exact             | Scan for `obj` keyword     |
+| endobj         | Required          | Accept missing             |
+| Stream length  | Exact             | Scan for `endstream`       |
 
 ## Test Cases
 
 ### Basic Parsing
+
 - Minimal valid PDF
 - PDF with multiple objects
 - PDF with streams
 
 ### Version Detection
+
 - PDF 1.0 through 2.0
 - Version at offset > 0
 - Malformed version string
 
 ### XRef Handling
+
 - Traditional table format
 - Stream format (PDF 1.5+)
 - Incremental updates with /Prev
 - Hybrid (mixed table/stream)
 
 ### Object Resolution
+
 - Simple object fetch
 - Object from object stream
 - Stream with indirect /Length
 - Circular reference detection
 
 ### Recovery
+
 - Missing xref → brute-force
 - Corrupted trailer → brute-force
 - Invalid startxref → brute-force
 - Partial file → best effort
 
 ### Edge Cases
+
 - Linearized PDF (xref at start)
 - Very large object numbers
 - Encrypted PDF (detect, don't decrypt yet)

@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
 import { Scanner } from "#src/io/scanner";
 import { PdfDict } from "#src/objects/pdf-dict.ts";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { DocumentParser } from "./document-parser";
 
 /**

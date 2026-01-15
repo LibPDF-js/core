@@ -26,6 +26,7 @@ endobj
 ```
 
 Structure:
+
 - `<objNum> <genNum> obj` - header
 - Any direct object (dict, array, number, etc.)
 - `endobj` - terminator
@@ -42,6 +43,7 @@ endobj
 ```
 
 Structure:
+
 - Same header as standard object
 - Dictionary with `/Length` (required)
 - `stream` keyword
@@ -64,6 +66,7 @@ endobj
 ```
 
 An object stream contains multiple objects packed together:
+
 - `/Type /ObjStm` identifies it
 - `/N` - number of objects in stream
 - `/First` - byte offset to first object within stream
@@ -72,6 +75,7 @@ An object stream contains multiple objects packed together:
   - Then: concatenated object values
 
 Objects in a stream:
+
 - Have generation 0
 - Cannot themselves contain streams
 - Are referenced via xref type 2 entries
@@ -164,11 +168,13 @@ When ObjectParser returns `{ hasStream: true }`:
 ### Stream EOL Handling
 
 Per PDF spec, after `stream` keyword:
+
 - Single EOL (LF or CRLF) before data
 - No EOL → error (but be lenient)
 - CR alone is technically not valid but accept it
 
 Before `endstream`:
+
 - EOL is recommended but not required
 - Data should be exactly `/Length` bytes
 
@@ -197,6 +203,7 @@ endobj
 ```
 
 When `/Length` is a reference:
+
 1. We need the xref to find object 6
 2. Parse object 6 to get the number
 3. Then read that many bytes
@@ -224,18 +231,19 @@ endstream
 
 ## Lenient Parsing
 
-| Issue | Lenient Handling |
-|-------|------------------|
-| Missing `endobj` | Warn, accept object |
-| Whitespace before `stream` | Accept any whitespace |
-| Wrong EOL after `stream` | Try to detect actual data start |
-| `/Length` off by small amount | Scan for `endstream` |
-| Extra bytes after `endstream` | Ignore, warn |
-| Missing `endstream` | Scan backwards from `endobj` |
+| Issue                         | Lenient Handling                |
+| ----------------------------- | ------------------------------- |
+| Missing `endobj`              | Warn, accept object             |
+| Whitespace before `stream`    | Accept any whitespace           |
+| Wrong EOL after `stream`      | Try to detect actual data start |
+| `/Length` off by small amount | Scan for `endstream`            |
+| Extra bytes after `endstream` | Ignore, warn                    |
+| Missing `endstream`           | Scan backwards from `endobj`    |
 
 ### Stream Length Recovery
 
 When `/Length` seems wrong:
+
 1. Read `/Length` bytes
 2. Check if next bytes are `endstream`
 3. If not, scan for `endstream` keyword
@@ -245,6 +253,7 @@ When `/Length` seems wrong:
 ## Test Cases
 
 ### Standard Objects
+
 - Simple dict object
 - Array object
 - Number object
@@ -252,6 +261,7 @@ When `/Length` seems wrong:
 - Object with generation > 0
 
 ### Stream Objects
+
 - Direct `/Length`
 - Indirect `/Length` reference
 - Empty stream (length 0)
@@ -259,17 +269,20 @@ When `/Length` seems wrong:
 - Stream with various filters (for future decompression)
 
 ### EOL Handling
+
 - LF after `stream`
 - CRLF after `stream`
 - CR only after `stream` (lenient)
 - No EOL before `endstream`
 
 ### Object Streams
+
 - Parse object from stream by index
 - Multiple objects in stream
 - Compressed object stream
 
 ### Error Recovery
+
 - Missing `endobj`
 - Wrong `/Length`
 - Truncated stream
@@ -287,12 +300,14 @@ When `/Length` seems wrong:
 ### Stream Data Ownership
 
 The `Uint8Array` for stream data should be a view or copy of the underlying bytes, not a reference to the scanner's buffer. This allows:
+
 - Multiple streams to exist simultaneously
 - Scanner to continue reading other parts
 
 ### Lazy vs Eager Stream Reading
 
 Two approaches:
+
 1. **Eager**: Read and store stream data immediately
 2. **Lazy**: Store offset and length, read on demand
 

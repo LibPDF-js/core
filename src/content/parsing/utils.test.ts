@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { AnyOperation, ParsedOperation } from "./types";
 import {
   extractTextOperations,

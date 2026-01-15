@@ -25,33 +25,33 @@ Decoded bytes (Uint8Array)
 
 ### Priority 1: Core Filters (Required for Object Streams)
 
-| Filter | Description | Implementation |
-|--------|-------------|----------------|
-| `FlateDecode` | zlib/deflate | Native `DecompressionStream` with pako fallback |
-| `Predictor` | PNG/TIFF prediction | Pure JS (row-based algorithm) |
+| Filter        | Description         | Implementation                                  |
+| ------------- | ------------------- | ----------------------------------------------- |
+| `FlateDecode` | zlib/deflate        | Native `DecompressionStream` with pako fallback |
+| `Predictor`   | PNG/TIFF prediction | Pure JS (row-based algorithm)                   |
 
 ### Priority 2: Text Encoding Filters
 
-| Filter | Description | Implementation |
-|--------|-------------|----------------|
-| `ASCIIHexDecode` | Hex → binary | Pure JS (trivial) |
-| `ASCII85Decode` | Base85 → binary | Pure JS |
+| Filter           | Description     | Implementation    |
+| ---------------- | --------------- | ----------------- |
+| `ASCIIHexDecode` | Hex → binary    | Pure JS (trivial) |
+| `ASCII85Decode`  | Base85 → binary | Pure JS           |
 
 ### Priority 3: Legacy/Specialized Filters
 
-| Filter | Description | Implementation |
-|--------|-------------|----------------|
-| `LZWDecode` | LZW compression | Pure JS (port from pdf.js) |
-| `RunLengthDecode` | RLE compression | Pure JS (simple) |
+| Filter            | Description     | Implementation             |
+| ----------------- | --------------- | -------------------------- |
+| `LZWDecode`       | LZW compression | Pure JS (port from pdf.js) |
+| `RunLengthDecode` | RLE compression | Pure JS (simple)           |
 
 ### Priority 4: Image Filters (Future)
 
-| Filter | Description | Notes |
-|--------|-------------|-------|
-| `DCTDecode` | JPEG | Usually pass-through (browser decodes) |
-| `JPXDecode` | JPEG2000 | Requires external library |
-| `CCITTFaxDecode` | Fax/TIFF | Complex, for scanned docs |
-| `JBIG2Decode` | Binary images | Complex, for scanned docs |
+| Filter           | Description   | Notes                                  |
+| ---------------- | ------------- | -------------------------------------- |
+| `DCTDecode`      | JPEG          | Usually pass-through (browser decodes) |
+| `JPXDecode`      | JPEG2000      | Requires external library              |
+| `CCITTFaxDecode` | Fax/TIFF      | Complex, for scanned docs              |
+| `JBIG2Decode`    | Binary images | Complex, for scanned docs              |
 
 ## API Design
 
@@ -60,8 +60,8 @@ Decoded bytes (Uint8Array)
  * Filter specification from PDF stream dictionary.
  */
 interface FilterSpec {
-  name: string;           // "FlateDecode", "ASCII85Decode", etc.
-  params?: PdfDict;       // /DecodeParms for this filter
+  name: string; // "FlateDecode", "ASCII85Decode", etc.
+  params?: PdfDict; // /DecodeParms for this filter
 }
 
 /**
@@ -97,18 +97,12 @@ class FilterPipeline {
    * Decode data through a chain of filters.
    * Filters are applied in order: first filter's output → second filter's input.
    */
-  static async decode(
-    data: Uint8Array,
-    filters: FilterSpec | FilterSpec[]
-  ): Promise<Uint8Array>;
+  static async decode(data: Uint8Array, filters: FilterSpec | FilterSpec[]): Promise<Uint8Array>;
 
   /**
    * Encode data through a chain of filters (reverse order).
    */
-  static async encode(
-    data: Uint8Array,
-    filters: FilterSpec | FilterSpec[]
-  ): Promise<Uint8Array>;
+  static async encode(data: Uint8Array, filters: FilterSpec | FilterSpec[]): Promise<Uint8Array>;
 }
 ```
 
@@ -170,14 +164,14 @@ class FlateFilter implements Filter {
 
 **Browser/Runtime Support:**
 
-| Environment | Native API | Fallback |
-|-------------|------------|----------|
-| Chrome 80+ | `DecompressionStream` | pako |
-| Firefox 113+ | `DecompressionStream` | pako |
-| Safari 16.4+ | `DecompressionStream` | pako |
-| Node.js 18+ | `DecompressionStream` | pako |
-| Bun | `DecompressionStream` | pako |
-| Older browsers | N/A | pako |
+| Environment    | Native API            | Fallback |
+| -------------- | --------------------- | -------- |
+| Chrome 80+     | `DecompressionStream` | pako     |
+| Firefox 113+   | `DecompressionStream` | pako     |
+| Safari 16.4+   | `DecompressionStream` | pako     |
+| Node.js 18+    | `DecompressionStream` | pako     |
+| Bun            | `DecompressionStream` | pako     |
+| Older browsers | N/A                   | pako     |
 
 ### Predictor (PNG/TIFF)
 
@@ -185,31 +179,28 @@ Applied after decompression for optimized streams.
 
 **Parameters** (from `/DecodeParms`):
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `/Predictor` | int | 1 | Algorithm: 1=none, 2=TIFF, 10-15=PNG |
-| `/Columns` | int | 1 | Samples per row |
-| `/Colors` | int | 1 | Color components per sample |
-| `/BitsPerComponent` | int | 8 | Bits per component |
+| Key                 | Type | Default | Description                          |
+| ------------------- | ---- | ------- | ------------------------------------ |
+| `/Predictor`        | int  | 1       | Algorithm: 1=none, 2=TIFF, 10-15=PNG |
+| `/Columns`          | int  | 1       | Samples per row                      |
+| `/Colors`           | int  | 1       | Color components per sample          |
+| `/BitsPerComponent` | int  | 8       | Bits per component                   |
 
 **Predictor Values:**
 
-| Value | Name | Algorithm |
-|-------|------|-----------|
-| 1 | None | Pass-through |
-| 2 | TIFF SUB | Add left pixel |
-| 10 | PNG None | Pass-through (per-row) |
-| 11 | PNG Sub | Add left pixel |
-| 12 | PNG Up | Add above pixel |
-| 13 | PNG Average | Add (left + above) / 2 |
-| 14 | PNG Paeth | Optimal left/up/upper-left |
-| 15 | PNG Optimum | Per-row algorithm selection |
+| Value | Name        | Algorithm                   |
+| ----- | ----------- | --------------------------- |
+| 1     | None        | Pass-through                |
+| 2     | TIFF SUB    | Add left pixel              |
+| 10    | PNG None    | Pass-through (per-row)      |
+| 11    | PNG Sub     | Add left pixel              |
+| 12    | PNG Up      | Add above pixel             |
+| 13    | PNG Average | Add (left + above) / 2      |
+| 14    | PNG Paeth   | Optimal left/up/upper-left  |
+| 15    | PNG Optimum | Per-row algorithm selection |
 
 ```typescript
-function applyPredictor(
-  data: Uint8Array,
-  params: PdfDict
-): Uint8Array {
+function applyPredictor(data: Uint8Array, params: PdfDict): Uint8Array {
   const predictor = params.getNumber("Predictor")?.value ?? 1;
   const columns = params.getNumber("Columns")?.value ?? 1;
   const colors = params.getNumber("Colors")?.value ?? 1;
@@ -235,7 +226,7 @@ function applyPredictor(
 function decodePngPredictor(
   data: Uint8Array,
   bytesPerRow: number,
-  bytesPerPixel: number
+  bytesPerPixel: number,
 ): Uint8Array {
   const rowSize = bytesPerRow + 1; // +1 for filter byte
   const rows = Math.floor(data.length / rowSize);
@@ -292,7 +283,8 @@ class ASCIIHexFilter implements Filter {
       }
 
       // End marker
-      if (byte === 0x3e) { // '>'
+      if (byte === 0x3e) {
+        // '>'
         break;
       }
 
@@ -350,7 +342,7 @@ class ASCII85Filter implements Filter {
           (buffer >> 24) & 0xff,
           (buffer >> 16) & 0xff,
           (buffer >> 8) & 0xff,
-          buffer & 0xff
+          buffer & 0xff,
         );
         buffer = 0;
         count = 0;
@@ -460,10 +452,7 @@ class FilterPipeline {
     this.filters.set(filter.name, filter);
   }
 
-  static async decode(
-    data: Uint8Array,
-    filters: FilterSpec | FilterSpec[]
-  ): Promise<Uint8Array> {
+  static async decode(data: Uint8Array, filters: FilterSpec | FilterSpec[]): Promise<Uint8Array> {
     const filterList = Array.isArray(filters) ? filters : [filters];
 
     let result = data;
@@ -482,10 +471,7 @@ class FilterPipeline {
     return result;
   }
 
-  static async encode(
-    data: Uint8Array,
-    filters: FilterSpec | FilterSpec[]
-  ): Promise<Uint8Array> {
+  static async encode(data: Uint8Array, filters: FilterSpec | FilterSpec[]): Promise<Uint8Array> {
     const filterList = Array.isArray(filters) ? filters : [filters];
 
     let result = data;
@@ -556,18 +542,18 @@ class PdfStream extends PdfDict {
 
     if (filter.type === "name") {
       // Single filter
-      const params = decodeParms?.type === "dict" ? decodeParms as PdfDict : undefined;
+      const params = decodeParms?.type === "dict" ? (decodeParms as PdfDict) : undefined;
       return [{ name: (filter as PdfName).value, params }];
     }
 
     if (filter.type === "array") {
       // Multiple filters
       const filterArray = filter as PdfArray;
-      const paramsArray = decodeParms?.type === "array" ? decodeParms as PdfArray : null;
+      const paramsArray = decodeParms?.type === "array" ? (decodeParms as PdfArray) : null;
 
       return filterArray.items.map((f, i) => ({
         name: (f as PdfName).value,
-        params: paramsArray?.at(i)?.type === "dict" ? paramsArray.at(i) as PdfDict : undefined,
+        params: paramsArray?.at(i)?.type === "dict" ? (paramsArray.at(i) as PdfDict) : undefined,
       }));
     }
 
@@ -594,9 +580,9 @@ src/
 
 ## Dependencies
 
-| Package | Purpose | Size |
-|---------|---------|------|
-| `pako` | FlateDecode fallback | ~47KB |
+| Package | Purpose              | Size  |
+| ------- | -------------------- | ----- |
+| `pako`  | FlateDecode fallback | ~47KB |
 
 **Note**: pako is only loaded when native `DecompressionStream` is unavailable. Consider dynamic import for tree-shaking:
 
@@ -610,6 +596,7 @@ async function decodePako(data: Uint8Array): Promise<Uint8Array> {
 ## Test Cases
 
 ### FlateDecode
+
 - Decompress simple zlib data
 - Decompress with PNG predictor
 - Decompress with TIFF predictor
@@ -617,6 +604,7 @@ async function decodePako(data: Uint8Array): Promise<Uint8Array> {
 - Invalid zlib header handling
 
 ### Predictor
+
 - PNG None (filter byte 0)
 - PNG Sub (filter byte 1)
 - PNG Up (filter byte 2)
@@ -627,6 +615,7 @@ async function decodePako(data: Uint8Array): Promise<Uint8Array> {
 - Non-8-bit components
 
 ### ASCII85
+
 - Standard encoding
 - 'z' shortcut
 - Partial final group
@@ -634,6 +623,7 @@ async function decodePako(data: Uint8Array): Promise<Uint8Array> {
 - End marker "~>"
 
 ### Filter Chains
+
 - FlateDecode + ASCIIHexDecode
 - Multiple filters in array
 - DecodeParms array matching

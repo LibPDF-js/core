@@ -7,8 +7,9 @@
  * - Minimal API for the lexer to build on
  */
 
-import { describe, expect, it } from "vitest";
 import { stringToBytes } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { Scanner } from "./scanner";
 
 describe("Scanner", () => {

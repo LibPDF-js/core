@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { createBuiltInEncoding, createBuiltInEncodingFromObject } from "./built-in-encoding.ts";
 import { EncodingBuilder } from "./encoding.ts";
 import { MAC_ROMAN_ENCODING } from "./mac-roman-encoding.ts";

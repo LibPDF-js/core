@@ -1,4 +1,3 @@
-import { describe, expect, it, vi } from "vitest";
 import { Scanner } from "#src/io/scanner";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfBool } from "#src/objects/pdf-bool";
@@ -8,6 +7,8 @@ import { PdfNull } from "#src/objects/pdf-null";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it, vi } from "vitest";
+
 import { ObjectParser } from "./object-parser";
 import { TokenReader } from "./token-reader";
 

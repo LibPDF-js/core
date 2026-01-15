@@ -12,6 +12,7 @@
 
 import { PdfArray } from "#src/objects/pdf-array.ts";
 import { PdfNumber } from "#src/objects/pdf-number.ts";
+
 import type { FontProgram } from "./font-program/index.ts";
 
 /**

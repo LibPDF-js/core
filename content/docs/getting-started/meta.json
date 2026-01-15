@@ -1,7 +1,3 @@
 {
-  "pages": [
-    "installation",
-    "parse-pdf",
-    "create-pdf"
-  ]
+  "pages": ["installation", "parse-pdf", "create-pdf"]
 }

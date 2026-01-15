@@ -2,9 +2,10 @@
  * Tests for layer (OCG) detection and removal.
  */
 
-import { describe, expect, it } from "vitest";
 import { PDF } from "#src/api/pdf";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { flattenLayers, getLayers, hasLayers } from "./index";
 
 describe("hasLayers", () => {

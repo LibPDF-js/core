@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { PdfBool } from "../objects/pdf-bool";
 import { PdfDict } from "../objects/pdf-dict";
 import { PdfName } from "../objects/pdf-name";

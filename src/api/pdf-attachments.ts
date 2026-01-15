@@ -35,6 +35,7 @@ import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/type
 import { buildNameTree } from "#src/document/name-tree.ts";
 import { PdfDict } from "#src/objects/pdf-dict.ts";
 import type { PdfRef } from "#src/objects/pdf-ref.ts";
+
 import type { PDFContext } from "./pdf-context.ts";
 
 /**

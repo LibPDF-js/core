@@ -41,25 +41,25 @@ Add a comprehensive drawing API to `PDFPage` for creating PDF content programmat
 
 ### New Files
 
-| File | Purpose |
-|------|---------|
-| `src/api/drawing/types.ts` | Option interfaces and types |
-| `src/api/drawing/operations.ts` | Pure functions returning `Operator[]` |
-| `src/api/drawing/text-layout.ts` | Text wrapping and measurement |
-| `src/api/drawing/path-builder.ts` | Fluent path building API |
-| `src/api/drawing/index.ts` | Public exports |
-| `src/images/pdf-image.ts` | Image embedding (JPEG, PNG) |
-| `src/images/jpeg.ts` | JPEG parsing |
-| `src/images/png.ts` | PNG parsing |
+| File                              | Purpose                               |
+| --------------------------------- | ------------------------------------- |
+| `src/api/drawing/types.ts`        | Option interfaces and types           |
+| `src/api/drawing/operations.ts`   | Pure functions returning `Operator[]` |
+| `src/api/drawing/text-layout.ts`  | Text wrapping and measurement         |
+| `src/api/drawing/path-builder.ts` | Fluent path building API              |
+| `src/api/drawing/index.ts`        | Public exports                        |
+| `src/images/pdf-image.ts`         | Image embedding (JPEG, PNG)           |
+| `src/images/jpeg.ts`              | JPEG parsing                          |
+| `src/images/png.ts`               | PNG parsing                           |
 
 ### Modified Files
 
-| File | Changes |
-|------|---------|
-| `src/helpers/colors.ts` | Add color presets (black, white, red, green, blue) |
-| `src/fonts/standard-14.ts` | Add `StandardFonts` const object |
-| `src/api/pdf.ts` | Add `getStandardFont()` method |
-| `src/api/pdf-page.ts` | Add all drawing methods |
+| File                       | Changes                                            |
+| -------------------------- | -------------------------------------------------- |
+| `src/helpers/colors.ts`    | Add color presets (black, white, red, green, blue) |
+| `src/fonts/standard-14.ts` | Add `StandardFonts` const object                   |
+| `src/api/pdf.ts`           | Add `getStandardFont()` method                     |
+| `src/api/pdf-page.ts`      | Add all drawing methods                            |
 
 ---
 
@@ -98,12 +98,12 @@ export const blue = rgb(0, 0, 1);
 
 We already have `Standard14FontName` in `src/fonts/standard-14.ts`. Add a convenience const:
 
-```typescript
+````typescript
 // Add to src/fonts/standard-14.ts
 
 /**
  * Standard 14 fonts enum for convenient access.
- * 
+ *
  * @example
  * ```typescript
  * page.drawText("Hello", { font: StandardFonts.Helvetica });
@@ -115,21 +115,21 @@ export const StandardFonts = {
   HelveticaBold: "Helvetica-Bold",
   HelveticaOblique: "Helvetica-Oblique",
   HelveticaBoldOblique: "Helvetica-BoldOblique",
-  
+
   TimesRoman: "Times-Roman",
   TimesBold: "Times-Bold",
   TimesItalic: "Times-Italic",
   TimesBoldItalic: "Times-BoldItalic",
-  
+
   Courier: "Courier",
   CourierBold: "Courier-Bold",
   CourierOblique: "Courier-Oblique",
   CourierBoldOblique: "Courier-BoldOblique",
-  
+
   Symbol: "Symbol",
   ZapfDingbats: "ZapfDingbats",
 } as const satisfies Record<string, Standard14FontName>;
-```
+````
 
 Drawing methods accept either a `Standard14FontName` string or an embedded `PDFFont`:
 
@@ -144,12 +144,13 @@ font?: Standard14FontName | PDFFont;  // Default: "Helvetica"
 
 export type TextAlignment = "left" | "center" | "right" | "justify";
 
-export type LineCap = "butt" | "round" | "square";  // 0, 1, 2
+export type LineCap = "butt" | "round" | "square"; // 0, 1, 2
 export type LineJoin = "miter" | "round" | "bevel"; // 0, 1, 2
 
 export interface Rotation {
-  angle: number;      // Degrees
-  origin?: {          // Rotation center (default: object center)
+  angle: number; // Degrees
+  origin?: {
+    // Rotation center (default: object center)
     x: number;
     y: number;
   };
@@ -158,18 +159,18 @@ export interface Rotation {
 // --- Text Options ---
 
 export interface DrawTextOptions {
-  x?: number;                    // Default: 0
-  y?: number;                    // Default: 0
-  font?: StandardFontName | PDFFont;  // Default: "Helvetica"
-  size?: number;                 // Default: 12
-  color?: Color;                 // Default: black
-  opacity?: number;              // Default: 1 (0-1)
-  
+  x?: number; // Default: 0
+  y?: number; // Default: 0
+  font?: StandardFontName | PDFFont; // Default: "Helvetica"
+  size?: number; // Default: 12
+  color?: Color; // Default: black
+  opacity?: number; // Default: 1 (0-1)
+
   // Multiline options
-  maxWidth?: number;             // Enable word wrapping
-  lineHeight?: number;           // Default: size * 1.2
-  alignment?: TextAlignment;     // Default: "left"
-  
+  maxWidth?: number; // Enable word wrapping
+  lineHeight?: number; // Default: size * 1.2
+  alignment?: TextAlignment; // Default: "left"
+
   // Transform
   rotate?: Rotation;
 }
@@ -177,11 +178,11 @@ export interface DrawTextOptions {
 // --- Image Options ---
 
 export interface DrawImageOptions {
-  x?: number;                    // Default: 0
-  y?: number;                    // Default: 0
-  width?: number;                // Default: image natural width
-  height?: number;               // Default: image natural height (or aspect-preserved)
-  opacity?: number;              // Default: 1
+  x?: number; // Default: 0
+  y?: number; // Default: 0
+  width?: number; // Default: image natural width
+  height?: number; // Default: image natural height (or aspect-preserved)
+  opacity?: number; // Default: 1
   rotate?: Rotation;
 }
 
@@ -192,42 +193,42 @@ export interface DrawRectangleOptions {
   y: number;
   width: number;
   height: number;
-  color?: Color;                 // Fill color (omit for no fill)
-  borderColor?: Color;           // Stroke color (omit for no stroke)
-  borderWidth?: number;          // Default: 1 (if borderColor set)
-  borderDashArray?: number[];    // Dash pattern
-  borderDashPhase?: number;      // Dash phase
-  cornerRadius?: number;         // Rounded corners
-  opacity?: number;              // Fill opacity
-  borderOpacity?: number;        // Stroke opacity
+  color?: Color; // Fill color (omit for no fill)
+  borderColor?: Color; // Stroke color (omit for no stroke)
+  borderWidth?: number; // Default: 1 (if borderColor set)
+  borderDashArray?: number[]; // Dash pattern
+  borderDashPhase?: number; // Dash phase
+  cornerRadius?: number; // Rounded corners
+  opacity?: number; // Fill opacity
+  borderOpacity?: number; // Stroke opacity
   rotate?: Rotation;
 }
 
 export interface DrawLineOptions {
   start: { x: number; y: number };
   end: { x: number; y: number };
-  color?: Color;                 // Default: black
-  thickness?: number;            // Default: 1
+  color?: Color; // Default: black
+  thickness?: number; // Default: 1
   dashArray?: number[];
   dashPhase?: number;
-  lineCap?: LineCap;             // Default: "butt"
+  lineCap?: LineCap; // Default: "butt"
   opacity?: number;
 }
 
 export interface DrawCircleOptions {
-  x: number;                     // Center x
-  y: number;                     // Center y
+  x: number; // Center x
+  y: number; // Center y
   radius: number;
-  color?: Color;                 // Fill color
-  borderColor?: Color;           // Stroke color
+  color?: Color; // Fill color
+  borderColor?: Color; // Stroke color
   borderWidth?: number;
   opacity?: number;
   borderOpacity?: number;
 }
 
 export interface DrawEllipseOptions {
-  x: number;                     // Center x
-  y: number;                     // Center y
+  x: number; // Center x
+  y: number; // Center y
   xRadius: number;
   yRadius: number;
   color?: Color;
@@ -241,8 +242,8 @@ export interface DrawEllipseOptions {
 // --- Path Builder Options ---
 
 export interface PathOptions {
-  color?: Color;                 // Fill color
-  borderColor?: Color;           // Stroke color
+  color?: Color; // Fill color
+  borderColor?: Color; // Stroke color
   borderWidth?: number;
   lineCap?: LineCap;
   lineJoin?: LineJoin;
@@ -257,18 +258,18 @@ export interface PathOptions {
 
 ### PDFPage Drawing Methods
 
-```typescript
+````typescript
 // Added to PDFPage class
 
 class PDFPage {
   // --- Text ---
-  
+
   /**
    * Draw text on the page.
-   * 
+   *
    * For multiline text, set `maxWidth` to enable word wrapping.
    * Text containing `\n` will always create line breaks.
-   * 
+   *
    * @example
    * ```typescript
    * page.drawText("Hello, World!", {
@@ -278,7 +279,7 @@ class PDFPage {
    *   size: 24,
    *   color: rgb(0, 0, 0),
    * });
-   * 
+   *
    * // Multiline with wrapping
    * page.drawText(longText, {
    *   x: 50,
@@ -292,15 +293,15 @@ class PDFPage {
    * ```
    */
   drawText(text: string, options: DrawTextOptions): void;
-  
+
   // --- Images ---
-  
+
   /**
    * Draw an image on the page.
-   * 
+   *
    * If only width or height is specified, aspect ratio is preserved.
    * If neither is specified, image is drawn at natural size.
-   * 
+   *
    * @example
    * ```typescript
    * const image = await pdf.embedImage(jpegBytes);
@@ -308,12 +309,12 @@ class PDFPage {
    * ```
    */
   drawImage(image: PDFImage, options?: DrawImageOptions): void;
-  
+
   // --- Shapes ---
-  
+
   /**
    * Draw a rectangle.
-   * 
+   *
    * @example
    * ```typescript
    * // Filled rectangle
@@ -321,7 +322,7 @@ class PDFPage {
    *   x: 50, y: 500, width: 200, height: 100,
    *   color: rgb(0.95, 0.95, 0.95),
    * });
-   * 
+   *
    * // Stroked rectangle with rounded corners
    * page.drawRectangle({
    *   x: 50, y: 500, width: 200, height: 100,
@@ -332,10 +333,10 @@ class PDFPage {
    * ```
    */
   drawRectangle(options: DrawRectangleOptions): void;
-  
+
   /**
    * Draw a line.
-   * 
+   *
    * @example
    * ```typescript
    * page.drawLine({
@@ -347,10 +348,10 @@ class PDFPage {
    * ```
    */
   drawLine(options: DrawLineOptions): void;
-  
+
   /**
    * Draw a circle.
-   * 
+   *
    * @example
    * ```typescript
    * page.drawCircle({
@@ -363,17 +364,17 @@ class PDFPage {
    * ```
    */
   drawCircle(options: DrawCircleOptions): void;
-  
+
   /**
    * Draw an ellipse.
    */
   drawEllipse(options: DrawEllipseOptions): void;
-  
+
   // --- Paths ---
-  
+
   /**
    * Start building a custom path.
-   * 
+   *
    * @example
    * ```typescript
    * page.drawPath()
@@ -386,7 +387,7 @@ class PDFPage {
    */
   drawPath(): PathBuilder;
 }
-```
+````
 
 ### PathBuilder (Fluent API)
 
@@ -395,24 +396,24 @@ class PDFPage {
 
 export class PathBuilder {
   constructor(page: PDFPage);
-  
+
   // Path construction
   moveTo(x: number, y: number): this;
   lineTo(x: number, y: number): this;
   curveTo(cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number): this;
   quadraticCurveTo(cpx: number, cpy: number, x: number, y: number): this;
   close(): this;
-  
+
   // Convenience shapes (add to current path)
   rectangle(x: number, y: number, width: number, height: number): this;
   circle(x: number, y: number, radius: number): this;
   ellipse(x: number, y: number, xRadius: number, yRadius: number): this;
-  
+
   // Painting (terminates the path)
   stroke(options?: PathOptions): void;
   fill(options?: PathOptions): void;
   fillAndStroke(options?: PathOptions): void;
-  
+
   // Clipping
   clip(): void;
   clipEvenOdd(): void;
@@ -421,29 +422,29 @@ export class PathBuilder {
 
 ### Image Embedding
 
-```typescript
+````typescript
 // src/images/pdf-image.ts
 
 export class PDFImage {
   /** Image width in pixels */
   readonly width: number;
-  
+
   /** Image height in pixels */
   readonly height: number;
-  
+
   /** Reference to the image XObject in the document */
   readonly ref: PdfRef;
-  
+
   /**
    * Scale factor to convert pixels to points.
    * Default is 1 (1 pixel = 1 point).
    * For print-quality (300 DPI), use 72/300 = 0.24.
    */
   readonly scale: number;
-  
+
   /** Width in points (pixels * scale) */
   get widthInPoints(): number;
-  
+
   /** Height in points (pixels * scale) */
   get heightInPoints(): number;
 }
@@ -452,10 +453,10 @@ export class PDFImage {
 class PDF {
   /**
    * Embed an image for use with page.drawImage().
-   * 
+   *
    * Supports JPEG and PNG formats. PNG alpha channels are
    * converted to PDF soft masks.
-   * 
+   *
    * @example
    * ```typescript
    * const image = await pdf.embedImage(jpegBytes);
@@ -463,18 +464,18 @@ class PDF {
    * ```
    */
   embedImage(bytes: Uint8Array): Promise<PDFImage>;
-  
+
   /**
    * Embed a JPEG image.
    */
   embedJpeg(bytes: Uint8Array): Promise<PDFImage>;
-  
+
   /**
    * Embed a PNG image.
    */
   embedPng(bytes: Uint8Array): Promise<PDFImage>;
 }
-```
+````
 
 ### Text Layout Utilities
 
@@ -493,7 +494,7 @@ export interface LayoutResult {
 
 /**
  * Break text into lines that fit within maxWidth.
- * 
+ *
  * - Splits on explicit line breaks (\n, \r\n, \r)
  * - Word-wraps at spaces when line exceeds maxWidth
  * - Long words that exceed maxWidth are kept intact (no character-level breaking)
@@ -509,11 +510,7 @@ export function layoutText(
 /**
  * Measure the width of text at a given font size.
  */
-export function measureText(
-  text: string,
-  font: PDFFont,
-  fontSize: number,
-): number;
+export function measureText(text: string, font: PDFFont, fontSize: number): number;
 
 /**
  * Calculate positions for justified text.
@@ -538,10 +535,10 @@ Every drawing operation wraps its content in `q` (save) / `Q` (restore) to isola
 ```typescript
 function drawRectangleOps(options: DrawRectangleOpsOptions): Operator[] {
   return [
-    pushGraphicsState(),           // q
+    pushGraphicsState(), // q
     // ... set colors, line width, etc.
     // ... draw rectangle
-    popGraphicsState(),            // Q
+    popGraphicsState(), // Q
   ];
 }
 ```
@@ -596,6 +593,7 @@ function withOpacity(fillOpacity?: number, strokeOpacity?: number): Operator | n
 ### Coordinate System
 
 PDF uses bottom-left origin. We keep this convention (don't flip) because:
+
 1. Matches PDF spec and all documentation
 2. Consistent with existing `drawPage()` behavior
 3. Users can apply transforms if they want different origin
@@ -606,12 +604,12 @@ PDF has no ellipse primitive. Approximate with 4 Bezier curves:
 
 ```typescript
 // Magic number for circular approximation
-const KAPPA = 0.5522847498;  // 4 * (sqrt(2) - 1) / 3
+const KAPPA = 0.5522847498; // 4 * (sqrt(2) - 1) / 3
 
 function ellipseOps(cx: number, cy: number, rx: number, ry: number): Operator[] {
   const kx = rx * KAPPA;
   const ky = ry * KAPPA;
-  
+
   return [
     moveTo(cx - rx, cy),
     curveTo(cx - rx, cy + ky, cx - kx, cy + ry, cx, cy + ry),
@@ -633,13 +631,13 @@ function roundedRectOps(x, y, w, h, r): Operator[] {
   return [
     moveTo(x + r, y),
     lineTo(x + w - r, y),
-    curveTo(x + w - r + k, y, x + w, y + r - k, x + w, y + r),  // bottom-right
+    curveTo(x + w - r + k, y, x + w, y + r - k, x + w, y + r), // bottom-right
     lineTo(x + w, y + h - r),
-    curveTo(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h),  // top-right
+    curveTo(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h), // top-right
     lineTo(x + r, y + h),
-    curveTo(x + r - k, y + h, x, y + h - r + k, x, y + h - r),  // top-left
+    curveTo(x + r - k, y + h, x, y + h - r + k, x, y + h - r), // top-left
     lineTo(x, y + r),
-    curveTo(x, y + r - k, x + r - k, y, x + r, y),  // bottom-left
+    curveTo(x, y + r - k, x + r - k, y, x + r, y), // bottom-left
     closePath(),
   ];
 }
@@ -662,14 +660,14 @@ function drawJustifiedLine(
     // Single word - just draw left-aligned
     return drawTextLineOps(...);
   }
-  
+
   // Calculate total word width
   const totalWordWidth = words.reduce((sum, w) => sum + measureText(w, font, fontSize), 0);
-  
+
   // Calculate space to distribute
   const extraSpace = targetWidth - totalWordWidth;
   const spacePerGap = extraSpace / (words.length - 1);
-  
+
   // Draw each word with TJ array for precise positioning
   // ... or use word spacing (Tw operator)
 }
@@ -704,7 +702,7 @@ function createJpegXObject(bytes: Uint8Array, info: JpegInfo): PdfStream {
       BitsPerComponent: PdfNumber.of(info.bitsPerComponent),
       Filter: PdfName.of("DCTDecode"),
     }),
-    bytes,  // Raw JPEG data
+    bytes, // Raw JPEG data
   );
 }
 ```
@@ -717,15 +715,15 @@ PNG requires decoding and re-encoding:
 interface PngInfo {
   width: number;
   height: number;
-  colorType: number;  // 0=gray, 2=RGB, 3=indexed, 4=gray+alpha, 6=RGBA
+  colorType: number; // 0=gray, 2=RGB, 3=indexed, 4=gray+alpha, 6=RGBA
   bitDepth: number;
   hasAlpha: boolean;
 }
 
 function parsePng(bytes: Uint8Array): {
   info: PngInfo;
-  pixels: Uint8Array;      // Decoded RGB/Gray pixels
-  alpha?: Uint8Array;      // Alpha channel (if present)
+  pixels: Uint8Array; // Decoded RGB/Gray pixels
+  alpha?: Uint8Array; // Alpha channel (if present)
 };
 
 function createPngXObject(
@@ -742,13 +740,13 @@ function createPngXObject(
     BitsPerComponent: PdfNumber.of(8),
     Filter: PdfName.of("FlateDecode"),
   });
-  
+
   if (alpha) {
     // Create soft mask for alpha channel
     const smask = createAlphaMask(alpha, info.width, info.height);
     dict.set("SMask", smask);
   }
-  
+
   return new PdfStream(dict, deflate(pixels));
 }
 ```
@@ -780,7 +778,7 @@ page.drawText("Hello, World!", {
 page.drawText("Bold Title", {
   x: 72,
   y: 650,
-  font: "Times-Bold",  // or StandardFonts.TimesBold
+  font: "Times-Bold", // or StandardFonts.TimesBold
   size: 18,
 });
 
@@ -804,7 +802,7 @@ page.drawText(longText, {
   x: 72,
   y: 700,
   size: 12,
-  maxWidth: 468,  // 612 - 72*2 margins
+  maxWidth: 468, // 612 - 72*2 margins
   lineHeight: 18,
   alignment: "justify",
 });
@@ -847,7 +845,8 @@ page.drawLine({
 
 ```typescript
 // Triangle
-page.drawPath()
+page
+  .drawPath()
   .moveTo(300, 200)
   .lineTo(350, 300)
   .lineTo(250, 300)
@@ -863,7 +862,7 @@ const image = await pdf.embedImage(jpegBytes);
 page.drawImage(image, {
   x: 72,
   y: 400,
-  width: 200,  // Height auto-calculated to preserve aspect ratio
+  width: 200, // Height auto-calculated to preserve aspect ratio
 });
 
 // With rotation

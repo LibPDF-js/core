@@ -13,6 +13,7 @@ import { PdfName } from "#src/objects/pdf-name";
 import type { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
+
 import type { ObjectRegistry } from "../object-registry";
 
 /**

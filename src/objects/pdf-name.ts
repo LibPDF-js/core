@@ -1,6 +1,7 @@
 import { CHAR_HASH, DELIMITERS, WHITESPACE } from "#src/helpers/chars";
 import { LRUCache } from "#src/helpers/lru-cache";
 import type { ByteWriter } from "#src/io/byte-writer";
+
 import type { PdfPrimitive } from "./pdf-primitive";
 
 // Characters that need hex escaping in names (PDF 1.7 spec 7.3.5)

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { ASCIIHexFilter } from "./ascii-hex-filter";
 import { ASCII85Filter } from "./ascii85-filter";
 import { FilterPipeline } from "./filter-pipeline";

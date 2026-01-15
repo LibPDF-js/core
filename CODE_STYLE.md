@@ -15,7 +15,7 @@ This document defines the code style conventions for @libpdf/core.
 
 ```typescript
 // Blank line after imports
-import { prisma } from '@documenso/prisma';
+import { prisma } from "@documenso/prisma";
 
 export const findDocuments = async () => {
   // ...
@@ -42,7 +42,7 @@ return result;
 // No blank lines between chained methods in same operation
 const documents = await prisma.document
   .findMany({ where: { userId } })
-  .then((docs) => docs.map(maskTokens));
+  .then(docs => docs.map(maskTokens));
 
 // Blank line between different operations
 const document = await createDocument({ userId });
@@ -69,12 +69,12 @@ const coords = { x: 0, y: 0 };
 // Array items on separate lines when objects
 const recipients = [
   {
-    name: 'John',
-    email: 'john@example.com',
+    name: "John",
+    email: "john@example.com",
   },
   {
-    name: 'Jane',
-    email: 'jane@example.com',
+    name: "Jane",
+    email: "jane@example.com",
   },
 ];
 ```
@@ -108,15 +108,18 @@ if (condition) {
 ## Naming Conventions
 
 ### Classes
+
 - PDF object types: `Pdf` prefix (e.g., `PdfDict`, `PdfStream`, `PdfName`)
 - Parsers: `*Parser` suffix (e.g., `ObjectParser`, `TokenReader`)
 - Filters: `*Filter` suffix (e.g., `FlateFilter`, `LZWFilter`)
 
 ### Files
+
 - Classes: kebab-case matching class name (e.g., `pdf-dict.ts`, `object-parser.ts`)
 - Tests: Same name with `.test.ts` suffix (e.g., `pdf-dict.test.ts`)
 
 ### Methods
+
 - Typed getters on PdfDict: `get*` pattern (e.g., `getName()`, `getNumber()`, `getBool()`)
 - Async operations: Use descriptive verbs (e.g., `getDecodedData()`, `parse()`)
 

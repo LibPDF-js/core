@@ -19,6 +19,7 @@ import {
   SPACE,
 } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
+
 import { KNOWN_OPERATORS } from "./operators";
 import type { ContentToken } from "./types";
 

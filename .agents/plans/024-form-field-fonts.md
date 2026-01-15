@@ -7,6 +7,7 @@ Enable setting custom fonts on form fields and generating proper appearance stre
 ## Problem
 
 Currently:
+
 - No way to set fonts on form fields
 - Appearance generation only works for text fields
 - Flattening uses existing appearances which may be malformed or use wrong fonts
@@ -15,6 +16,7 @@ Currently:
 ## Scope
 
 **In scope:**
+
 - `field.setFont(font)` - set font for any field
 - `field.setFontSize(size)` - set font size
 - `field.setTextColor(r, g, b)` - set text color
@@ -27,6 +29,7 @@ Currently:
 - Real font metrics for accurate text layout
 
 **Out of scope:**
+
 - Font creation/modification
 - Complex text layout / RTL (requires HarfBuzz from Plan 020)
 - Signature field appearances (require crypto)
@@ -59,7 +62,7 @@ const cjkFont = await pdf.fonts.embed(notoSansCJKBytes);
 
 const field = form.getTextField("address");
 field.setFont(cjkFont);
-field.setValue("東京都渋谷区");  // Font automatically tracks these glyphs for subsetting
+field.setValue("東京都渋谷区"); // Font automatically tracks these glyphs for subsetting
 ```
 
 ### Default Font for All Fields
@@ -75,7 +78,7 @@ form.setDefaultFontSize(10);
 form.fill({
   name: "John Doe",
   address: "123 Main St",
-  city: "New York"
+  city: "New York",
 });
 ```
 
@@ -110,7 +113,7 @@ if (font.canEncode(text)) {
 const form = await pdf.getForm();
 
 // Get fonts already in the PDF
-const existingFont = form.getExistingFont("/Helv");  // Helvetica
+const existingFont = form.getExistingFont("/Helv"); // Helvetica
 if (existingFont) {
   field.setFont(existingFont);
 }
@@ -125,7 +128,7 @@ field.setFont(customFont);
 ```typescript
 const field = form.getTextField("name");
 field.setFont(myFont);
-field.setTextColor(1, 0, 0);  // RGB red
+field.setTextColor(1, 0, 0); // RGB red
 field.setValue("Error text");
 ```
 
@@ -141,7 +144,7 @@ interface EmbeddedFont {
   readonly name: string;
   readonly ref: PdfRef;
   canEncode(text: string): boolean;
-  encodeText(text: string): Uint8Array;  // Tracks glyphs for subsetting
+  encodeText(text: string): Uint8Array; // Tracks glyphs for subsetting
   getTextWidth(text: string, fontSize: number): number;
   getAscent(fontSize: number): number;
   getDescent(fontSize: number): number;
@@ -149,7 +152,7 @@ interface EmbeddedFont {
 
 // Existing PDF font - lightweight wrapper
 interface ExistingFont {
-  readonly name: string;  // e.g., "/Helv", "/ZaDb"
+  readonly name: string; // e.g., "/Helv", "/ZaDb"
   readonly ref: PdfRef | null;
   // Limited metrics (approximations for standard fonts)
   getTextWidth(text: string, fontSize: number): number;
@@ -161,6 +164,7 @@ type FormFont = EmbeddedFont | ExistingFont;
 ### Text Encoding Strategy
 
 **Critical distinction:**
+
 - `/V` (value) stores **Unicode text** — human-readable, searchable, copy-pasteable
 - Appearance stream uses **encoded glyph sequences** — font-specific rendering
 
@@ -225,40 +229,40 @@ abstract class FormField {
   readonly name: string;
   readonly type: FieldType;
   needsAppearanceUpdate: boolean;
-  
+
   // New - Font
   protected _font: FormFont | null;
   protected _fontSize: number | null;
   protected _textColor: { r: number; g: number; b: number } | null;
-  
+
   /**
    * Set the font for this field.
    * Accepts embedded fonts or existing PDF fonts.
    * Applies to all widgets of this field.
    */
   setFont(font: FormFont): void;
-  
+
   /**
    * Get the font for this field, or null if using default.
    */
   getFont(): FormFont | null;
-  
+
   /**
    * Set the font size in points.
    * Use 0 for auto-size (fit to field).
    */
   setFontSize(size: number): void;
-  
+
   /**
    * Get the font size, or null if using default/DA value.
    */
   getFontSize(): number | null;
-  
+
   /**
    * Set text color as RGB values (0-1 range).
    */
   setTextColor(r: number, g: number, b: number): void;
-  
+
   /**
    * Get text color, or null if using existing DA color.
    */
@@ -274,40 +278,40 @@ class PDFForm {
   getTextField(name: string): TextField | undefined;
   fill(values: Record<string, FieldValue>): FillResult;
   flatten(options?: FlattenOptions): Promise<void>;
-  
+
   // New - Default Font
   private _defaultFont: FormFont | null;
   private _defaultFontSize: number;
-  
+
   /**
    * Set the default font for all fields.
    */
   setDefaultFont(font: FormFont): void;
-  
+
   /**
    * Get the default font.
    */
   getDefaultFont(): FormFont | null;
-  
+
   /**
    * Set the default font size for all fields.
    */
   setDefaultFontSize(size: number): void;
-  
+
   /**
    * Get the default font size.
    */
   getDefaultFontSize(): number;
-  
+
   // New - Existing Fonts
   /**
    * Get an existing font from the PDF's resources.
    * Returns null if font not found.
-   * 
+   *
    * @param name Font name including slash, e.g., "/Helv", "/ZaDb"
    */
   getExistingFont(name: string): ExistingFont | null;
-  
+
   /**
    * List all fonts available in the PDF's default resources.
    */
@@ -321,10 +325,10 @@ class PDFForm {
 interface FlattenOptions {
   /** Skip appearance update (use existing appearances) */
   skipAppearanceUpdate?: boolean;
-  
+
   /** Font to use when regenerating appearances */
   font?: FormFont;
-  
+
   /** Font size to use (0 = auto) */
   fontSize?: number;
 }
@@ -348,6 +352,7 @@ generateTextAppearance(field: TextField, widget: WidgetAnnotation): PdfStream
 ```
 
 **Comb field handling:**
+
 - Detect comb flag from `/Ff`
 - Calculate cell width: `fieldWidth / maxLength`
 - Center each character horizontally in its cell
@@ -453,7 +458,7 @@ Right-to-left text (Arabic, Hebrew) is **not supported** without HarfBuzz integr
 ```typescript
 // Throws immediately if font can't encode character
 field.setFont(latinFont);
-field.setValue("Hello 世界");  // Throws: "Font cannot encode character '世' (U+4E16)"
+field.setValue("Hello 世界"); // Throws: "Font cannot encode character '世' (U+4E16)"
 ```
 
 For bulk operations like `form.fill()`, the first encoding failure throws. User fixes that field and retries.
@@ -511,6 +516,7 @@ AcroForm Dictionary
 ## Test Plan
 
 ### Font Setting
+
 - Set embedded font on text field
 - Set existing PDF font on text field
 - Set font size (explicit value)
@@ -520,17 +526,20 @@ AcroForm Dictionary
 - Verify font added to resources
 
 ### Default Font
+
 - Set form default font
 - Fields without explicit font use default
 - Explicit font overrides default
 - Default font size inheritance
 
 ### Existing Fonts
+
 - `getExistingFont()` finds fonts in /DR
 - `getAvailableFonts()` lists all fonts
 - Using existing font doesn't duplicate resources
 
 ### Text Field Appearance
+
 - Single-line with custom font
 - Multi-line with word wrap
 - Text overflow clips correctly
@@ -540,12 +549,14 @@ AcroForm Dictionary
 - Auto font size calculation
 
 ### Checkbox/Radio Appearance
+
 - Checkbox checked state (ZapfDingbats checkmark)
 - Checkbox unchecked state (empty)
 - Radio selected state (filled circle)
 - Radio unselected state (empty circle)
 
 ### Choice Field Appearance
+
 - Dropdown with selected value
 - Dropdown selection highlight color
 - List box with multiple items
@@ -553,31 +564,37 @@ AcroForm Dictionary
 - Scrollable content clips correctly
 
 ### Button Appearance
+
 - Button with text caption
 - Caption centered correctly
 - Only normal state generated
 
 ### Border/Background
+
 - Field with /MK background renders background
 - Field with /MK border renders border
 - Field without /MK has no border/background
 
 ### Read-Only Fields
+
 - Read-only fields keep existing appearance during flatten
 - Regular fields regenerated with new font
 
 ### Font Subsetting
+
 - setValue tracks glyphs correctly
 - Multiple setValue calls accumulate glyphs
 - Subset contains only used glyphs after save
 - CJK characters included in subset
 
 ### Error Cases
+
 - Font can't encode character → throws with details
 - Missing font reference → falls back gracefully
 - Invalid font size → throws
 
 ### Edge Cases
+
 - Empty text value
 - Very long text (overflow)
 - Very small field (font size limits)

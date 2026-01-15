@@ -7,6 +7,7 @@ Implement a type-safe API for building PDF content streams. This is a prerequisi
 ## Motivation
 
 Content streams are sequences of operators with operands:
+
 ```
 q                    % Push graphics state
 1 0 0 1 10 20 cm     % Concat matrix
@@ -28,10 +29,10 @@ Rather than string concatenation (error-prone), we need a typed API.
 
 ## Research Summary
 
-| Library | Approach |
-|---------|----------|
-| pdf.js | Numeric enum (`OPS`), parallel arrays for operands |
-| PDFBox | String constants + fluent builder with state tracking |
+| Library | Approach                                                  |
+| ------- | --------------------------------------------------------- |
+| pdf.js  | Numeric enum (`OPS`), parallel arrays for operands        |
+| PDFBox  | String constants + fluent builder with state tracking     |
 | pdf-lib | TypeScript enum + `PDFOperator` class + factory functions |
 
 We'll follow pdf-lib's pattern (most TypeScript-friendly) but keep it simpler.
@@ -155,7 +156,7 @@ export type Operand = number | string | PdfName | PdfString | PdfArray | PdfDict
 export class Operator {
   private constructor(
     readonly op: Op,
-    readonly operands: readonly Operand[]
+    readonly operands: readonly Operand[],
   ) {}
 
   /**
@@ -238,36 +239,25 @@ function formatNumber(n: number): string {
 export const pushGraphicsState = () => Operator.of(Op.PushGraphicsState);
 export const popGraphicsState = () => Operator.of(Op.PopGraphicsState);
 
-export const concatMatrix = (
-  a: number, b: number, c: number,
-  d: number, e: number, f: number
-) => Operator.of(Op.ConcatMatrix, a, b, c, d, e, f);
+export const concatMatrix = (a: number, b: number, c: number, d: number, e: number, f: number) =>
+  Operator.of(Op.ConcatMatrix, a, b, c, d, e, f);
 
-export const setLineWidth = (width: number) =>
-  Operator.of(Op.SetLineWidth, width);
+export const setLineWidth = (width: number) => Operator.of(Op.SetLineWidth, width);
 
-export const setLineCap = (cap: 0 | 1 | 2) =>
-  Operator.of(Op.SetLineCap, cap);
+export const setLineCap = (cap: 0 | 1 | 2) => Operator.of(Op.SetLineCap, cap);
 
-export const setLineJoin = (join: 0 | 1 | 2) =>
-  Operator.of(Op.SetLineJoin, join);
+export const setLineJoin = (join: 0 | 1 | 2) => Operator.of(Op.SetLineJoin, join);
 
-export const setGraphicsState = (name: string) =>
-  Operator.of(Op.SetGraphicsState, name);
+export const setGraphicsState = (name: string) => Operator.of(Op.SetGraphicsState, name);
 
 // ============= Path Construction =============
 
-export const moveTo = (x: number, y: number) =>
-  Operator.of(Op.MoveTo, x, y);
+export const moveTo = (x: number, y: number) => Operator.of(Op.MoveTo, x, y);
 
-export const lineTo = (x: number, y: number) =>
-  Operator.of(Op.LineTo, x, y);
+export const lineTo = (x: number, y: number) => Operator.of(Op.LineTo, x, y);
 
-export const curveTo = (
-  x1: number, y1: number,
-  x2: number, y2: number,
-  x3: number, y3: number
-) => Operator.of(Op.CurveTo, x1, y1, x2, y2, x3, y3);
+export const curveTo = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) =>
+  Operator.of(Op.CurveTo, x1, y1, x2, y2, x3, y3);
 
 export const closePath = () => Operator.of(Op.ClosePath);
 
@@ -290,60 +280,47 @@ export const clipEvenOdd = () => Operator.of(Op.ClipEvenOdd);
 
 // ============= Text State =============
 
-export const setCharSpacing = (spacing: number) =>
-  Operator.of(Op.SetCharSpacing, spacing);
+export const setCharSpacing = (spacing: number) => Operator.of(Op.SetCharSpacing, spacing);
 
-export const setWordSpacing = (spacing: number) =>
-  Operator.of(Op.SetWordSpacing, spacing);
+export const setWordSpacing = (spacing: number) => Operator.of(Op.SetWordSpacing, spacing);
 
-export const setHorizontalScale = (scale: number) =>
-  Operator.of(Op.SetHorizontalScale, scale);
+export const setHorizontalScale = (scale: number) => Operator.of(Op.SetHorizontalScale, scale);
 
-export const setLeading = (leading: number) =>
-  Operator.of(Op.SetLeading, leading);
+export const setLeading = (leading: number) => Operator.of(Op.SetLeading, leading);
 
-export const setFont = (name: string, size: number) =>
-  Operator.of(Op.SetFont, name, size);
+export const setFont = (name: string, size: number) => Operator.of(Op.SetFont, name, size);
 
 export const setTextRenderMode = (mode: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7) =>
   Operator.of(Op.SetTextRenderMode, mode);
 
-export const setTextRise = (rise: number) =>
-  Operator.of(Op.SetTextRise, rise);
+export const setTextRise = (rise: number) => Operator.of(Op.SetTextRise, rise);
 
 // ============= Text Positioning =============
 
 export const beginText = () => Operator.of(Op.BeginText);
 export const endText = () => Operator.of(Op.EndText);
 
-export const moveText = (tx: number, ty: number) =>
-  Operator.of(Op.MoveText, tx, ty);
+export const moveText = (tx: number, ty: number) => Operator.of(Op.MoveText, tx, ty);
 
 export const moveTextSetLeading = (tx: number, ty: number) =>
   Operator.of(Op.MoveTextSetLeading, tx, ty);
 
-export const setTextMatrix = (
-  a: number, b: number, c: number,
-  d: number, e: number, f: number
-) => Operator.of(Op.SetTextMatrix, a, b, c, d, e, f);
+export const setTextMatrix = (a: number, b: number, c: number, d: number, e: number, f: number) =>
+  Operator.of(Op.SetTextMatrix, a, b, c, d, e, f);
 
 export const nextLine = () => Operator.of(Op.NextLine);
 
 // ============= Text Showing =============
 
-export const showText = (text: PdfString) =>
-  Operator.of(Op.ShowText, text);
+export const showText = (text: PdfString) => Operator.of(Op.ShowText, text);
 
-export const showTextArray = (array: PdfArray) =>
-  Operator.of(Op.ShowTextArray, array);
+export const showTextArray = (array: PdfArray) => Operator.of(Op.ShowTextArray, array);
 
 // ============= Color =============
 
-export const setStrokingGray = (gray: number) =>
-  Operator.of(Op.SetStrokingGray, gray);
+export const setStrokingGray = (gray: number) => Operator.of(Op.SetStrokingGray, gray);
 
-export const setNonStrokingGray = (gray: number) =>
-  Operator.of(Op.SetNonStrokingGray, gray);
+export const setNonStrokingGray = (gray: number) => Operator.of(Op.SetNonStrokingGray, gray);
 
 export const setStrokingRGB = (r: number, g: number, b: number) =>
   Operator.of(Op.SetStrokingRGB, r, g, b);
@@ -359,13 +336,11 @@ export const setNonStrokingCMYK = (c: number, m: number, y: number, k: number) =
 
 // ============= XObjects =============
 
-export const drawXObject = (name: string) =>
-  Operator.of(Op.DrawXObject, name);
+export const drawXObject = (name: string) => Operator.of(Op.DrawXObject, name);
 
 // ============= Marked Content =============
 
-export const beginMarkedContent = (tag: string) =>
-  Operator.of(Op.BeginMarkedContent, tag);
+export const beginMarkedContent = (tag: string) => Operator.of(Op.BeginMarkedContent, tag);
 
 export const beginMarkedContentProps = (tag: string, props: PdfDict | string) =>
   Operator.of(Op.BeginMarkedContentProps, tag, props);
@@ -375,7 +350,7 @@ export const endMarkedContent = () => Operator.of(Op.EndMarkedContent);
 
 ### ContentStreamBuilder
 
-```typescript
+````typescript
 // src/content/content-stream.ts
 
 import { PdfDict, PdfNumber, PdfStream } from "../objects";
@@ -390,7 +365,7 @@ export class ContentStreamBuilder {
   /**
    * Create a builder from an array of operators.
    * Convenient for building content streams declaratively.
-   * 
+   *
    * @example
    * ```ts
    * const content = ContentStreamBuilder.from([
@@ -489,24 +464,29 @@ export class ContentStreamBuilder {
     return this.toStream(dict);
   }
 }
-```
+````
 
 ## Usage Examples
 
 ### Basic Path Drawing
 
 ```typescript
-import { 
+import {
   ContentStreamBuilder,
-  pushGraphicsState, popGraphicsState,
-  moveTo, lineTo, closePath, stroke,
-  setLineWidth, setStrokingRGB
+  pushGraphicsState,
+  popGraphicsState,
+  moveTo,
+  lineTo,
+  closePath,
+  stroke,
+  setLineWidth,
+  setStrokingRGB,
 } from "./content";
 
 const content = new ContentStreamBuilder()
   .add(pushGraphicsState())
   .add(setLineWidth(2))
-  .add(setStrokingRGB(1, 0, 0))  // Red
+  .add(setStrokingRGB(1, 0, 0)) // Red
   .add(moveTo(100, 100))
   .add(lineTo(200, 100))
   .add(lineTo(200, 200))
@@ -562,20 +542,13 @@ const flatten = new ContentStreamBuilder()
 
 ```typescript
 // Build content from an array (nice for conditional composition)
-const ops = [
-  pushGraphicsState(),
-  setLineWidth(1),
-];
+const ops = [pushGraphicsState(), setLineWidth(1)];
 
 if (hasFill) {
   ops.push(setNonStrokingRGB(1, 0, 0));
 }
 
-ops.push(
-  rectangle(10, 10, 100, 50),
-  hasFill ? fillAndStroke() : stroke(),
-  popGraphicsState()
-);
+ops.push(rectangle(10, 10, 100, 50), hasFill ? fillAndStroke() : stroke(), popGraphicsState());
 
 const content = ContentStreamBuilder.from(ops);
 ```

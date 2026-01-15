@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { PDF } from "./pdf";
 
 describe("PDF font embedding", () => {

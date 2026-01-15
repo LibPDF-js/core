@@ -19,6 +19,7 @@ import { PdfNull } from "#src/objects/pdf-null";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+
 import { PDFAnnotation, rectToArray } from "./base";
 import type { DestinationType, LinkAnnotationOptions, LinkDestination } from "./types";
 

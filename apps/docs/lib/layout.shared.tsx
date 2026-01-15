@@ -1,10 +1,10 @@
-import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
+import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: 'LibPDF',
+      title: "LibPDF",
     },
-    githubUrl: 'https://github.com/libpdf-js/core',
+    githubUrl: "https://github.com/libpdf-js/core",
   };
 }

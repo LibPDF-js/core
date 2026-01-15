@@ -12,6 +12,7 @@ import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
+
 import type { ObjectRegistry } from "../object-registry";
 import { AppearanceGenerator, extractAppearanceStyle } from "./appearance-generator";
 import { FieldTree } from "./field-tree";

@@ -14,6 +14,7 @@ import type { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfObject } from "#src/objects/pdf-object";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import type { StandardSecurityHandler } from "#src/security/standard-handler";
+
 import type { PDFCatalog } from "./pdf-catalog";
 import type { PDFPageTree } from "./pdf-page-tree";
 

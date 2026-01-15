@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { loadFixture } from "../../test-utils.ts";
 import { parseTTF } from "./parser.ts";
 import { TTFSubsetter } from "./subsetter.ts";

@@ -3,6 +3,7 @@ import type { Scanner } from "#src/io/scanner";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfRef } from "#src/objects/pdf-ref";
 import type { PdfStream } from "#src/objects/pdf-stream";
+
 import { IndirectObjectParser } from "./indirect-object-parser";
 import { ObjectParser } from "./object-parser";
 import { ObjectStreamParser } from "./object-stream-parser";

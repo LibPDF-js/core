@@ -9,6 +9,7 @@
 
 import { PdfBool } from "#src/objects/pdf-bool";
 import type { PdfRef } from "#src/objects/pdf-ref";
+
 import { PDFAnnotation } from "./base";
 
 /**

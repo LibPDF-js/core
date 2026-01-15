@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { DifferencesEncoding } from "./encodings/differences";
 import { WinAnsiEncoding } from "./encodings/win-ansi";
 import { FontDescriptor } from "./font-descriptor";

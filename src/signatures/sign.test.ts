@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { generateUniqueName } from "../helpers/strings";
 import { SignatureError } from "./types";
 

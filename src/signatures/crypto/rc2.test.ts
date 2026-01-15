@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { RC2 } from "./rc2";
 
 describe("RC2", () => {

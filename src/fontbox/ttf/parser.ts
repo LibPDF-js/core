@@ -7,6 +7,7 @@
  */
 
 import { BinaryScanner } from "#src/io/binary-scanner.ts";
+
 import { TrueTypeFont } from "./truetype-font.ts";
 import type { TableRecord } from "./types.ts";
 

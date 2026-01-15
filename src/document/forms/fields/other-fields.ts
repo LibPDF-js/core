@@ -7,6 +7,7 @@
 
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfRef } from "#src/objects/pdf-ref";
+
 import { TerminalField } from "./base";
 
 /**

@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { PDF } from "#src/api/pdf";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -7,6 +6,8 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { ObjectCopier } from "./object-copier";
 
 describe("ObjectCopier", () => {

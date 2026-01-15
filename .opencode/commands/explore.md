@@ -20,6 +20,7 @@ You are researching how a feature or concept is implemented in the reference lib
 ### Step 1: Search Each Library
 
 For each reference library, search for relevant code:
+
 - Class definitions and data structures
 - Key methods and algorithms
 - Error handling approaches
@@ -29,6 +30,7 @@ For each reference library, search for relevant code:
 ### Step 2: Compare Approaches
 
 Analyze the differences:
+
 - What patterns does each library use?
 - What are the tradeoffs of each approach?
 - Which handles edge cases best?
@@ -37,6 +39,7 @@ Analyze the differences:
 ### Step 3: Extract Insights
 
 Identify what we should learn:
+
 - Best practices to adopt
 - Pitfalls to avoid
 - Edge cases we must handle
@@ -50,24 +53,29 @@ Write your findings to `.agents/scratch/<topic>-research.md` with this structure
 # <Topic> Research
 
 ## Summary
+
 Brief overview of findings and recommendations.
 
 ## pdf.js Approach
+
 - How it works
 - Key files: `path/to/file.js`
 - Pros/cons
 
 ## pdf-lib Approach
+
 - How it works
 - Key files: `path/to/file.ts`
 - Pros/cons
 
 ## PDFBox Approach
+
 - How it works
 - Key files: `path/to/File.java`
 - Pros/cons
 
 ## Recommendations for @libpdf/core
+
 - What approach to take
 - Key considerations
 - Edge cases to handle

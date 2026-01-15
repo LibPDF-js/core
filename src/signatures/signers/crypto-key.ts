@@ -5,6 +5,7 @@
  */
 
 import * as pkijs from "pkijs";
+
 import type { DigestAlgorithm, KeyType, SignatureAlgorithm, Signer } from "../types";
 
 const cryptoEngine = pkijs.getCrypto(true);

@@ -92,6 +92,7 @@ import { getPlainText, groupCharsIntoLines } from "#src/text/line-grouper";
 import { TextExtractor } from "#src/text/text-extractor";
 import { searchPage } from "#src/text/text-search";
 import type { ExtractTextOptions, FindTextOptions, PageText, TextMatch } from "#src/text/types";
+
 import {
   drawCircleOps,
   drawEllipseOps,

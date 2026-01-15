@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it } from "vitest";
+
 import { buildNameTree, NameTree, type Resolver } from "./name-tree";
 
 /**

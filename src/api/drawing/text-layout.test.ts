@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { layoutJustifiedLine, layoutText, measureText } from "./text-layout";
 
 describe("measureText", () => {

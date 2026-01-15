@@ -6,7 +6,8 @@ description: Add highlights, links, sticky notes, shapes, stamps, and freehand d
 # Annotations
 
 <Callout type="warn" title="Beta Feature">
-The annotations API is still in beta. While the core functionality is stable, the API may change in future releases.
+  The annotations API is still in beta. While the core functionality is stable, the API may change
+  in future releases.
 </Callout>
 
 PDF annotations add interactive and visual elements to pages - highlights, sticky notes, links, shapes, stamps, and freehand drawings.
@@ -61,15 +62,15 @@ Mark up text with highlights, underlines, strikeouts, or squiggly lines.
 
 ### addHighlightAnnotation(options)
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rect` | `Rect` | | Single rectangle |
-| `rects` | `Rect[]` | | Multiple rectangles (multi-line) |
-| `quadPoints` | `number[][]` | | Raw quad points (rotated text) |
-| `color` | `Color` | yellow | Highlight color |
-| `opacity` | `number` | `1` | Opacity (0-1) |
-| `contents` | `string` | | Comment text |
-| `title` | `string` | | Author name |
+| Param        | Type         | Default | Description                      |
+| ------------ | ------------ | ------- | -------------------------------- |
+| `rect`       | `Rect`       |         | Single rectangle                 |
+| `rects`      | `Rect[]`     |         | Multiple rectangles (multi-line) |
+| `quadPoints` | `number[][]` |         | Raw quad points (rotated text)   |
+| `color`      | `Color`      | yellow  | Highlight color                  |
+| `opacity`    | `number`     | `1`     | Opacity (0-1)                    |
+| `contents`   | `string`     |         | Comment text                     |
+| `title`      | `string`     |         | Author name                      |
 
 **Returns**: `PDFHighlightAnnotation`
 
@@ -141,13 +142,13 @@ page.addSquigglyAnnotation({
 
 ### addLinkAnnotation(options)
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rect` | `Rect` | required | Link area |
-| `uri` | `string` | | External URL |
-| `destination` | `InternalLinkDestination` | | Internal page link |
-| `borderWidth` | `number` | `0` | Border width |
-| `borderColor` | `Color` | | Border color |
+| Param         | Type                      | Default  | Description        |
+| ------------- | ------------------------- | -------- | ------------------ |
+| `rect`        | `Rect`                    | required | Link area          |
+| `uri`         | `string`                  |          | External URL       |
+| `destination` | `InternalLinkDestination` |          | Internal page link |
+| `borderWidth` | `number`                  | `0`      | Border width       |
+| `borderColor` | `Color`                   |          | Border color       |
 
 **Returns**: `PDFLinkAnnotation`
 
@@ -180,13 +181,13 @@ page.addLinkAnnotation({
 
 **Destination Types**:
 
-| Type | Description | Parameters |
-|------|-------------|------------|
-| `Fit` | Fit entire page | none |
-| `FitH` | Fit page width | `top` |
-| `FitV` | Fit page height | `left` |
-| `XYZ` | Explicit position and zoom | `left`, `top`, `zoom` |
-| `FitR` | Fit rectangle | `rect: [l, b, r, t]` |
+| Type   | Description                | Parameters            |
+| ------ | -------------------------- | --------------------- |
+| `Fit`  | Fit entire page            | none                  |
+| `FitH` | Fit page width             | `top`                 |
+| `FitV` | Fit page height            | `left`                |
+| `XYZ`  | Explicit position and zoom | `left`, `top`, `zoom` |
+| `FitR` | Fit rectangle              | `rect: [l, b, r, t]`  |
 
 ---
 
@@ -194,14 +195,14 @@ page.addLinkAnnotation({
 
 ### addTextAnnotation(options)
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rect` | `Rect` | required | Icon position |
-| `contents` | `string` | | Note text |
-| `title` | `string` | | Author name |
-| `color` | `Color` | yellow | Background color |
-| `icon` | `TextAnnotationIcon` | `"Note"` | Icon type |
-| `open` | `boolean` | `false` | Show popup immediately |
+| Param      | Type                 | Default  | Description            |
+| ---------- | -------------------- | -------- | ---------------------- |
+| `rect`     | `Rect`               | required | Icon position          |
+| `contents` | `string`             |          | Note text              |
+| `title`    | `string`             |          | Author name            |
+| `color`    | `Color`              | yellow   | Background color       |
+| `icon`     | `TextAnnotationIcon` | `"Note"` | Icon type              |
+| `open`     | `boolean`            | `false`  | Show popup immediately |
 
 **Returns**: `PDFTextAnnotation`
 
@@ -224,16 +225,16 @@ page.addTextAnnotation({
 
 ### addLineAnnotation(options)
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `start` | `Point` | required | Start point |
-| `end` | `Point` | required | End point |
-| `color` | `Color` | black | Line color |
-| `width` | `number` | `1` | Line width |
-| `startStyle` | `LineEndingStyle` | `"None"` | Start ending |
-| `endStyle` | `LineEndingStyle` | `"None"` | End ending |
-| `interiorColor` | `Color` | | Fill for closed arrows |
-| `contents` | `string` | | Comment |
+| Param           | Type              | Default  | Description            |
+| --------------- | ----------------- | -------- | ---------------------- |
+| `start`         | `Point`           | required | Start point            |
+| `end`           | `Point`           | required | End point              |
+| `color`         | `Color`           | black    | Line color             |
+| `width`         | `number`          | `1`      | Line width             |
+| `startStyle`    | `LineEndingStyle` | `"None"` | Start ending           |
+| `endStyle`      | `LineEndingStyle` | `"None"` | End ending             |
+| `interiorColor` | `Color`           |          | Fill for closed arrows |
+| `contents`      | `string`          |          | Comment                |
 
 **Returns**: `PDFLineAnnotation`
 
@@ -262,13 +263,13 @@ page.addLineAnnotation({
 
 ### addSquareAnnotation(options)
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rect` | `Rect` | required | Rectangle bounds |
-| `color` | `Color` | black | Stroke color |
-| `fillColor` | `Color` | | Fill color |
-| `borderWidth` | `number` | `1` | Border width |
-| `contents` | `string` | | Comment |
+| Param         | Type     | Default  | Description      |
+| ------------- | -------- | -------- | ---------------- |
+| `rect`        | `Rect`   | required | Rectangle bounds |
+| `color`       | `Color`  | black    | Stroke color     |
+| `fillColor`   | `Color`  |          | Fill color       |
+| `borderWidth` | `number` | `1`      | Border width     |
+| `contents`    | `string` |          | Comment          |
 
 **Returns**: `PDFSquareAnnotation`
 
@@ -304,11 +305,11 @@ page.addCircleAnnotation({
 
 ### addStampAnnotation(options)
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `rect` | `Rect` | required | Stamp bounds |
-| `name` | `StampName \| string` | `"Draft"` | Stamp type |
-| `contents` | `string` | | Comment |
+| Param      | Type                  | Default   | Description  |
+| ---------- | --------------------- | --------- | ------------ |
+| `rect`     | `Rect`                | required  | Stamp bounds |
+| `name`     | `StampName \| string` | `"Draft"` | Stamp type   |
+| `contents` | `string`              |           | Comment      |
 
 **Returns**: `PDFStampAnnotation`
 
@@ -327,12 +328,12 @@ page.addStampAnnotation({
 
 ### addInkAnnotation(options)
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `paths` | `Point[][]` | required | Array of stroke paths |
-| `color` | `Color` | black | Stroke color |
-| `width` | `number` | `1` | Stroke width |
-| `contents` | `string` | | Comment |
+| Param      | Type        | Default  | Description           |
+| ---------- | ----------- | -------- | --------------------- |
+| `paths`    | `Point[][]` | required | Array of stroke paths |
+| `color`    | `Color`     | black    | Stroke color          |
+| `width`    | `number`    | `1`      | Stroke width          |
+| `contents` | `string`    |          | Comment               |
 
 **Returns**: `PDFInkAnnotation`
 
@@ -384,8 +385,8 @@ await page.removeAnnotation(highlights[0]);
 
 Remove annotations, optionally filtered by type.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param            | Type                | Description    |
+| ---------------- | ------------------- | -------------- |
 | `[options.type]` | `AnnotationSubtype` | Filter by type |
 
 ```typescript
@@ -402,15 +403,15 @@ await page.removeAnnotations();
 
 All annotations have these properties:
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `type` | `AnnotationSubtype` | Annotation type |
-| `rect` | `Rect` | Bounding rectangle |
-| `contents` | `string \| null` | Text content |
-| `color` | `Color \| null` | Annotation color |
-| `isHidden` | `boolean` | Hidden state |
-| `isPrintable` | `boolean` | Printable state |
-| `isModified` | `boolean` | Modified state |
+| Property      | Type                | Description        |
+| ------------- | ------------------- | ------------------ |
+| `type`        | `AnnotationSubtype` | Annotation type    |
+| `rect`        | `Rect`              | Bounding rectangle |
+| `contents`    | `string \| null`    | Text content       |
+| `color`       | `Color \| null`     | Annotation color   |
+| `isHidden`    | `boolean`           | Hidden state       |
+| `isPrintable` | `boolean`           | Printable state    |
+| `isModified`  | `boolean`           | Modified state     |
 
 ---
 
@@ -420,8 +421,8 @@ All annotations have these properties:
 
 ```typescript
 interface Rect {
-  x: number;      // Left edge
-  y: number;      // Bottom edge
+  x: number; // Left edge
+  y: number; // Bottom edge
   width: number;
   height: number;
 }
@@ -450,14 +451,14 @@ if (annotation.hasFlag(AnnotationFlags.Print)) {
 annotation.setFlag(AnnotationFlags.ReadOnly, true);
 ```
 
-| Flag | Description |
-|------|-------------|
-| `Invisible` | Don't display unknown types |
-| `Hidden` | Don't display or print |
-| `Print` | Print when page is printed |
-| `NoZoom` | Don't scale with zoom |
-| `NoRotate` | Don't rotate with page |
-| `NoView` | Don't display on screen |
-| `ReadOnly` | Don't allow interaction |
-| `Locked` | Don't allow deletion |
+| Flag             | Description                 |
+| ---------------- | --------------------------- |
+| `Invisible`      | Don't display unknown types |
+| `Hidden`         | Don't display or print      |
+| `Print`          | Print when page is printed  |
+| `NoZoom`         | Don't scale with zoom       |
+| `NoRotate`       | Don't rotate with page      |
+| `NoView`         | Don't display on screen     |
+| `ReadOnly`       | Don't allow interaction     |
+| `Locked`         | Don't allow deletion        |
 | `LockedContents` | Don't allow content changes |

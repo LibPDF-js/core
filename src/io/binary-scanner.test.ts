@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { BinaryScanner } from "./binary-scanner.ts";
 
 describe("BinaryScanner", () => {

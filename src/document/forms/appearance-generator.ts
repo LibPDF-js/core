@@ -14,6 +14,7 @@
  */
 
 import type { PdfStream } from "#src/objects/pdf-stream";
+
 import type { ObjectRegistry } from "../object-registry";
 import type { AcroForm } from "./acro-form";
 import type {

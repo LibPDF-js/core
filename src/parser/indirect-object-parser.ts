@@ -4,6 +4,7 @@ import type { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfObject } from "#src/objects/pdf-object";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
+
 import { ObjectParseError } from "./errors";
 import { ObjectParser } from "./object-parser";
 import { TokenReader } from "./token-reader";

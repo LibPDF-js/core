@@ -7,6 +7,7 @@
  */
 
 import { BinaryScanner } from "#src/io/binary-scanner.ts";
+
 import { type AvarTable, parseAvarTable } from "./tables/avar.ts";
 import { type CmapTable, parseCmapTable } from "./tables/cmap.ts";
 import {

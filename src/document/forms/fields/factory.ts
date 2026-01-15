@@ -7,6 +7,7 @@
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfRef } from "#src/objects/pdf-ref";
+
 import type { ObjectRegistry } from "../../object-registry";
 import type { TerminalField } from "./base";
 import { CheckboxField } from "./checkbox-field";

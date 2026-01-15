@@ -5,10 +5,10 @@
  * to test-output/annotations/ for manual inspection.
  */
 
-import { describe, expect, it } from "vitest";
 import { PDF } from "#src/api/pdf";
 import { rgb } from "#src/helpers/colors";
 import { saveTestOutput } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
 
 describe("Annotations Integration", () => {
   describe("Text markup annotations", () => {

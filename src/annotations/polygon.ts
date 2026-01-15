@@ -11,6 +11,7 @@ import { type Color, colorToArray } from "#src/helpers/colors";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+
 import { parseColorArray } from "./base";
 import { PDFMarkupAnnotation } from "./markup";
 import type { LineEndingStyle, Point } from "./types";

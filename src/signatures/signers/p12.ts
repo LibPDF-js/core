@@ -6,6 +6,7 @@
 
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
+
 import { toArrayBuffer } from "../../helpers/buffer";
 import { buildCertificateChain } from "../aia";
 import { decryptLegacyPbe, installCryptoEngine, isLegacyPbeOid, PKCS12KDF } from "../crypto";

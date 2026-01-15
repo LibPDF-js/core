@@ -9,20 +9,20 @@ LibPDF was designed with API familiarity in mind. If you're coming from pdf-lib,
 
 ## Quick Comparison
 
-| Feature | pdf-lib | LibPDF |
-|---------|---------|--------------|
-| Load PDF | `PDFDocument.load(bytes)` | `PDF.load(bytes)` |
-| Create PDF | `PDFDocument.create()` | `PDF.create()` |
-| Add page | `pdfDoc.addPage()` | `pdf.addPage()` |
-| Get page | `pdfDoc.getPage(0)` | `await pdf.getPage(0)` |
-| Draw text | `page.drawText()` | `page.drawText()` |
-| Embed font | `pdfDoc.embedFont()` | `pdf.embedFont()` |
-| Save | `pdfDoc.save()` | `pdf.save()` |
-| Text extraction | Not supported | `page.extractText()` |
-| Incremental saves | Not supported | `pdf.save({ incremental: true })` |
-| Digital signatures | Not supported | `pdf.sign({ signer })` |
-| Malformed PDFs | Strict (often fails) | Lenient by default |
-| Encrypted PDFs | Limited | Full support (R2-R6) |
+| Feature            | pdf-lib                   | LibPDF                            |
+| ------------------ | ------------------------- | --------------------------------- |
+| Load PDF           | `PDFDocument.load(bytes)` | `PDF.load(bytes)`                 |
+| Create PDF         | `PDFDocument.create()`    | `PDF.create()`                    |
+| Add page           | `pdfDoc.addPage()`        | `pdf.addPage()`                   |
+| Get page           | `pdfDoc.getPage(0)`       | `await pdf.getPage(0)`            |
+| Draw text          | `page.drawText()`         | `page.drawText()`                 |
+| Embed font         | `pdfDoc.embedFont()`      | `pdf.embedFont()`                 |
+| Save               | `pdfDoc.save()`           | `pdf.save()`                      |
+| Text extraction    | Not supported             | `page.extractText()`              |
+| Incremental saves  | Not supported             | `pdf.save({ incremental: true })` |
+| Digital signatures | Not supported             | `pdf.sign({ signer })`            |
+| Malformed PDFs     | Strict (often fails)      | Lenient by default                |
+| Encrypted PDFs     | Limited                   | Full support (R2-R6)              |
 
 ## Code Migration
 
@@ -179,8 +179,8 @@ const bytes = await pdf.save();
 
 // With options
 const bytes = await pdf.save({
-  incremental: true,  // NEW: preserve signatures
-  subsetFonts: true,  // Subset embedded fonts
+  incremental: true, // NEW: preserve signatures
+  subsetFonts: true, // Subset embedded fonts
 });
 ```
 
@@ -366,12 +366,12 @@ const pdf = await PDF.load(bytes, { lenient: false });
 
 Some operations that were sync in pdf-lib are async in LibPDF:
 
-| Operation | pdf-lib | LibPDF |
-|-----------|---------|--------|
-| `getPage(0)` | sync | **async** |
-| `getPages()` | sync | **async** |
-| `getForm()` | sync | **async** |
-| `create()` | async | **sync** |
+| Operation    | pdf-lib | LibPDF    |
+| ------------ | ------- | --------- |
+| `getPage(0)` | sync    | **async** |
+| `getPages()` | sync    | **async** |
+| `getForm()`  | sync    | **async** |
+| `create()`   | async   | **sync**  |
 
 This is because LibPDF uses lazy loading for better memory efficiency with large documents.
 
@@ -451,7 +451,7 @@ async function createInvoice(data: InvoiceData) {
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const page = pdfDoc.addPage([612, 792]);
-  
+
   page.drawText("INVOICE", {
     x: 50,
     y: 750,
@@ -459,14 +459,14 @@ async function createInvoice(data: InvoiceData) {
     font,
     color: rgb(0, 0, 0),
   });
-  
+
   page.drawText(data.customerName, {
     x: 50,
     y: 700,
     size: 12,
     font,
   });
-  
+
   return pdfDoc.save();
 }
 ```
@@ -479,7 +479,7 @@ import { PDF, rgb } from "@libpdf/core";
 async function createInvoice(data: InvoiceData) {
   const pdf = PDF.create();
   const page = pdf.addPage({ size: "letter" });
-  
+
   page.drawText("INVOICE", {
     x: 50,
     y: 750,
@@ -487,14 +487,14 @@ async function createInvoice(data: InvoiceData) {
     font: "Helvetica",
     color: rgb(0, 0, 0),
   });
-  
+
   page.drawText(data.customerName, {
     x: 50,
     y: 700,
     size: 12,
     font: "Helvetica",
   });
-  
+
   return pdf.save();
 }
 ```

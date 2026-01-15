@@ -9,6 +9,7 @@
  */
 
 import type { TrueTypeFont } from "#src/fontbox/ttf/truetype-font.ts";
+
 import { parseFontProgram } from "./embedded-parser.ts";
 import { FontDescriptor } from "./font-descriptor.ts";
 import { type FontProgram, TrueTypeFontProgram } from "./font-program/index.ts";

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { searchPage } from "./text-search";
 import type { ExtractedChar, PageText, TextLine, TextSpan } from "./types";
 

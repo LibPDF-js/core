@@ -20,6 +20,7 @@
 import { PdfArray } from "#src/objects/pdf-array";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import { PdfRef } from "#src/objects/pdf-ref.ts";
+
 import { CIDFont, parseCIDFont } from "./cid-font";
 import { CMap, parseCMap } from "./cmap";
 import type { FontDescriptor } from "./font-descriptor";

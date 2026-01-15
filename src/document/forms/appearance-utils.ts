@@ -23,6 +23,7 @@ import {
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfStream } from "#src/objects/pdf-stream";
+
 import { type FormFont, isEmbeddedFont } from "./form-font";
 
 /**

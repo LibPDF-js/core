@@ -37,17 +37,10 @@ export {
 
 // Encoding
 export type { CFFEncoding } from "./encoding.ts";
-export {
-  CFFEncodingBase,
-  getPredefinedEncoding,
-  createEncoding,
-} from "./encoding.ts";
+export { CFFEncodingBase, getPredefinedEncoding, createEncoding } from "./encoding.ts";
 
 // Operators
 export { getOperator, getOperator2, isTwoByteOperator } from "./operators.ts";
 
 // Standard strings
-export {
-  getStandardString,
-  STANDARD_STRINGS_COUNT,
-} from "./standard-strings.ts";
+export { getStandardString, STANDARD_STRINGS_COUNT } from "./standard-strings.ts";

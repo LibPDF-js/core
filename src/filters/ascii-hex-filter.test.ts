@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ASCIIHexFilter } from "./ascii-hex-filter";
 
 describe("ASCIIHexFilter", () => {

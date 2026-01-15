@@ -16,7 +16,7 @@ Currently, only `createSignatureField` exists for creating new form fields. User
 ### In Scope
 
 - `form.createTextField(name, options)`
-- `form.createCheckbox(name, options)` 
+- `form.createCheckbox(name, options)`
 - `form.createRadioGroup(name, options)`
 - `form.createDropdown(name, options)`
 - `form.createListbox(name, options)`
@@ -50,7 +50,7 @@ const form = await pdf.getOrCreateForm();
 const nameField = form.createTextField("name", {
   font: ubuntuFont,
   fontSize: 12,
-  color: rgb(0, 0, 0),             // text color
+  color: rgb(0, 0, 0), // text color
   backgroundColor: rgb(1, 1, 0.9), // light cream
   borderColor: rgb(0.5, 0.5, 0.5),
   borderWidth: 1,
@@ -72,7 +72,7 @@ await page.drawField(nameField, {
 // Create a checkbox with custom symbol
 const agreeCheckbox = form.createCheckbox("agree", {
   onValue: "Yes",
-  symbol: "check",  // or "cross", "square"
+  symbol: "check", // or "cross", "square"
   backgroundColor: rgb(1, 1, 1),
   borderColor: rgb(0, 0, 0),
   borderWidth: 1,
@@ -104,30 +104,40 @@ await page.drawField(countryDropdown, {
 // Create a radio group with options on different locations
 const paymentRadio = form.createRadioGroup("payment", {
   options: ["Credit Card", "PayPal", "Bank Transfer"],
-  symbol: "circle",  // or "check"
+  symbol: "circle", // or "check"
   defaultValue: "Credit Card",
 });
 
 // Each option gets its own widget (option is required for radio groups)
 await page.drawField(paymentRadio, {
-  x: 100, y: 550, width: 16, height: 16,
+  x: 100,
+  y: 550,
+  width: 16,
+  height: 16,
   option: "Credit Card",
 });
 await page.drawField(paymentRadio, {
-  x: 100, y: 520, width: 16, height: 16,
+  x: 100,
+  y: 520,
+  width: 16,
+  height: 16,
   option: "PayPal",
 });
 await page.drawField(paymentRadio, {
-  x: 100, y: 490, width: 16, height: 16,
+  x: 100,
+  y: 490,
+  width: 16,
+  height: 16,
   option: "Bank Transfer",
 });
 
 // Fields can span multiple pages with different sizes
 const page2 = await pdf.getPage(1);
-await page2.drawField(nameField, {  // Same field, different widget
+await page2.drawField(nameField, {
+  // Same field, different widget
   x: 50,
   y: 500,
-  width: 300,  // Different size - gets its own appearance stream
+  width: 300, // Different size - gets its own appearance stream
   height: 30,
 });
 
@@ -224,19 +234,19 @@ Create simple color helper functions in `src/helpers/colors.ts`:
 ```typescript
 export interface RGB {
   type: "RGB";
-  red: number;   // 0-1
+  red: number; // 0-1
   green: number;
   blue: number;
 }
 
 export interface Grayscale {
   type: "Grayscale";
-  gray: number;  // 0-1
+  gray: number; // 0-1
 }
 
 export interface CMYK {
   type: "CMYK";
-  cyan: number;    // 0-1
+  cyan: number; // 0-1
   magenta: number;
   yellow: number;
   black: number;
@@ -326,6 +336,7 @@ const form = await pdf.getOrCreateForm();
 ```
 
 Creates a full AcroForm with defaults:
+
 - `/Fields []` - empty fields array
 - `/DR` - default resources containing Helvetica and ZapfDingbats
 - `/DA "/Helv 0 Tf 0 g"` - default appearance string
@@ -341,11 +352,13 @@ Creates a full AcroForm with defaults:
 ### Validation Behavior
 
 **Radio group `option` parameter:**
+
 - Radio groups **require** the `option` parameter in `drawField` - throws error if missing
 - Non-radio fields with `option` specified - ignored silently (lenient)
 - Invalid option value for radio group - throws error
 
 **Field names:**
+
 - Any characters allowed, user's responsibility
 - Document risks: dots imply hierarchy in some viewers, brackets used for array notation
 - Unicode fully supported
@@ -358,22 +371,22 @@ Widgets are added to the page's `/Annots` array in the order `drawField` is call
 
 ### New Files
 
-| File | Purpose |
-|------|---------|
-| `src/helpers/colors.ts` | Color types and `rgb()`, `grayscale()`, `cmyk()` helpers |
-| `src/helpers/rotations.ts` | `degrees()` helper |
+| File                       | Purpose                                                  |
+| -------------------------- | -------------------------------------------------------- |
+| `src/helpers/colors.ts`    | Color types and `rgb()`, `grayscale()`, `cmyk()` helpers |
+| `src/helpers/rotations.ts` | `degrees()` helper                                       |
 
 ### Modified Files
 
-| File | Changes |
-|------|---------|
-| `src/api/pdf.ts` | Add `getOrCreateForm()` method |
-| `src/api/pdf-form.ts` | Add `createTextField`, `createCheckbox`, `createRadioGroup`, `createDropdown`, `createListbox` |
-| `src/api/pdf-page.ts` | Add `drawField()` method, add internal `addAnnotation()` helper |
-| `src/document/forms/acro-form.ts` | Add `addFontToResources()`, support creating new AcroForm |
-| `src/document/forms/fields/base.ts` | Support adding widgets to `/Kids` via `addWidget()` method |
-| `src/document/forms/appearance-generator.ts` | Add symbol support for checkbox/radio |
-| `src/index.ts` | Export new types and helpers |
+| File                                         | Changes                                                                                        |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `src/api/pdf.ts`                             | Add `getOrCreateForm()` method                                                                 |
+| `src/api/pdf-form.ts`                        | Add `createTextField`, `createCheckbox`, `createRadioGroup`, `createDropdown`, `createListbox` |
+| `src/api/pdf-page.ts`                        | Add `drawField()` method, add internal `addAnnotation()` helper                                |
+| `src/document/forms/acro-form.ts`            | Add `addFontToResources()`, support creating new AcroForm                                      |
+| `src/document/forms/fields/base.ts`          | Support adding widgets to `/Kids` via `addWidget()` method                                     |
+| `src/document/forms/appearance-generator.ts` | Add symbol support for checkbox/radio                                                          |
+| `src/index.ts`                               | Export new types and helpers                                                                   |
 
 ### Type Definitions
 
@@ -394,7 +407,7 @@ interface FieldOptions {
 interface TextFieldOptions extends FieldOptions {
   font?: EmbeddedFont;
   fontSize?: number;
-  color?: Color;           // text color
+  color?: Color; // text color
   maxLength?: number;
   multiline?: boolean;
   password?: boolean;
@@ -405,15 +418,15 @@ interface TextFieldOptions extends FieldOptions {
 
 // Checkbox specific
 interface CheckboxOptions extends FieldOptions {
-  onValue?: string;        // default "Yes"
+  onValue?: string; // default "Yes"
   symbol?: CheckboxSymbol; // default "check"
   defaultChecked?: boolean;
 }
 
 // Radio group specific
 interface RadioGroupOptions extends FieldOptions {
-  options: string[];       // required: option values
-  symbol?: RadioSymbol;    // default "circle"
+  options: string[]; // required: option values
+  symbol?: RadioSymbol; // default "circle"
   defaultValue?: string;
 }
 
@@ -423,7 +436,7 @@ interface DropdownOptions extends FieldOptions {
   font?: EmbeddedFont;
   fontSize?: number;
   color?: Color;
-  editable?: boolean;      // allow user to type
+  editable?: boolean; // allow user to type
   defaultValue?: string;
 }
 
@@ -443,7 +456,7 @@ interface DrawFieldOptions {
   y: number;
   width: number;
   height: number;
-  option?: string;         // required for radio groups, ignored for others
+  option?: string; // required for radio groups, ignored for others
 }
 ```
 
@@ -478,6 +491,7 @@ interface DrawFieldOptions {
 ### Viewer Testing
 
 Test in multiple PDF viewers:
+
 - Adobe Acrobat
 - macOS Preview
 - Chrome PDF viewer

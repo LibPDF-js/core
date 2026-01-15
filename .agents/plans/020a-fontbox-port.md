@@ -15,16 +15,17 @@ Port Apache PDFBox's fontbox module to TypeScript for font parsing and subsettin
 
 **Porting (in priority order):**
 
-| Module | Description | Priority |
-|--------|-------------|----------|
-| **ttf/** | TrueType/OpenType parsing and subsetting | High |
-| **cff/** | Compact Font Format (OTF with PostScript outlines) | High |
-| **cmap/** | CMap parsing for CID-keyed fonts | High |
-| **type1/** | Type 1 PostScript fonts | Medium |
-| **afm/** | Adobe Font Metrics | Medium |
-| **pfb/** | PostScript Font Binary | Medium |
+| Module     | Description                                        | Priority |
+| ---------- | -------------------------------------------------- | -------- |
+| **ttf/**   | TrueType/OpenType parsing and subsetting           | High     |
+| **cff/**   | Compact Font Format (OTF with PostScript outlines) | High     |
+| **cmap/**  | CMap parsing for CID-keyed fonts                   | High     |
+| **type1/** | Type 1 PostScript fonts                            | Medium   |
+| **afm/**   | Adobe Font Metrics                                 | Medium   |
+| **pfb/**   | PostScript Font Binary                             | Medium   |
 
 **Adding (not in fontbox):**
+
 - Variable font tables: fvar, avar, gvar
 - HarfBuzz integration for text shaping (fontbox's GSUB is incomplete)
 
@@ -33,8 +34,9 @@ Port Apache PDFBox's fontbox module to TypeScript for font parsing and subsettin
 ### Heavily Inspired, Idiomatically TypeScript
 
 This is not a line-by-line translation. We:
+
 - Follow fontbox's architecture and battle-tested logic
-- Use the same table structures and algorithms  
+- Use the same table structures and algorithms
 - But express them idiomatically in TypeScript
 
 ### Reuse Existing Infrastructure
@@ -43,55 +45,58 @@ Use existing `src/io/` utilities:
 
 ```typescript
 import { Scanner } from "#src/io/scanner";
-import { BinaryScanner } from "#src/io/binary-scanner";  // Extends Scanner with big-endian reads
+import { BinaryScanner } from "#src/io/binary-scanner"; // Extends Scanner with big-endian reads
 import { ByteWriter } from "#src/io/byte-writer";
 ```
 
 ### Key Differences from Java
 
-| Java (fontbox) | TypeScript (this port) |
-|----------------|------------------------|
-| `TTFDataStream` | `BinaryScanner` (extends Scanner) |
-| `RandomAccessRead` | `Uint8Array` input |
-| Checked exceptions | Thrown errors or result types |
-| Synchronized blocks | Not needed |
-| Inheritance hierarchies | Composition, interfaces |
-| `GeneralPath` | Path data arrays |
+| Java (fontbox)          | TypeScript (this port)            |
+| ----------------------- | --------------------------------- |
+| `TTFDataStream`         | `BinaryScanner` (extends Scanner) |
+| `RandomAccessRead`      | `Uint8Array` input                |
+| Checked exceptions      | Thrown errors or result types     |
+| Synchronized blocks     | Not needed                        |
+| Inheritance hierarchies | Composition, interfaces           |
+| `GeneralPath`           | Path data arrays                  |
 
 ## Source Mapping
 
 Key fontbox sources in `checkouts/pdfbox/fontbox/src/main/java/org/apache/fontbox/`:
 
 ### TTF Module
-| Java File | TypeScript Target | Purpose |
-|-----------|-------------------|---------|
-| `ttf/TTFParser.java` | `ttf/parser.ts` | Parse table directory |
-| `ttf/TrueTypeFont.java` | `ttf/font.ts` | Font data model |
-| `ttf/TTFSubsetter.java` | `ttf/subsetter.ts` | Subsetting |
-| `ttf/TTFTable.java` | `ttf/table.ts` | Base table |
-| `ttf/HeaderTable.java` | `ttf/tables/head.ts` | head table |
-| `ttf/HorizontalHeaderTable.java` | `ttf/tables/hhea.ts` | hhea table |
-| `ttf/HorizontalMetricsTable.java` | `ttf/tables/hmtx.ts` | hmtx table |
-| `ttf/MaximumProfileTable.java` | `ttf/tables/maxp.ts` | maxp table |
-| `ttf/IndexToLocationTable.java` | `ttf/tables/loca.ts` | loca table |
-| `ttf/GlyphTable.java` | `ttf/tables/glyf.ts` | glyf table |
-| `ttf/CmapTable.java` | `ttf/tables/cmap.ts` | cmap table |
-| `ttf/NamingTable.java` | `ttf/tables/name.ts` | name table |
-| `ttf/PostScriptTable.java` | `ttf/tables/post.ts` | post table |
-| `ttf/OS2WindowsMetricsTable.java` | `ttf/tables/os2.ts` | OS/2 table |
+
+| Java File                         | TypeScript Target    | Purpose               |
+| --------------------------------- | -------------------- | --------------------- |
+| `ttf/TTFParser.java`              | `ttf/parser.ts`      | Parse table directory |
+| `ttf/TrueTypeFont.java`           | `ttf/font.ts`        | Font data model       |
+| `ttf/TTFSubsetter.java`           | `ttf/subsetter.ts`   | Subsetting            |
+| `ttf/TTFTable.java`               | `ttf/table.ts`       | Base table            |
+| `ttf/HeaderTable.java`            | `ttf/tables/head.ts` | head table            |
+| `ttf/HorizontalHeaderTable.java`  | `ttf/tables/hhea.ts` | hhea table            |
+| `ttf/HorizontalMetricsTable.java` | `ttf/tables/hmtx.ts` | hmtx table            |
+| `ttf/MaximumProfileTable.java`    | `ttf/tables/maxp.ts` | maxp table            |
+| `ttf/IndexToLocationTable.java`   | `ttf/tables/loca.ts` | loca table            |
+| `ttf/GlyphTable.java`             | `ttf/tables/glyf.ts` | glyf table            |
+| `ttf/CmapTable.java`              | `ttf/tables/cmap.ts` | cmap table            |
+| `ttf/NamingTable.java`            | `ttf/tables/name.ts` | name table            |
+| `ttf/PostScriptTable.java`        | `ttf/tables/post.ts` | post table            |
+| `ttf/OS2WindowsMetricsTable.java` | `ttf/tables/os2.ts`  | OS/2 table            |
 
 ### CFF Module
-| Java File | TypeScript Target | Purpose |
-|-----------|-------------------|---------|
-| `cff/CFFParser.java` | `cff/parser.ts` | Parse CFF data |
-| `cff/CFFFont.java` | `cff/font.ts` | CFF font model |
+
+| Java File                  | TypeScript Target   | Purpose            |
+| -------------------------- | ------------------- | ------------------ |
+| `cff/CFFParser.java`       | `cff/parser.ts`     | Parse CFF data     |
+| `cff/CFFFont.java`         | `cff/font.ts`       | CFF font model     |
 | `cff/Type2CharString.java` | `cff/charstring.ts` | Charstring parsing |
 
 ### Type1 Module
-| Java File | TypeScript Target | Purpose |
-|-----------|-------------------|---------|
-| `type1/Type1Parser.java` | `type1/parser.ts` | Parse Type1 |
-| `type1/Type1Font.java` | `type1/font.ts` | Type1 font model |
+
+| Java File                | TypeScript Target | Purpose          |
+| ------------------------ | ----------------- | ---------------- |
+| `type1/Type1Parser.java` | `type1/parser.ts` | Parse Type1      |
+| `type1/Type1Font.java`   | `type1/font.ts`   | Type1 font model |
 
 ## File Structure
 
@@ -99,7 +104,7 @@ Key fontbox sources in `checkouts/pdfbox/fontbox/src/main/java/org/apache/fontbo
 src/
 ├── io/
 │   ├── scanner.ts           # Existing - extend if needed
-│   ├── byte-writer.ts       # Existing - extend if needed  
+│   ├── byte-writer.ts       # Existing - extend if needed
 │   └── binary-reader.ts     # New - big-endian, fixed-point reads
 └── fontbox/
     ├── README.md
@@ -178,7 +183,7 @@ const font = TTFParser.parse(variableFontBytes);
 
 if (font.isVariable) {
   console.log(font.axes); // [{ tag: "wght", min: 100, max: 900, default: 400 }]
-  
+
   // Create static instance
   const bold = font.instantiate({ wght: 700 });
 }
@@ -187,6 +192,7 @@ if (font.isVariable) {
 ## Test Plan
 
 ### TTF Parsing
+
 - Parse valid TTF file
 - Parse OTF with TrueType outlines
 - Reject truncated/invalid files
@@ -194,6 +200,7 @@ if (font.isVariable) {
 - Lazy table loading works correctly
 
 ### Table Parsing
+
 - head: unitsPerEm, bbox, loca format
 - hhea: ascent, descent, lineGap
 - hmtx: advance widths
@@ -206,6 +213,7 @@ if (font.isVariable) {
 - OS/2: weight, width, panose
 
 ### TTF Subsetting
+
 - Include .notdef always
 - Single and multiple glyphs
 - Composite glyphs include components
@@ -215,18 +223,21 @@ if (font.isVariable) {
 - Deterministic output
 
 ### Variable Fonts
+
 - Parse fvar axes
 - Parse gvar glyph variations
 - Instantiate at axis values
 - Default instance works
 
 ### CFF Parsing
+
 - Parse standalone CFF
 - Parse CFF from OTF
 - Extract glyph outlines
 - Handle CID-keyed fonts
 
 ### Type1 Parsing
+
 - Parse PFA (ASCII)
 - Parse PFB (binary)
 - Extract metrics

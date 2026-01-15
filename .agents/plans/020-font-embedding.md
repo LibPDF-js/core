@@ -3,6 +3,7 @@
 ## Overview
 
 Implement embedding TrueType/OpenType fonts into PDFs with subsetting support. This enables:
+
 - Using custom fonts in form fields
 - CJK character support
 - Consistent rendering across systems
@@ -10,6 +11,7 @@ Implement embedding TrueType/OpenType fonts into PDFs with subsetting support. T
 ## Scope
 
 **In scope:**
+
 - Embed TrueType (.ttf) fonts as CIDFontType2
 - Embed OpenType with TrueType outlines (.otf)
 - Variable fonts (fvar/gvar tables) - flatten to static instance
@@ -20,6 +22,7 @@ Implement embedding TrueType/OpenType fonts into PDFs with subsetting support. T
 - Proper text shaping (ligatures, Arabic, Indic)
 
 **Out of scope:**
+
 - OpenType with CFF outlines (Type0 CIDFontType0) - complex, rare need
 - Multiple Master fonts
 - Font modification (add glyphs)
@@ -27,19 +30,20 @@ Implement embedding TrueType/OpenType fonts into PDFs with subsetting support. T
 ## External Dependencies: Analysis
 
 Font handling requires two capabilities:
+
 1. **Text shaping** - Convert Unicode text to positioned glyphs (handles ligatures, Arabic joining, etc.)
 2. **Font subsetting** - Extract only used glyphs to reduce file size
 
 ### Library Comparison
 
-| Library | Shaping | Subsetting | CJK | Bundle | Issues |
-|---------|---------|------------|-----|--------|--------|
-| **fontkit** | Basic | Yes | Partial | ~55KB | Ligature bugs, Noto Sans issues |
-| **opentype.js** | Basic | No | Partial | ~45KB | No subsetting |
-| **harfbuzzjs** | Full | No | Full | ~180KB WASM | Shaping only |
-| **fonteditor-core** | None | Yes | Partial | ~90KB | OTF/CJK glyph mangling |
+| Library             | Shaping | Subsetting | CJK     | Bundle      | Issues                          |
+| ------------------- | ------- | ---------- | ------- | ----------- | ------------------------------- |
+| **fontkit**         | Basic   | Yes        | Partial | ~55KB       | Ligature bugs, Noto Sans issues |
+| **opentype.js**     | Basic   | No         | Partial | ~45KB       | No subsetting                   |
+| **harfbuzzjs**      | Full    | No         | Full    | ~180KB WASM | Shaping only                    |
+| **fonteditor-core** | None    | Yes        | Partial | ~90KB       | OTF/CJK glyph mangling          |
 
-**Key insight**: No single library does everything well. 
+**Key insight**: No single library does everything well.
 
 ### Known Issues
 
@@ -182,12 +186,12 @@ User provides TTF/OTF bytes
 
 ### Key Components
 
-| Component | Responsibility |
-|-----------|----------------|
-| **TTFParser** | Parse TTF/OTF tables, extract metrics, map codepoints to glyphs |
-| **TextShaper** | Interface for text shaping (IdentityShaper default, HarfBuzz optional) |
-| **TTFSubsetter** | Create minimal font with only used glyphs |
-| **EmbeddedFont** | User-facing API, tracks usage, coordinates encoding |
+| Component        | Responsibility                                                         |
+| ---------------- | ---------------------------------------------------------------------- |
+| **TTFParser**    | Parse TTF/OTF tables, extract metrics, map codepoints to glyphs        |
+| **TextShaper**   | Interface for text shaping (IdentityShaper default, HarfBuzz optional) |
+| **TTFSubsetter** | Create minimal font with only used glyphs                              |
+| **EmbeddedFont** | User-facing API, tracks usage, coordinates encoding                    |
 | **FontEmbedder** | Creates PDF font dictionary structure (Type0, CIDFont, FontDescriptor) |
 
 ### Two Encoding Modes
@@ -195,7 +199,6 @@ User provides TTF/OTF bytes
 1. **Identity-H (default)**: Character codes = Unicode code points
    - Simple, works for most CJK
    - No shaping needed for non-complex scripts
-   
 2. **Shaped (with HarfBuzz)**: Character codes = glyph IDs
    - Required for: Arabic, Hebrew, Indic scripts, complex ligatures
    - User opts in by registering HarfBuzz
@@ -245,6 +248,7 @@ src/fonts/
 ## Test Plan
 
 ### TTFParser
+
 - Parse valid TTF and OTF fonts
 - Reject invalid/corrupted fonts
 - Extract metrics (unitsPerEm, ascent, descent, bbox)
@@ -253,6 +257,7 @@ src/fonts/
 - Get advance widths
 
 ### TTFSubsetter
+
 - Include .notdef by default
 - Subset to only requested glyphs
 - Handle composite glyphs (remap component references)
@@ -260,27 +265,32 @@ src/fonts/
 - Deterministic output (same input = same output)
 
 ### TextShaper
+
 - IdentityShaper maps codepoints directly
 - HarfBuzzShaper handles ligatures and RTL scripts
 
 ### EmbeddedFont
+
 - Encode text to hex string for PDF content streams
 - Track used codepoints for subsetting
 - Calculate text width
 - Report whether font can encode given text
 
 ### FontEmbedder
+
 - Create complete Type0 font structure
 - Build correct /W widths array
 - Generate ToUnicode CMap for text extraction
 - Include subset tag in font name
 
 ### Integration
+
 - Embed font → save → load → font renders correctly
 - Text searchable/copyable via ToUnicode
 - Only used glyphs in subset (verify file size)
 
 ### Variable Fonts
+
 - Parse fvar table (axes and named instances)
 - Parse gvar table (glyph variations)
 - Apply axis values to produce static instance
@@ -288,6 +298,7 @@ src/fonts/
 - Subset variable font same as static font after flattening
 
 ### Edge Cases
+
 - Font with no OS/2 table
 - Short vs long loca format
 - Composite glyphs with nested components
@@ -297,14 +308,14 @@ src/fonts/
 
 ## Bundle Size Estimate
 
-| Component | Size (gzip) | Required |
-|-----------|-------------|----------|
-| TTFParser | ~5KB | Yes |
-| TTFSubsetter | ~8KB | Yes |
-| IdentityShaper | ~1KB | Yes |
-| FontEmbedder | ~3KB | Yes |
-| **Core Total** | **~17KB** | - |
-| HarfBuzz WASM | ~180KB | Optional |
+| Component      | Size (gzip) | Required |
+| -------------- | ----------- | -------- |
+| TTFParser      | ~5KB        | Yes      |
+| TTFSubsetter   | ~8KB        | Yes      |
+| IdentityShaper | ~1KB        | Yes      |
+| FontEmbedder   | ~3KB        | Yes      |
+| **Core Total** | **~17KB**   | -        |
+| HarfBuzz WASM  | ~180KB      | Optional |
 
 ## PDFBox Fontbox Insights
 
@@ -312,22 +323,22 @@ PDFBox's fontbox module is self-contained (only depends on pdfbox-io for seekabl
 
 ### Patterns to Adopt
 
-| Pattern | Rationale |
-|---------|-----------|
-| Lazy table loading | Tables parsed on first access, not all at once |
-| Table directory as registry | Parse directory first, load tables by tag on demand |
-| Factory for table types | Switch on tag to create appropriate parser |
-| Sorted set for GIDs | Enables O(log n) GID remapping during subsetting |
-| Composite resolution loop | Run until no new component GIDs discovered |
-| Preserve unknown tables | Copy tables we don't understand for round-trip fidelity |
+| Pattern                     | Rationale                                               |
+| --------------------------- | ------------------------------------------------------- |
+| Lazy table loading          | Tables parsed on first access, not all at once          |
+| Table directory as registry | Parse directory first, load tables by tag on demand     |
+| Factory for table types     | Switch on tag to create appropriate parser              |
+| Sorted set for GIDs         | Enables O(log n) GID remapping during subsetting        |
+| Composite resolution loop   | Run until no new component GIDs discovered              |
+| Preserve unknown tables     | Copy tables we don't understand for round-trip fidelity |
 
 ### Patterns to Avoid
 
-| Pattern | Issue |
-|---------|-------|
-| Excessive inheritance | OpenTypeFont extends TrueTypeFont creates confusion |
-| Incomplete GSUB | Types 5/6 not implemented, no GPOS - defer to HarfBuzz instead |
-| Missing bounds checking | Some parsers trust input too much |
+| Pattern                 | Issue                                                          |
+| ----------------------- | -------------------------------------------------------------- |
+| Excessive inheritance   | OpenTypeFont extends TrueTypeFont creates confusion            |
+| Incomplete GSUB         | Types 5/6 not implemented, no GPOS - defer to HarfBuzz instead |
+| Missing bounds checking | Some parsers trust input too much                              |
 
 ### Notable Gaps in Fontbox
 
@@ -353,7 +364,7 @@ Variable fonts contain multiple styles (weights, widths, etc.) in a single file.
 
 ```typescript
 const font = await pdf.embedFont(variableFontBytes, {
-  variations: { wght: 700, wdth: 100 }  // Bold, normal width
+  variations: { wght: 700, wdth: 100 }, // Bold, normal width
 });
 ```
 

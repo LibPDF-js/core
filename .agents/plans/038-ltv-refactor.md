@@ -3,6 +3,7 @@
 ## Problem Statement
 
 The current signing implementation in `pdf-signature.ts` has grown to handle too many responsibilities:
+
 - PDF structure manipulation (fields, annotations, catalog)
 - CMS signature orchestration
 - DSS dictionary building (duplicating the existing `DSSBuilder` class)
@@ -11,6 +12,7 @@ The current signing implementation in `pdf-signature.ts` has grown to handle too
 - Revocation data fetching
 
 This makes the code hard to maintain, test, and extend. Additionally:
+
 - `DSSBuilder` exists but isn't used by `PDFSignature`
 - Debug `console.log` statements are scattered throughout
 - Production code imports from `test-utils.ts`
@@ -74,22 +76,22 @@ Single class for gathering all LTV data from any CMS structure (signatures or ti
 export interface LtvData {
   /** The original CMS bytes (padded, for VRI key computation) */
   cmsBytes: Uint8Array;
-  
+
   /** All certificates needed for validation (deduplicated) */
   certificates: Uint8Array[];
-  
+
   /** OCSP responses for certificate validation */
   ocspResponses: Uint8Array[];
-  
+
   /** CRLs for certificate validation */
   crls: Uint8Array[];
-  
+
   /** Embedded timestamp tokens that need their own VRI entries */
   embeddedTimestamps: Uint8Array[];
-  
+
   /** When the LTV data was gathered */
   timestamp: Date;
-  
+
   /** Warnings encountered during gathering */
   warnings: LtvWarning[];
 }
@@ -102,10 +104,10 @@ export interface LtvWarning {
 export interface LtvGathererOptions {
   /** Custom revocation provider (defaults to DefaultRevocationProvider) */
   revocationProvider?: RevocationProvider;
-  
+
   /** Timeout for network requests in ms (default: 10000) */
   timeout?: number;
-  
+
   /** Whether to recursively gather LTV for embedded timestamps (default: true) */
   gatherTimestampLtv?: boolean;
 }
@@ -115,7 +117,7 @@ export class LtvDataGatherer {
 
   /**
    * Gather LTV data from CMS SignedData bytes.
-   * 
+   *
    * Works for both signatures and timestamp tokens since both are CMS.
    * Extracts signer certificate, builds chain via AIA, gathers revocation
    * data, and handles embedded timestamps.
@@ -155,7 +157,7 @@ export interface DSSBuilderOptions {
 export class DSSBuilder {
   constructor(
     private registry: ObjectRegistry,
-    private options: DSSBuilderOptions = {}
+    private options: DSSBuilderOptions = {},
   ) {}
 
   /**
@@ -165,7 +167,7 @@ export class DSSBuilder {
   static async fromCatalog(
     catalog: PdfDict,
     registry: ObjectRegistry,
-    options?: DSSBuilderOptions
+    options?: DSSBuilderOptions,
   ): Promise<DSSBuilder>;
 
   /**
@@ -183,6 +185,7 @@ export class DSSBuilder {
 ```
 
 **Merge behavior:**
+
 - Existing VRI entries are preserved (not overwritten)
 - New certs/OCSPs/CRLs are deduplicated against existing
 - References to existing streams are reused
@@ -194,7 +197,7 @@ export class DSSBuilder {
 
 /**
  * Compute VRI key from CMS bytes.
- * 
+ *
  * The VRI key is uppercase hex SHA-1 of the signature's /Contents value,
  * including any zero-padding. This matches how the bytes appear in the PDF.
  */
@@ -234,69 +237,69 @@ After refactor, `PDFSignature.sign()` becomes a thin orchestrator:
 ```typescript
 async sign(options: SignOptions): Promise<SignResult> {
   const warnings: SignWarning[] = [];
-  
+
   // 1. Resolve options (PAdES level -> individual flags)
   const resolved = this.resolveOptions(options);
-  
+
   // 2. Create signature field and placeholder
   const { pdfBytes, placeholders } = await this.createSignaturePlaceholder(resolved);
-  
+
   // 3. Build and embed CMS signature
   const signatureDer = await this.buildCmsSignature(pdfBytes, placeholders, resolved);
   const paddedSignature = patchContents(pdfBytes, placeholders, signatureDer);
-  
+
   // 4. Reload PDF
   await this.pdf.reload(pdfBytes);
-  
+
   // 5. Add LTV data if requested
   if (resolved.longTermValidation) {
     const gatherer = new LtvDataGatherer({
       revocationProvider: resolved.revocationProvider,
     });
-    
+
     const ltvData = await gatherer.gather(paddedSignature);
     warnings.push(...ltvData.warnings.map(w => ({ code: w.code, message: w.message })));
-    
+
     const dssBuilder = await DSSBuilder.fromCatalog(
       await this.pdf.getCatalog(),
       this.pdf.context.registry
     );
     await dssBuilder.addLtvData(ltvData);
-    
+
     const dssRef = await dssBuilder.build();
     (await this.pdf.getCatalog()).set("DSS", dssRef);
-    
+
     // Save DSS revision
     const dssBytes = await this.pdf.save({ incremental: true });
     await this.pdf.reload(dssBytes);
-    
+
     // 6. Add document timestamp if B-LTA
     if (resolved.archivalTimestamp && resolved.timestampAuthority) {
       const docTsBytes = await this.addDocumentTimestamp(
         resolved.timestampAuthority,
         resolved.digestAlgorithm
       );
-      
+
       // Gather LTV for document timestamp
       const docTsLtvData = await gatherer.gather(docTsBytes);
       warnings.push(...docTsLtvData.warnings.map(w => ({ code: w.code, message: w.message })));
-      
+
       // Merge into DSS
       const dssBuilder2 = await DSSBuilder.fromCatalog(
         await this.pdf.getCatalog(),
         this.pdf.context.registry
       );
       await dssBuilder2.addLtvData(docTsLtvData);
-      
+
       const dssRef2 = await dssBuilder2.build();
       (await this.pdf.getCatalog()).set("DSS", dssRef2);
-      
+
       // Save final revision
       const finalBytes = await this.pdf.save({ incremental: true });
       await this.pdf.reload(finalBytes);
     }
   }
-  
+
   return {
     bytes: await this.pdf.save({ incremental: true }),
     warnings,
@@ -306,17 +309,18 @@ async sign(options: SignOptions): Promise<SignResult> {
 
 ### Helper Migrations
 
-| Current Location | New Location | Notes |
-|-----------------|--------------|-------|
-| `test-utils.ts` → `hexToBytes` | `helpers/bytes.ts` | Production helper |
-| `pdf-signature.ts` → `computeVriKey` | `ltv/vri.ts` | VRI-specific |
-| `pdf-signature.ts` → `computeSha1Hex` | `ltv/vri.ts` | Deduplication helper |
-| `dss.ts` | `ltv/dss-builder.ts` | Enhanced, moved |
-| `revocation.ts` | `revocation.ts` | Unchanged location, keep as single file |
+| Current Location                      | New Location         | Notes                                   |
+| ------------------------------------- | -------------------- | --------------------------------------- |
+| `test-utils.ts` → `hexToBytes`        | `helpers/bytes.ts`   | Production helper                       |
+| `pdf-signature.ts` → `computeVriKey`  | `ltv/vri.ts`         | VRI-specific                            |
+| `pdf-signature.ts` → `computeSha1Hex` | `ltv/vri.ts`         | Deduplication helper                    |
+| `dss.ts`                              | `ltv/dss-builder.ts` | Enhanced, moved                         |
+| `revocation.ts`                       | `revocation.ts`      | Unchanged location, keep as single file |
 
 ## Implementation Steps
 
 ### Phase 1: Prepare Helpers & Add AIA/Revocation Tests
+
 1. Move `hexToBytes` from `test-utils.ts` to `helpers/bytes.ts`
 2. Create `ltv/vri.ts` with `computeVriKey`, `computeSha1Hex`
 3. Add unit tests for `aia.ts`:
@@ -329,12 +333,14 @@ async sign(options: SignOptions): Promise<SignResult> {
    - `extractOcspResponderCerts()` with real OCSP responses
 
 ### Phase 2: Create LtvDataGatherer
+
 1. Create `ltv/gatherer.ts` with `LtvDataGatherer` class
 2. Extract CMS parsing logic from `gatherLtvData`
 3. Implement unified gathering for signatures and timestamps
 4. Add tests for gatherer in isolation
 
 ### Phase 3: Enhance DSSBuilder
+
 1. Move `dss.ts` to `ltv/dss-builder.ts`
 2. Add `fromCatalog()` static method for loading existing DSS
 3. Add `addLtvData()` method that accepts `LtvData`
@@ -342,6 +348,7 @@ async sign(options: SignOptions): Promise<SignResult> {
 5. Add tests for merge scenarios
 
 ### Phase 4: Refactor PDFSignature
+
 1. Remove `gatherLtvData`, `gatherTimestampLtvData`, `gatherRevocationData`
 2. Remove inline DSS building in `addDss`
 3. Use `LtvDataGatherer` and `DSSBuilder` instead
@@ -349,6 +356,7 @@ async sign(options: SignOptions): Promise<SignResult> {
 5. Verify all existing tests pass
 
 ### Phase 5: Cleanup
+
 1. Update exports in `signatures/index.ts`
 2. Remove old `dss.ts` (now at `ltv/dss-builder.ts`)
 3. Update any imports across codebase
@@ -361,10 +369,12 @@ async sign(options: SignOptions): Promise<SignResult> {
 **AIA (`aia.ts`):**
 
 Test fixtures needed: Real certificates with AIA extensions. Can be obtained from:
+
 - Any public website's certificate chain (e.g., `openssl s_client -connect example.com:443`)
 - Saved as DER-encoded fixtures in `fixtures/certificates/`
 
 Test cases:
+
 - Extracts CA Issuers URL from certificate with AIA extension
 - Returns null for certificate without AIA (use self-signed test cert)
 - Handles malformed AIA extension gracefully
@@ -382,6 +392,7 @@ Test fixtures needed: Same real certificates, plus OCSP responses.
 OCSP responses can be captured via: `openssl ocsp -issuer issuer.pem -cert cert.pem -url <ocsp-url> -respout ocsp.der`
 
 Test cases:
+
 - Extracts OCSP URL from certificate AIA extension
 - Returns null for certificate without OCSP URL
 - Extracts CRL URLs from CRL Distribution Points extension
@@ -391,6 +402,7 @@ Test cases:
 - `isOcspResponseSuccessful()` validates response status (0=success, others=failure)
 
 **LtvDataGatherer:**
+
 - Parses CMS and extracts signer cert
 - Builds chain via AIA (mock network)
 - Extracts embedded timestamps
@@ -400,6 +412,7 @@ Test cases:
 - Deduplicates certificates
 
 **DSSBuilder:**
+
 - Creates DSS with certs/OCSPs/CRLs
 - Creates VRI entries with correct keys
 - Loads existing DSS from catalog
@@ -420,14 +433,14 @@ All existing tests in `signing.integration.test.ts` must continue to pass.
 
 ## Open Questions
 
-1. **Should `LtvDataGatherer` cache results?** For example, if the same TSA cert appears in multiple timestamps, avoid re-fetching revocation data. 
-   - *Tentative*: Yes, use internal Maps keyed by cert hash.
+1. **Should `LtvDataGatherer` cache results?** For example, if the same TSA cert appears in multiple timestamps, avoid re-fetching revocation data.
+   - _Tentative_: Yes, use internal Maps keyed by cert hash.
 
 2. **Should we support partial LTV?** Currently if chain building fails, we continue with partial data. Keep this behavior?
-   - *Tentative*: Yes, with warnings. Better to have partial LTV than none.
+   - _Tentative_: Yes, with warnings. Better to have partial LTV than none.
 
 3. **What about existing DSS with different stream objects?** If existing DSS has a cert as stream X, and we add the same cert, should we reuse X or create new stream?
-   - *Tentative*: Reuse existing refs when data matches (compare by hash).
+   - _Tentative_: Reuse existing refs when data matches (compare by hash).
 
 ## Technical Notes
 

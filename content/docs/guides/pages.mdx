@@ -116,10 +116,7 @@ await writeFile("dest.pdf", await destPdf.save());
 ### Copy All Pages
 
 ```ts
-const allIndices = Array.from(
-  { length: sourcePdf.getPageCount() }, 
-  (_, i) => i
-);
+const allIndices = Array.from({ length: sourcePdf.getPageCount() }, (_, i) => i);
 await destPdf.copyPagesFrom(sourcePdf, allIndices);
 ```
 
@@ -172,7 +169,7 @@ for (let i = 0; i < pdf.getPageCount(); i++) {
 ```ts
 async function splitEvery(pdf: PDF, pagesPerChunk: number): Promise<PDF[]> {
   const chunks: PDF[] = [];
-  
+
   for (let i = 0; i < pdf.getPageCount(); i += pagesPerChunk) {
     const indices = [];
     for (let j = i; j < Math.min(i + pagesPerChunk, pdf.getPageCount()); j++) {
@@ -180,7 +177,7 @@ async function splitEvery(pdf: PDF, pagesPerChunk: number): Promise<PDF[]> {
     }
     chunks.push(await pdf.extractPages(indices));
   }
-  
+
   return chunks;
 }
 
@@ -211,12 +208,12 @@ for (const page of await pdf.getPages()) {
 
 ## Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| Pages appear blank after copy | Use `copyPagesFrom()` which copies resources automatically |
-| Wrong page order after merge | Check source document page indices |
-| Memory issues with large PDFs | Process pages in batches, save incrementally |
-| Fonts look different after copy | Ensure source PDF has embedded fonts |
+| Issue                           | Solution                                                   |
+| ------------------------------- | ---------------------------------------------------------- |
+| Pages appear blank after copy   | Use `copyPagesFrom()` which copies resources automatically |
+| Wrong page order after merge    | Check source document page indices                         |
+| Memory issues with large PDFs   | Process pages in batches, save incrementally               |
+| Fonts look different after copy | Ensure source PDF has embedded fonts                       |
 
 ## Next Steps
 

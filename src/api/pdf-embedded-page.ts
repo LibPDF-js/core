@@ -17,6 +17,7 @@
  */
 
 import type { PdfRef } from "#src/objects/pdf-ref";
+
 import type { Rectangle } from "./pdf-page";
 
 /**

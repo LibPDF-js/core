@@ -37,6 +37,7 @@ Our current form field implementation has several issues identified during compa
 ### 1. Terminal vs Non-Terminal Fields
 
 PDFBox distinguishes:
+
 - **Terminal fields**: Have widgets (visual), hold values
 - **Non-terminal fields**: Containers only, no value, just organize hierarchy
 
@@ -45,6 +46,7 @@ We currently conflate these. Separating them clarifies the model.
 ### 2. Field Type Detection via Factory
 
 PDFBox's `PDFieldFactory.createField()`:
+
 - Looks at `/FT` (field type)
 - Checks `/Ff` flags for button subtype (push, radio, checkbox)
 - Checks `/Ff` flags for choice subtype (combo vs listbox)
@@ -61,6 +63,7 @@ await field.setValue("new value"); // Regenerates appearance automatically
 ```
 
 For batch operations, use `Promise.all`:
+
 ```typescript
 await Promise.all([
   field1.setValue("value1"),
@@ -94,6 +97,7 @@ The `validateChanges()` method throws a `ValidationError` containing all validat
 ### 5. Button Export Values (`/Opt`)
 
 PDFBox supports `/Opt` array for radio buttons:
+
 - Allows non-Latin export values
 - Allows radio buttons with same visual appearance but different export values
 - `getExportValues()` returns the list
@@ -104,6 +108,7 @@ We will add this support.
 ### 6. Widget State Synchronization
 
 For buttons, update **all widget `/AS` entries** when value changes (following PDFBox):
+
 ```typescript
 for (const widget of this.getWidgets()) {
   if (widget.hasAppearanceForState(value)) {
@@ -167,14 +172,14 @@ Per-operation `{ strict: boolean }` option overrides the default.
 
 ### Error Categories
 
-| Scenario | Lenient Behavior | Strict Behavior |
-|----------|------------------|-----------------|
-| Circular reference in field tree | Warn, skip field | Throw |
-| Widget with missing `/P` | Warn, scan pages for it | Warn, scan pages for it |
-| Invalid field type (`/FT` missing) | Create `UnknownField` | Throw |
-| Zero-size appearance BBox | Warn, skip widget | Throw |
-| Font can't encode character | Throw always | Throw always |
-| Dynamic XFA form | Warn, skip flatten | Warn, skip flatten |
+| Scenario                           | Lenient Behavior        | Strict Behavior         |
+| ---------------------------------- | ----------------------- | ----------------------- |
+| Circular reference in field tree   | Warn, skip field        | Throw                   |
+| Widget with missing `/P`           | Warn, scan pages for it | Warn, scan pages for it |
+| Invalid field type (`/FT` missing) | Create `UnknownField`   | Throw                   |
+| Zero-size appearance BBox          | Warn, skip widget       | Throw                   |
+| Font can't encode character        | Throw always            | Throw always            |
+| Dynamic XFA form                   | Warn, skip flatten      | Warn, skip flatten      |
 
 **Note**: Font encoding errors always throw - this is data loss that can't be recovered silently.
 
@@ -185,7 +190,7 @@ When a font cannot encode text, throw immediately with a clear error:
 ```typescript
 throw new Error(
   `Font "Helvetica" cannot encode character '中' (U+4E2D). ` +
-  `Use field.setFont() with a font that supports this character.`
+    `Use field.setFont() with a font that supports this character.`,
 );
 ```
 
@@ -200,14 +205,16 @@ Future enhancement: Add font fallback chains via `acroForm.setFontFallbacks([...
 **Decision**: Smart detection - only generate if missing or invalid.
 
 Regenerate checkbox/radio appearances when:
+
 1. No `/AP` dictionary exists
-2. No `/N` (normal appearance) entry exists  
+2. No `/N` (normal appearance) entry exists
 3. Required state key is missing from `/N`
 4. BBox has zero width or height
 5. Appearance stream has zero bytes
 6. `NeedAppearances` flag is set on the form
 
 **Do NOT regenerate when**:
+
 - Valid appearance exists (even if simple)
 - Push buttons (always preserve - they have custom artwork)
 
@@ -224,9 +231,9 @@ class AppearanceGenerator {
     private acroForm: AcroForm,
     private registry: ObjectRegistry
   )
-  
+
   async generateAppearances(): Promise<void>
-  
+
   private generateTextAppearance(widget: WidgetAnnotation): PdfStream
   private generateCheckboxAppearance(widget: WidgetAnnotation): { on: PdfStream, off: PdfStream }
   private generateRadioAppearance(widget: WidgetAnnotation): { selected: PdfStream, off: PdfStream }
@@ -236,6 +243,7 @@ class AppearanceGenerator {
 ```
 
 Key behaviors:
+
 - Handles resource copying from widget to form `/DR`
 - Preserves extracted styling (colors, fonts) from existing appearance
 - Regenerates content from scratch (doesn't preserve BMC/EMC structure)
@@ -253,7 +261,7 @@ Key behaviors:
 private buildPageWidgetMap(): Map<PdfRef, WidgetAnnotation[]> {
   const map = new Map();
   let hasMissingPageRef = false;
-  
+
   // Phase 1: Try /P references
   for (const field of this.fields) {
     for (const widget of field.getWidgets()) {
@@ -266,13 +274,13 @@ private buildPageWidgetMap(): Map<PdfRef, WidgetAnnotation[]> {
       }
     }
   }
-  
+
   // Phase 2: If any missing, scan all pages
   if (hasMissingPageRef) {
     warn("Scanning all pages for widgets with missing /P references");
     this.scanAllPagesForWidgets(map);
   }
-  
+
   return map;
 }
 ```
@@ -282,14 +290,17 @@ private buildPageWidgetMap(): Map<PdfRef, WidgetAnnotation[]> {
 **Decision**: Follow PDFBox exactly.
 
 Skip widgets with:
+
 - `Invisible` flag (bit 1)
 - `Hidden` flag (bit 2)
 
 Flatten widgets with:
+
 - `NoView` flag (print-only content gets flattened)
 - No `Print` flag (still flattened)
 
 Also skip if:
+
 - No normal appearance stream
 - BBox is null or has zero dimensions
 
@@ -298,12 +309,14 @@ Also skip if:
 **Decision**: Follow PDFBox - selective cleanup.
 
 **Remove**:
+
 - Flattened fields from `/Fields` array
 - `/XFA` entry (always)
 - `/SigFlags` (only if no signature fields remain)
 - Widget annotations from page `/Annots` arrays
 
 **Keep**:
+
 - AcroForm dictionary itself (even if empty)
 - `/DR` (default resources - may be referenced by flattened content)
 - `/DA` (default appearance)
@@ -329,9 +342,9 @@ if (this.hasDynamicXFA()) {
 private getTransformedAppearanceBBox(appearance: PdfStream): BoundingBox {
   const bbox = this.getAppearanceBBox(appearance);
   const matrix = this.getAppearanceMatrix(appearance);
-  
+
   if (!matrix) return bbox;
-  
+
   // Transform all 4 corners
   const corners = [
     transform(bbox.x1, bbox.y1, matrix),
@@ -339,7 +352,7 @@ private getTransformedAppearanceBBox(appearance: PdfStream): BoundingBox {
     transform(bbox.x2, bbox.y2, matrix),
     transform(bbox.x1, bbox.y2, matrix),
   ];
-  
+
   // Find axis-aligned bounding box
   return {
     x: Math.min(...corners.map(c => c.x)),
@@ -355,6 +368,7 @@ private getTransformedAppearanceBBox(appearance: PdfStream): BoundingBox {
 **Decision**: All-or-nothing initially, add selective later.
 
 First implementation flattens all fields. Future enhancement:
+
 ```typescript
 await acroForm.flatten({ fields: [field1, field2] });
 ```
@@ -372,7 +386,7 @@ FormField (abstract)
   - registry: ObjectRegistry
   - parent: FormField | null
   - name: string (fully-qualified)
-  
+
   abstract getValue(): unknown
   abstract getWidgets(): WidgetAnnotation[]
 
@@ -437,12 +451,12 @@ UnknownField extends TerminalField
 ```typescript
 class FieldTree implements Iterable<FormField> {
   constructor(private acroForm: AcroForm)
-  
+
   *[Symbol.iterator](): Generator<FormField> {
     // Breadth-first, cycle-safe iteration
     // Sets parent references during iteration
   }
-  
+
   *terminalFields(): Generator<TerminalField> {
     for (const field of this) {
       if (field instanceof TerminalField) {
@@ -458,24 +472,24 @@ class FieldTree implements Iterable<FormField> {
 ```typescript
 class AcroForm {
   // Field access - with overloaded signatures for proper typing
-  getFields(opts?: { includeNonTerminal?: false, strict?: boolean }): Promise<TerminalField[]>
-  getFields(opts: { includeNonTerminal: true, strict?: boolean }): Promise<FormField[]>
-  
-  getField(name: string): Promise<FormField | null>
-  getFieldTree(): FieldTree
-  
+  getFields(opts?: { includeNonTerminal?: false; strict?: boolean }): Promise<TerminalField[]>;
+  getFields(opts: { includeNonTerminal: true; strict?: boolean }): Promise<FormField[]>;
+
+  getField(name: string): Promise<FormField | null>;
+  getFieldTree(): FieldTree;
+
   // Batch operations
-  validateChanges(changes: Array<{ field: TerminalField, value: unknown }>): Promise<void>
-  applyChanges(changes: Array<{ field: TerminalField, value: unknown }>): Promise<void>
-  
+  validateChanges(changes: Array<{ field: TerminalField; value: unknown }>): Promise<void>;
+  applyChanges(changes: Array<{ field: TerminalField; value: unknown }>): Promise<void>;
+
   // Flattening
-  flatten(options?: FlattenOptions): Promise<void>
-  
+  flatten(options?: FlattenOptions): Promise<void>;
+
   // Font management
-  getExistingFont(name: string): ExistingFont | null
-  getAvailableFonts(): ExistingFont[]
-  setDefaultFont(font: FormFont): void
-  setDefaultFontSize(size: number): void
+  getExistingFont(name: string): ExistingFont | null;
+  getAvailableFonts(): ExistingFont[];
+  setDefaultFont(font: FormFont): void;
+  setDefaultFontSize(size: number): void;
   // Future: setFontFallbacks(fonts: FormFont[]): void
 }
 
@@ -495,9 +509,9 @@ class FormFlattener {
     private registry: ObjectRegistry,
     private options: FlattenOptions
   )
-  
+
   async flatten(): Promise<void>
-  
+
   private buildPageWidgetMap(): Map<PdfRef, WidgetAnnotation[]>
   private scanAllPagesForWidgets(map: Map<PdfRef, WidgetAnnotation[]>): void
   private isVisibleWidget(widget: WidgetAnnotation): boolean

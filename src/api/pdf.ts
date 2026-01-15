@@ -5,7 +5,6 @@
  * Wraps the low-level parsing and writing infrastructure.
  */
 
-import { deflate } from "pako";
 import type { AddAttachmentOptions, AttachmentInfo } from "#src/attachments/types";
 import { hasChanges } from "#src/document/change-collector";
 import { isLinearizationDict } from "#src/document/linearization";
@@ -39,6 +38,8 @@ import type { StandardSecurityHandler } from "#src/security/standard-handler.ts"
 import type { SignOptions, SignResult } from "#src/signatures/types";
 import type { FindTextOptions, PageText, TextMatch } from "#src/text/types";
 import { writeComplete, writeIncremental } from "#src/writer/pdf-writer";
+import { deflate } from "pako";
+
 import { PDFAttachments } from "./pdf-attachments";
 import { PDFCatalog } from "./pdf-catalog";
 import { type DocumentInfo, PDFContext } from "./pdf-context";

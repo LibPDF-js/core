@@ -47,11 +47,12 @@ save({ subsetFonts: true }) → subsetting happens HERE
 ### 1. Subsetting is Optional
 
 ```typescript
-await pdf.save({ subsetFonts: true });  // Subset embedded fonts
-await pdf.save();                        // Embed full fonts (default)
+await pdf.save({ subsetFonts: true }); // Subset embedded fonts
+await pdf.save(); // Embed full fonts (default)
 ```
 
-**Rationale**: 
+**Rationale**:
+
 - Subsetting reduces file size but takes time
 - Some use cases need full fonts (e.g., editable forms where users might type any character)
 - Default to full embedding for safety/simplicity
@@ -59,17 +60,18 @@ await pdf.save();                        // Embed full fonts (default)
 ### 2. Track Form Usage
 
 Fonts used in form fields should NOT be subsetted because:
+
 - Users can type any character at runtime
 - The subset wouldn't include all possible glyphs
 
 ```typescript
 class EmbeddedFont {
   private usedInForm: boolean = false;
-  
+
   markUsedInForm(): void {
     this.usedInForm = true;
   }
-  
+
   canSubset(): boolean {
     return !this.usedInForm;
   }
@@ -81,11 +83,13 @@ class EmbeddedFont {
 During document construction, fonts need references for page resources. Options:
 
 **Option A: Pre-allocate refs** (Recommended)
+
 - Allocate a `PdfRef` immediately in `embedFont()`
 - The ref points to nothing until `save()` creates the actual objects
 - Simple, no async needed
 
 **Option B: Lazy ref resolution**
+
 - Use a placeholder name in resources
 - Resolve to actual refs during serialization
 - More complex, requires special handling in writer
@@ -93,6 +97,7 @@ During document construction, fonts need references for page resources. Options:
 ### 4. Sync vs Async Subsetting
 
 The `TTFSubsetter.write()` is marked async but contains no await calls - it's purely synchronous. We can:
+
 - Make it sync (remove async/Promise)
 - Or keep async for future-proofing (Web Workers, etc.)
 
@@ -115,13 +120,13 @@ drawText(text: string, options?: DrawTextOptions): void
 ```typescript
 interface SaveOptions {
   // ... existing options
-  
+
   /**
    * Subset embedded fonts to include only used glyphs.
    * Reduces file size but takes additional processing time.
-   * 
+   *
    * Fonts used in form fields are never subsetted (users may type any character).
-   * 
+   *
    * @default false
    */
   subsetFonts?: boolean;
@@ -136,10 +141,10 @@ await pdf.save({ subsetFonts: true });
 class EmbeddedFont {
   /** Mark this font as used in a form field (prevents subsetting) */
   markUsedInForm(): void;
-  
+
   /** Whether this font can be subsetted */
   canSubset(): boolean;
-  
+
   /** Reset glyph usage tracking (for testing) */
   resetUsage(): void;
 }
@@ -214,17 +219,17 @@ class EmbeddedFont {
 
 ## File Changes
 
-| File | Changes |
-|------|---------|
-| `src/api/pdf.ts` | Add `subsetFonts` to `SaveOptions`, call `fonts.finalize()` |
-| `src/api/pdf-fonts.ts` | Pre-allocate refs, add `finalize()`, remove `prepare()` |
-| `src/api/pdf-context.ts` | Make `getFontRef()` sync |
-| `src/api/pdf-page.ts` | Make `drawText()` sync, make `addFontResource()` sync |
-| `src/fonts/embedded-font.ts` | Add `usedInForm`, `markUsedInForm()`, `canSubset()` |
-| `src/fonts/font-embedder.ts` | Split into full/subset embedding functions |
-| `src/document/forms/appearance-generator.ts` | Call `markUsedInForm()` for embedded fonts |
-| `src/api/drawing/drawing.integration.test.ts` | Remove `await` from `drawText()` calls |
-| Various other tests | Update to sync `drawText()` |
+| File                                          | Changes                                                     |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| `src/api/pdf.ts`                              | Add `subsetFonts` to `SaveOptions`, call `fonts.finalize()` |
+| `src/api/pdf-fonts.ts`                        | Pre-allocate refs, add `finalize()`, remove `prepare()`     |
+| `src/api/pdf-context.ts`                      | Make `getFontRef()` sync                                    |
+| `src/api/pdf-page.ts`                         | Make `drawText()` sync, make `addFontResource()` sync       |
+| `src/fonts/embedded-font.ts`                  | Add `usedInForm`, `markUsedInForm()`, `canSubset()`         |
+| `src/fonts/font-embedder.ts`                  | Split into full/subset embedding functions                  |
+| `src/document/forms/appearance-generator.ts`  | Call `markUsedInForm()` for embedded fonts                  |
+| `src/api/drawing/drawing.integration.test.ts` | Remove `await` from `drawText()` calls                      |
+| Various other tests                           | Update to sync `drawText()`                                 |
 
 ## Testing Strategy
 
@@ -250,6 +255,7 @@ class EmbeddedFont {
 ## Migration Notes
 
 This is a **breaking API change** for anyone using `await page.drawText()`. However:
+
 - TypeScript will catch the issue (return type changes from `Promise<void>` to `void`)
 - The `await` on a non-Promise is harmless (just returns the value)
 - So existing code with `await` will still work, just with a type warning

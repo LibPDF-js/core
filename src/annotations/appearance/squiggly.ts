@@ -10,6 +10,7 @@ import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfStream } from "#src/objects/pdf-stream";
+
 import type { Rect } from "../types";
 
 /**

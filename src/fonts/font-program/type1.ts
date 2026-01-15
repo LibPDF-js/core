@@ -3,6 +3,7 @@
  */
 
 import type { Type1Font } from "#src/fontbox/type1/font.ts";
+
 import type { FontProgram } from "./base.ts";
 
 /**

@@ -17,6 +17,7 @@ import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
+
 import { PDFAnnotation, rectToArray } from "./base";
 import { PDFPopupAnnotation } from "./popup";
 import type { PopupOptions } from "./types";

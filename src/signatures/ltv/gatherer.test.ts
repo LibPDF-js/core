@@ -5,11 +5,12 @@
  * the LTV data gathering logic.
  */
 
+import { toArrayBuffer } from "#src/helpers/buffer.ts";
+import { loadFixture } from "#src/test-utils.ts";
 import { fromBER, OctetString } from "asn1js";
 import * as pkijs from "pkijs";
 import { describe, expect, it } from "vitest";
-import { toArrayBuffer } from "#src/helpers/buffer.ts";
-import { loadFixture } from "#src/test-utils.ts";
+
 import type { RevocationProvider } from "../types";
 import { LtvDataGatherer } from "./gatherer";
 import { computeSha1Hex } from "./vri";

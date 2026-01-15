@@ -8,8 +8,8 @@
  * @see RFC 7292 - PKCS #12: Personal Information Exchange Syntax
  */
 
-import { sha1 } from "@noble/hashes/legacy.js";
 import { concatBytes } from "#src/helpers/buffer";
+import { sha1 } from "@noble/hashes/legacy.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API

@@ -12,11 +12,11 @@ This guide covers encrypting PDFs with passwords and setting access permissions.
 LibPDF supports all standard PDF encryption methods:
 
 | Algorithm | Key Length | Read | Write |
-|-----------|------------|------|-------|
-| RC4 | 40-bit | Yes | Yes |
-| RC4 | 128-bit | Yes | Yes |
-| AES | 128-bit | Yes | Yes |
-| AES | 256-bit | Yes | Yes |
+| --------- | ---------- | ---- | ----- |
+| RC4       | 40-bit     | Yes  | Yes   |
+| RC4       | 128-bit    | Yes  | Yes   |
+| AES       | 128-bit    | Yes  | Yes   |
+| AES       | 256-bit    | Yes  | Yes   |
 
 AES-256 is recommended for new documents.
 
@@ -26,7 +26,7 @@ AES-256 is recommended for new documents.
 
 ```ts
 const pdf = await PDF.load(bytes, {
-  credentials: "secret"
+  credentials: "secret",
 });
 ```
 
@@ -51,9 +51,9 @@ To load an encrypted PDF without decrypting (for inspection only):
 const pdf = await PDF.load(bytes);
 
 // Can check encryption status
-console.log(pdf.isEncrypted);        // true
-console.log(pdf.isAuthenticated);    // false - no password provided
-console.log(pdf.getPageCount());     // Structure is accessible
+console.log(pdf.isEncrypted); // true
+console.log(pdf.isAuthenticated); // false - no password provided
+console.log(pdf.getPageCount()); // Structure is accessible
 ```
 
 ## Encrypt on Save
@@ -110,14 +110,14 @@ pdf.setProtection({
   userPassword: "secret",
   ownerPassword: "admin",
   permissions: {
-    print: true,            // Allow printing
+    print: true, // Allow printing
     printHighQuality: true, // High-resolution printing
-    copy: false,            // Deny text/image copying
-    modify: false,          // Deny content modification
-    annotate: true,         // Allow annotations
-    fillForms: true,        // Allow form filling
-    accessibility: true,    // Screen readers
-    assemble: false,        // Deny page manipulation
+    copy: false, // Deny text/image copying
+    modify: false, // Deny content modification
+    annotate: true, // Allow annotations
+    fillForms: true, // Allow form filling
+    accessibility: true, // Screen readers
+    assemble: false, // Deny page manipulation
   },
 });
 
@@ -154,13 +154,14 @@ Specify the encryption algorithm:
 ```ts
 pdf.setProtection({
   userPassword: "secret",
-  algorithm: "AES-256",  // Recommended
+  algorithm: "AES-256", // Recommended
 });
 
 await pdf.save();
 ```
 
 Options:
+
 - `"RC4-40"` - Legacy, weak (not recommended)
 - `"RC4-128"` - Legacy (not recommended)
 - `"AES-128"` - Good compatibility
@@ -175,7 +176,7 @@ const pdf = await PDF.load(bytes, { credentials: "secret" });
 
 if (pdf.isEncrypted) {
   const permissions = pdf.getPermissions();
-  
+
   console.log("Printing allowed:", permissions.print);
   console.log("Copying allowed:", permissions.copy);
   console.log("Modifying allowed:", permissions.modify);

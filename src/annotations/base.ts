@@ -16,6 +16,7 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+
 import {
   AnnotationFlags,
   type AnnotationSubtype,

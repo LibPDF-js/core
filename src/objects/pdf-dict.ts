@@ -1,4 +1,5 @@
 import type { ByteWriter } from "#src/io/byte-writer";
+
 import type { PdfArray } from "./pdf-array";
 import type { PdfBool } from "./pdf-bool";
 import { PdfName } from "./pdf-name";

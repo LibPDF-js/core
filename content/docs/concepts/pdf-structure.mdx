@@ -9,7 +9,7 @@ Understanding PDF internals helps you work more effectively with LibPDF. This gu
 
 ## A Book Read Backwards
 
-Think of a PDF as a **book with an index at the back**. While you might expect to read a file from start to finish, PDF readers start at the *end* of the file.
+Think of a PDF as a **book with an index at the back**. While you might expect to read a file from start to finish, PDF readers start at the _end_ of the file.
 
 Why? Because the PDF format was designed for efficient updates. By reading from the end, a viewer can quickly find the most recent version of the document without scanning the entire file.
 
@@ -54,6 +54,7 @@ The first line declares the PDF version:
 ```
 
 Common versions:
+
 - **1.4**: Added encryption, JavaScript
 - **1.5**: Added compressed object streams
 - **1.6**: Added AES encryption
@@ -75,6 +76,7 @@ endobj
 This is object 1, generation 0. The `2 0 R` is a **reference** to object 2.
 
 Objects can be:
+
 - **Dictionaries**: `<< /Key /Value >>` - structured data
 - **Arrays**: `[ 1 2 3 ]` - ordered lists
 - **Streams**: Large data (page content, images, fonts)
@@ -169,6 +171,7 @@ The PDF format's design enables **incremental saves**. Instead of rewriting the 
 ```
 
 This is crucial for:
+
 - **Preserving signatures**: Signed regions stay untouched
 - **Fast saves**: Only write what changed
 - **Audit trails**: Previous versions remain in the file
@@ -227,14 +230,15 @@ if (contentsRef) {
 
 ## Summary
 
-| Component | Purpose | Library Access |
-|-----------|---------|----------------|
-| Header | Version info | `pdf.version` |
-| Body | Document content | `pdf.getPage()`, `pdf.getForm()`, etc. |
-| XRef | Object index | Internal (handled automatically) |
-| Trailer | Root pointers | `pdf.context.info.trailer` |
+| Component | Purpose          | Library Access                         |
+| --------- | ---------------- | -------------------------------------- |
+| Header    | Version info     | `pdf.version`                          |
+| Body      | Document content | `pdf.getPage()`, `pdf.getForm()`, etc. |
+| XRef      | Object index     | Internal (handled automatically)       |
+| Trailer   | Root pointers    | `pdf.context.info.trailer`             |
 
 Understanding PDF structure helps you:
+
 - Debug loading issues
 - Choose between incremental and full saves
 - Work with low-level APIs when needed
