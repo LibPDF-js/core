@@ -43,7 +43,7 @@ If the PDF is password-protected, provide the password:
 
 ```ts
 const pdf = await PDF.load(bytes, {
-  credentials: "secret"
+  credentials: "secret",
 });
 ```
 
@@ -60,11 +60,11 @@ console.log(pdf.getPageCount()); // e.g., 5
 ### Metadata
 
 ```ts
-console.log(pdf.getTitle());    // "Annual Report 2024"
-console.log(pdf.getAuthor());   // "John Doe"
-console.log(pdf.getSubject());  // "Financial Results"
+console.log(pdf.getTitle()); // "Annual Report 2024"
+console.log(pdf.getAuthor()); // "John Doe"
+console.log(pdf.getSubject()); // "Financial Results"
 console.log(pdf.getKeywords()); // ["finance", "quarterly"]
-console.log(pdf.getCreator());  // "Microsoft Word"
+console.log(pdf.getCreator()); // "Microsoft Word"
 console.log(pdf.getProducer()); // "@libpdf/core"
 ```
 
@@ -80,11 +80,11 @@ console.log(`${width} x ${height} points`);
 
 Common page sizes in points:
 
-| Size | Width | Height |
-|------|-------|--------|
-| Letter | 612 | 792 |
-| A4 | 595 | 842 |
-| Legal | 612 | 1008 |
+| Size   | Width | Height |
+| ------ | ----- | ------ |
+| Letter | 612   | 792    |
+| A4     | 595   | 842    |
+| Legal  | 612   | 1008   |
 
 ### Rotation
 
@@ -118,6 +118,7 @@ for (const line of pageText.lines) {
 ```
 
 Each line includes:
+
 - `text` - the text content
 - `bbox` - bounding box with `x`, `y`, `width`, `height`
 - `spans` - individual text spans with font information

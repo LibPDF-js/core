@@ -1,4 +1,5 @@
 {
-  "*.{ts,tsx,js,jsx,json}": ["biome check --write"],
-  "content/**/*.json": []
+  "*.{ts,tsx,js,jsx}": ["oxlint --fix", "oxfmt"],
+  "*.json": ["oxfmt"],
+  "*.md": ["oxfmt"]
 }

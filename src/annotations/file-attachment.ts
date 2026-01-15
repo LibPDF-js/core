@@ -10,6 +10,7 @@
 import type { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfRef } from "#src/objects/pdf-ref";
+
 import { PDFMarkupAnnotation } from "./markup";
 import type { FileAttachmentIcon } from "./types";
 

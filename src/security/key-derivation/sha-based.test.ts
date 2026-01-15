@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   computeHash2A,
   computeHash2B,

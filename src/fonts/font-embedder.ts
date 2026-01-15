@@ -18,6 +18,7 @@ import { PdfNumber } from "#src/objects/pdf-number.ts";
 import type { PdfRef } from "#src/objects/pdf-ref.ts";
 import { PdfStream } from "#src/objects/pdf-stream.ts";
 import { PdfString } from "#src/objects/pdf-string.ts";
+
 import type { EmbeddedFont } from "./embedded-font.ts";
 import type {
   CFFCIDFontProgram,

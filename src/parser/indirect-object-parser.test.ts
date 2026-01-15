@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { Scanner } from "#src/io/scanner";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -7,6 +6,8 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it } from "vitest";
+
 import { IndirectObjectParser } from "./indirect-object-parser";
 
 /**

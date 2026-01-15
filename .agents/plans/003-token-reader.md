@@ -6,19 +6,20 @@ On-demand tokenizer sitting on top of Scanner. Reads PDF tokens one at a time wi
 
 ## PDF Token Types
 
-| Token | Example | Notes |
-|-------|---------|-------|
-| Number | `42`, `-3.14`, `.5` | Integer or real |
-| Name | `/Type`, `/MediaBox` | Starts with `/` |
-| String (literal) | `(Hello World)` | Parentheses, supports escapes |
-| String (hex) | `<48656C6C6F>` | Angle brackets |
-| Keyword | `true`, `false`, `null`, `obj`, `endobj`, `stream`, `endstream`, `R` | Reserved words |
-| Delimiter | `[`, `]`, `<<`, `>>` | Array and dict markers |
-| EOF | — | End of input |
+| Token            | Example                                                              | Notes                         |
+| ---------------- | -------------------------------------------------------------------- | ----------------------------- |
+| Number           | `42`, `-3.14`, `.5`                                                  | Integer or real               |
+| Name             | `/Type`, `/MediaBox`                                                 | Starts with `/`               |
+| String (literal) | `(Hello World)`                                                      | Parentheses, supports escapes |
+| String (hex)     | `<48656C6C6F>`                                                       | Angle brackets                |
+| Keyword          | `true`, `false`, `null`, `obj`, `endobj`, `stream`, `endstream`, `R` | Reserved words                |
+| Delimiter        | `[`, `]`, `<<`, `>>`                                                 | Array and dict markers        |
+| EOF              | —                                                                    | End of input                  |
 
 ## Whitespace & Comments
 
 **Whitespace characters** (PDF spec 7.2.2):
+
 - `0x00` NUL
 - `0x09` TAB
 - `0x0A` LF
@@ -32,18 +33,18 @@ On-demand tokenizer sitting on top of Scanner. Reads PDF tokens one at a time wi
 
 ```typescript
 class TokenReader {
-  constructor(scanner: Scanner)
+  constructor(scanner: Scanner);
 
   // Position
-  get position(): number
+  get position(): number;
 
   // Core reading
-  nextToken(): Token
-  peekToken(): Token      // Look ahead without consuming
+  nextToken(): Token;
+  peekToken(): Token; // Look ahead without consuming
 
   // Low-level (for recovery/special cases)
-  skipWhitespaceAndComments(): void
-  peekByte(): number
+  skipWhitespaceAndComments(): void;
+  peekByte(): number;
 }
 ```
 
@@ -52,27 +53,30 @@ class TokenReader {
 ```typescript
 type Token =
   | { type: "number"; value: number; isInteger: boolean }
-  | { type: "name"; value: string }          // Without leading /
+  | { type: "name"; value: string } // Without leading /
   | { type: "string"; value: Uint8Array; format: "literal" | "hex" }
   | { type: "keyword"; value: string }
   | { type: "delimiter"; value: "[" | "]" | "<<" | ">>" }
-  | { type: "eof" }
+  | { type: "eof" };
 ```
 
 ## Lenient Parsing Rules
 
 ### Numbers (from pdf.js/PDFBox)
+
 - Ignore double negatives: `--5` → `5`
 - Multiple decimal points: take first, stop at second
 - Leading decimal: `.5` → `0.5`
 - Trailing garbage: `123abc` → `123` (stop at non-digit)
 
 ### Names
+
 - `#XX` hex escapes: `/F#6fo` → `Foo`
 - Lone `#` at end: warn, treat as literal `#`
 - Empty name `/` is valid
 
 ### Literal Strings `(...)`
+
 - Nested parens: `(a(b)c)` → balanced
 - Escape sequences: `\n`, `\r`, `\t`, `\b`, `\f`, `\\`, `\(`, `\)`
 - Octal: `\ddd` (1-3 digits)
@@ -80,11 +84,13 @@ type Token =
 - Unbalanced parens: heuristic recovery (PDFBox pattern)
 
 ### Hex Strings `<...>`
+
 - Ignore whitespace inside
 - Invalid hex chars: skip with warning
 - Odd length: pad with trailing `0`
 
 ### Keywords
+
 - Case sensitive: `true` not `TRUE`
 - Unknown sequences become keywords (parser decides validity)
 
@@ -102,18 +108,22 @@ Double char: `<<`, `>>` (must peek to distinguish `<` hex string vs `<<` dict)
 ## Implementation Notes
 
 ### Peek Token Caching
+
 Cache peeked token to avoid re-parsing:
+
 ```
 peekToken() → if cached, return; else read and cache
 nextToken() → if cached, clear and return; else read
 ```
 
 ### Position Tracking
+
 Token should know where it started (for error messages):
+
 ```typescript
 interface Token {
   // ... type fields
-  position: number  // Byte offset where token started
+  position: number; // Byte offset where token started
 }
 ```
 

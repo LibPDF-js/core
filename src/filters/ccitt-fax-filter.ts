@@ -1,6 +1,7 @@
 import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
 import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
+
 import type { Filter } from "./filter";
 
 /**
@@ -186,6 +187,7 @@ export class CCITTFaxFilter implements Filter {
         // Check for mode codes
         const bits = peekBits(7);
 
+        // oxlint-disable-next-line no-dupe-else-if
         if (bits >> 4 === 0b001) {
           // Horizontal mode (001)
           readBits(3);

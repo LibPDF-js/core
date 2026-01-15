@@ -12,6 +12,7 @@
 
 import { fromBER, ObjectIdentifier, OctetString, UTCTime } from "asn1js";
 import * as pkijs from "pkijs";
+
 import { toArrayBuffer } from "../../helpers/buffer";
 import {
   OID_CONTENT_TYPE,

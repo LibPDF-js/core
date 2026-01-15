@@ -20,16 +20,17 @@ console.log(`${pdf.getPageCount()} pages`);
 
 Load a PDF from bytes.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `bytes` | `Uint8Array` | required | PDF file bytes |
-| `[options]` | `LoadOptions` | | |
-| `[options.credentials]` | `string` | | User or owner password |
-| `[options.lenient]` | `boolean` | `true` | Enable lenient parsing for malformed PDFs |
+| Param                   | Type          | Default  | Description                               |
+| ----------------------- | ------------- | -------- | ----------------------------------------- |
+| `bytes`                 | `Uint8Array`  | required | PDF file bytes                            |
+| `[options]`             | `LoadOptions` |          |                                           |
+| `[options.credentials]` | `string`      |          | User or owner password                    |
+| `[options.lenient]`     | `boolean`     | `true`   | Enable lenient parsing for malformed PDFs |
 
 **Returns**: `Promise<PDF>`
 
 **Throws**:
+
 - `Error` - Document has no catalog (missing /Root in trailer)
 - `Error` - Parsing fails and lenient mode is disabled
 
@@ -64,12 +65,12 @@ const bytes = await pdf.save();
 
 Merge multiple PDF documents into one.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `sources` | `Uint8Array[]` | required | Array of PDF bytes to merge |
-| `[options]` | `MergeOptions` | | |
-| `[options.credentials]` | `string` | | Password for encrypted sources |
-| `[options.includeAnnotations]` | `boolean` | `true` | Include annotations from sources |
+| Param                          | Type           | Default  | Description                      |
+| ------------------------------ | -------------- | -------- | -------------------------------- |
+| `sources`                      | `Uint8Array[]` | required | Array of PDF bytes to merge      |
+| `[options]`                    | `MergeOptions` |          |                                  |
+| `[options.credentials]`        | `string`       |          | Password for encrypted sources   |
+| `[options.includeAnnotations]` | `boolean`      | `true`   | Include annotations from sources |
 
 **Returns**: `Promise<PDF>`
 
@@ -156,8 +157,8 @@ const count = pdf.getPageCount();
 
 Get a single page by index (0-based).
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param   | Type     | Description          |
+| ------- | -------- | -------------------- |
 | `index` | `number` | Page index (0-based) |
 
 **Returns**: `Promise<PDFPage | null>`
@@ -190,15 +191,15 @@ for (const page of pages) {
 
 Add a new blank page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `[options]` | `AddPageOptions` | | |
-| `[options.width]` | `number` | `612` | Page width in points |
-| `[options.height]` | `number` | `792` | Page height in points |
-| `[options.size]` | `"letter" \| "a4" \| "legal"` | `"letter"` | Preset size |
-| `[options.orientation]` | `"portrait" \| "landscape"` | `"portrait"` | Page orientation |
-| `[options.rotate]` | `number` | `0` | Rotation (0, 90, 180, 270) |
-| `[options.insertAt]` | `number` | end | Insert position |
+| Param                   | Type                          | Default      | Description                |
+| ----------------------- | ----------------------------- | ------------ | -------------------------- |
+| `[options]`             | `AddPageOptions`              |              |                            |
+| `[options.width]`       | `number`                      | `612`        | Page width in points       |
+| `[options.height]`      | `number`                      | `792`        | Page height in points      |
+| `[options.size]`        | `"letter" \| "a4" \| "legal"` | `"letter"`   | Preset size                |
+| `[options.orientation]` | `"portrait" \| "landscape"`   | `"portrait"` | Page orientation           |
+| `[options.rotate]`      | `number`                      | `0`          | Rotation (0, 90, 180, 270) |
+| `[options.insertAt]`    | `number`                      | end          | Insert position            |
 
 **Returns**: `PDFPage`
 
@@ -221,8 +222,8 @@ const wide = pdf.addPage({ width: 1000, height: 500 });
 
 Remove a page at the given index.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param   | Type     | Description          |
+| ------- | -------- | -------------------- |
 | `index` | `number` | Page index to remove |
 
 **Returns**: `PdfRef` - The removed page reference
@@ -239,10 +240,10 @@ pdf.removePage(0); // Remove first page
 
 Move a page from one position to another.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param       | Type     | Description        |
+| ----------- | -------- | ------------------ |
 | `fromIndex` | `number` | Current page index |
-| `toIndex` | `number` | Target page index |
+| `toIndex`   | `number` | Target page index  |
 
 **Throws**: `RangeError` - If either index is out of bounds
 
@@ -256,17 +257,18 @@ pdf.movePage(5, 0); // Move page 5 to the beginning
 
 Copy pages from another PDF document.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `source` | `PDF` | required | Source PDF document |
-| `indices` | `number[]` | required | Page indices to copy (0-based) |
-| `[options]` | `CopyPagesOptions` | | |
-| `[options.insertAt]` | `number` | end | Insert position |
-| `[options.includeAnnotations]` | `boolean` | `true` | Include annotations |
+| Param                          | Type               | Default  | Description                    |
+| ------------------------------ | ------------------ | -------- | ------------------------------ |
+| `source`                       | `PDF`              | required | Source PDF document            |
+| `indices`                      | `number[]`         | required | Page indices to copy (0-based) |
+| `[options]`                    | `CopyPagesOptions` |          |                                |
+| `[options.insertAt]`           | `number`           | end      | Insert position                |
+| `[options.includeAnnotations]` | `boolean`          | `true`   | Include annotations            |
 
 **Returns**: `Promise<PDFPage[]>` - Array of copied pages
 
 **Throws**:
+
 - `RangeError` - If any source page index is out of bounds
 - `Error` - If source page not found
 
@@ -287,11 +289,11 @@ await pdf.copyPagesFrom(pdf, [0], { insertAt: 1 });
 
 Extract pages into a new PDF document.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `indices` | `number[]` | required | Page indices to extract |
-| `[options]` | `ExtractPagesOptions` | | |
-| `[options.includeAnnotations]` | `boolean` | `true` | Include annotations |
+| Param                          | Type                  | Default  | Description             |
+| ------------------------------ | --------------------- | -------- | ----------------------- |
+| `indices`                      | `number[]`            | required | Page indices to extract |
+| `[options]`                    | `ExtractPagesOptions` |          |                         |
+| `[options.includeAnnotations]` | `boolean`             | `true`   | Include annotations     |
 
 **Returns**: `Promise<PDF>` - New PDF containing extracted pages
 
@@ -313,9 +315,9 @@ const bytes = await first3.save();
 
 Embed a page from another PDF as a reusable Form XObject.
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `source` | `PDF` | Source PDF document |
+| Param       | Type     | Description                   |
+| ----------- | -------- | ----------------------------- |
+| `source`    | `PDF`    | Source PDF document           |
 | `pageIndex` | `number` | Page index to embed (0-based) |
 
 **Returns**: `Promise<PDFEmbeddedPage>`
@@ -501,16 +503,16 @@ if (!perms.copy) {
 
 **Permission Flags**:
 
-| Flag | Description |
-|------|-------------|
-| `print` | Print the document |
-| `printHighQuality` | High-resolution printing |
-| `modify` | Modify document contents |
-| `copy` | Copy text and graphics |
-| `annotate` | Add or modify annotations |
-| `fillForms` | Fill form fields |
-| `assembleDocument` | Insert, delete, rotate pages |
-| `extractForAccessibility` | Extract for accessibility |
+| Flag                      | Description                  |
+| ------------------------- | ---------------------------- |
+| `print`                   | Print the document           |
+| `printHighQuality`        | High-resolution printing     |
+| `modify`                  | Modify document contents     |
+| `copy`                    | Copy text and graphics       |
+| `annotate`                | Add or modify annotations    |
+| `fillForms`               | Fill form fields             |
+| `assembleDocument`        | Insert, delete, rotate pages |
+| `extractForAccessibility` | Extract for accessibility    |
 
 ---
 
@@ -532,8 +534,8 @@ if (pdf.hasOwnerAccess()) {
 
 Attempt to authenticate with a password.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param      | Type     | Description     |
+| ---------- | -------- | --------------- |
 | `password` | `string` | Password to try |
 
 **Returns**: `AuthenticationResult`
@@ -551,25 +553,25 @@ if (result.isOwner) {
 
 Add or change document encryption.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `options` | `ProtectionOptions` | required | |
-| `[options.userPassword]` | `string` | | Password to open |
-| `[options.ownerPassword]` | `string` | random | Password for full access |
-| `[options.permissions]` | `PermissionOptions` | all true | Permission flags |
-| `[options.algorithm]` | `EncryptionAlgorithmOption` | `"AES-256"` | Encryption algorithm |
-| `[options.encryptMetadata]` | `boolean` | `true` | Encrypt metadata |
+| Param                       | Type                        | Default     | Description              |
+| --------------------------- | --------------------------- | ----------- | ------------------------ |
+| `options`                   | `ProtectionOptions`         | required    |                          |
+| `[options.userPassword]`    | `string`                    |             | Password to open         |
+| `[options.ownerPassword]`   | `string`                    | random      | Password for full access |
+| `[options.permissions]`     | `PermissionOptions`         | all true    | Permission flags         |
+| `[options.algorithm]`       | `EncryptionAlgorithmOption` | `"AES-256"` | Encryption algorithm     |
+| `[options.encryptMetadata]` | `boolean`                   | `true`      | Encrypt metadata         |
 
 **Throws**: `PermissionDeniedError` - If insufficient permissions
 
 **Algorithm Options**:
 
-| Algorithm | Key Length | Notes |
-|-----------|------------|-------|
-| `"RC4-40"` | 40-bit | Legacy, weak, avoid |
-| `"RC4-128"` | 128-bit | Deprecated |
-| `"AES-128"` | 128-bit | Recommended minimum |
-| `"AES-256"` | 256-bit | Strongest, default |
+| Algorithm   | Key Length | Notes               |
+| ----------- | ---------- | ------------------- |
+| `"RC4-40"`  | 40-bit     | Legacy, weak, avoid |
+| `"RC4-128"` | 128-bit    | Deprecated          |
+| `"AES-128"` | 128-bit    | Recommended minimum |
+| `"AES-256"` | 256-bit    | Strongest, default  |
 
 ```typescript
 pdf.setProtection({
@@ -602,11 +604,11 @@ const unprotectedBytes = await pdf.save();
 
 Embed a font for use in drawing operations.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `bytes` | `Uint8Array` | required | TTF or OTF font file bytes |
-| `[options]` | `EmbedFontOptions` | | |
-| `[options.subset]` | `boolean` | `true` | Subset font on save |
+| Param              | Type               | Default  | Description                |
+| ------------------ | ------------------ | -------- | -------------------------- |
+| `bytes`            | `Uint8Array`       | required | TTF or OTF font file bytes |
+| `[options]`        | `EmbedFontOptions` |          |                            |
+| `[options.subset]` | `boolean`          | `true`   | Subset font on save        |
 
 **Returns**: `EmbeddedFont`
 
@@ -625,8 +627,8 @@ page.drawText("Hello", {
 
 Embed an image for use in drawing operations.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param   | Type         | Description             |
+| ------- | ------------ | ----------------------- |
 | `bytes` | `Uint8Array` | JPEG or PNG image bytes |
 
 **Returns**: `Promise<PDFImage>`
@@ -649,24 +651,24 @@ page.drawImage(image, {
 
 Sign the document with a digital signature.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `options` | `SignOptions` | required | |
-| `options.signer` | `Signer` | required | P12Signer or CryptoKeySigner |
-| `[options.level]` | `PAdESLevel` | `"B-B"` | PAdES conformance level |
-| `[options.timestampServer]` | `string` | | RFC 3161 timestamp URL |
-| `[options.fieldName]` | `string` | auto | Signature field name |
+| Param                       | Type          | Default  | Description                  |
+| --------------------------- | ------------- | -------- | ---------------------------- |
+| `options`                   | `SignOptions` | required |                              |
+| `options.signer`            | `Signer`      | required | P12Signer or CryptoKeySigner |
+| `[options.level]`           | `PAdESLevel`  | `"B-B"`  | PAdES conformance level      |
+| `[options.timestampServer]` | `string`      |          | RFC 3161 timestamp URL       |
+| `[options.fieldName]`       | `string`      | auto     | Signature field name         |
 
 **Returns**: `Promise<SignResult>`
 
 **PAdES Levels**:
 
-| Level | Description |
-|-------|-------------|
-| `"B-B"` | Basic signature |
-| `"B-T"` | With timestamp |
-| `"B-LT"` | Long-term validation |
-| `"B-LTA"` | Long-term archival |
+| Level     | Description          |
+| --------- | -------------------- |
+| `"B-B"`   | Basic signature      |
+| `"B-T"`   | With timestamp       |
+| `"B-LT"`  | Long-term validation |
+| `"B-LTA"` | Long-term archival   |
 
 ```typescript
 import { P12Signer } from "@libpdf/core";
@@ -690,12 +692,12 @@ const result = await pdf.sign({
 
 Save the document to bytes.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `[options]` | `SaveOptions` | | |
-| `[options.incremental]` | `boolean` | `false` | Append-only save (preserves signatures) |
-| `[options.useXRefStream]` | `boolean` | auto | Use XRef stream format |
-| `[options.subsetFonts]` | `boolean` | `false` | Subset embedded fonts |
+| Param                     | Type          | Default | Description                             |
+| ------------------------- | ------------- | ------- | --------------------------------------- |
+| `[options]`               | `SaveOptions` |         |                                         |
+| `[options.incremental]`   | `boolean`     | `false` | Append-only save (preserves signatures) |
+| `[options.useXRefStream]` | `boolean`     | auto    | Use XRef stream format                  |
+| `[options.subsetFonts]`   | `boolean`     | `false` | Subset embedded fonts                   |
 
 **Returns**: `Promise<Uint8Array>`
 
@@ -716,8 +718,8 @@ const bytes = await pdf.save({ subsetFonts: true });
 
 Reload the PDF from new bytes after an incremental save.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param   | Type         | Description   |
+| ------- | ------------ | ------------- |
 | `bytes` | `Uint8Array` | New PDF bytes |
 
 **Throws**: `Error` - If the document has no catalog
@@ -736,8 +738,8 @@ await pdf.reload(signed.bytes);
 
 ```typescript
 interface LoadOptions {
-  credentials?: string;  // User or owner password
-  lenient?: boolean;     // Enable lenient parsing (default: true)
+  credentials?: string; // User or owner password
+  lenient?: boolean; // Enable lenient parsing (default: true)
 }
 ```
 
@@ -745,9 +747,9 @@ interface LoadOptions {
 
 ```typescript
 interface SaveOptions {
-  incremental?: boolean;   // Append-only save
+  incremental?: boolean; // Append-only save
   useXRefStream?: boolean; // Use XRef stream format
-  subsetFonts?: boolean;   // Subset embedded fonts
+  subsetFonts?: boolean; // Subset embedded fonts
 }
 ```
 

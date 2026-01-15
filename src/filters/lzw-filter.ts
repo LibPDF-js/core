@@ -1,5 +1,6 @@
 import { ByteWriter } from "#src/io/byte-writer.ts";
 import type { PdfDict } from "#src/objects/pdf-dict";
+
 import type { Filter } from "./filter";
 import { applyPredictor } from "./predictor";
 

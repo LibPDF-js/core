@@ -7,6 +7,7 @@
 
 import type { PdfArray } from "#src/objects/pdf-array";
 import type { PdfDict } from "#src/objects/pdf-dict";
+
 import { CompositeFont, parseCompositeFont } from "./composite-font";
 import { PdfFont } from "./pdf-font";
 import { parseSimpleFont, SimpleFont } from "./simple-font";

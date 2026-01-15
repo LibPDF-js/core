@@ -30,6 +30,7 @@ import {
   registerFontObjects,
 } from "#src/fonts/font-embedder.ts";
 import type { PdfRef } from "#src/objects/pdf-ref.ts";
+
 import type { PDFContext } from "./pdf-context.ts";
 
 /**

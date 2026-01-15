@@ -5,6 +5,7 @@
  */
 
 import { PdfName } from "#src/objects/pdf-name";
+
 import { TerminalField } from "./base";
 
 /**

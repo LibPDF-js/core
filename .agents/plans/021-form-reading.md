@@ -52,18 +52,18 @@ Field <<
 
 ### Field Types
 
-| /FT | /Ff Flags | Class | Description |
-|-----|-----------|-------|-------------|
-| Tx | - | TextField | Text input |
-| Tx | MULTILINE (bit 13) | TextField | Multiline text |
-| Tx | PASSWORD (bit 14) | TextField | Password (masked) |
-| Tx | COMB (bit 25) | TextField | Fixed-width cells |
-| Btn | - | CheckboxField | Checkbox (single or group) |
-| Btn | RADIO (bit 16) | RadioField | Radio button group |
-| Btn | PUSHBUTTON (bit 17) | ButtonField | Push button |
-| Ch | COMBO (bit 18) | DropdownField | Dropdown/combo box |
-| Ch | - | ListBoxField | List box |
-| Sig | - | SignatureField | Signature field |
+| /FT | /Ff Flags           | Class          | Description                |
+| --- | ------------------- | -------------- | -------------------------- |
+| Tx  | -                   | TextField      | Text input                 |
+| Tx  | MULTILINE (bit 13)  | TextField      | Multiline text             |
+| Tx  | PASSWORD (bit 14)   | TextField      | Password (masked)          |
+| Tx  | COMB (bit 25)       | TextField      | Fixed-width cells          |
+| Btn | -                   | CheckboxField  | Checkbox (single or group) |
+| Btn | RADIO (bit 16)      | RadioField     | Radio button group         |
+| Btn | PUSHBUTTON (bit 17) | ButtonField    | Push button                |
+| Ch  | COMBO (bit 18)      | DropdownField  | Dropdown/combo box         |
+| Ch  | -                   | ListBoxField   | List box                   |
+| Sig | -                   | SignatureField | Signature field            |
 
 ## Class Design
 
@@ -89,10 +89,10 @@ export class AcroForm {
   static load(catalog: PdfDict, registry: ObjectRegistry): AcroForm | null {
     const acroFormRef = catalog.get("AcroForm");
     if (!acroFormRef) return null;
-    
+
     const dict = registry.resolve(acroFormRef) as PdfDict;
     if (!dict) return null;
-    
+
     return new AcroForm(dict, registry);
   }
 
@@ -127,13 +127,13 @@ export class AcroForm {
    */
   getFields(): FormField[] {
     if (this.fieldsCache) return this.fieldsCache;
-    
+
     const fieldsArray = this.dict.getArray("Fields");
     if (!fieldsArray) return [];
-    
+
     const visited = new Set<string>();
     const fields = this.collectFields(fieldsArray, visited, "");
-    
+
     this.fieldsCache = fields;
     return fields;
   }
@@ -160,17 +160,13 @@ export class AcroForm {
     return this.dict;
   }
 
-  private collectFields(
-    kids: PdfArray,
-    visited: Set<string>,
-    parentName: string
-  ): FormField[] {
+  private collectFields(kids: PdfArray, visited: Set<string>, parentName: string): FormField[] {
     const fields: FormField[] = [];
 
     for (const item of kids) {
       const ref = item instanceof PdfRef ? item : null;
       const refKey = ref?.toString() ?? "";
-      
+
       if (refKey && visited.has(refKey)) {
         console.warn(`Circular reference in form: ${refKey}`);
         continue;
@@ -182,8 +178,10 @@ export class AcroForm {
 
       // Build fully-qualified name
       const partialName = dict.getString("T") ?? "";
-      const fullName = parentName 
-        ? (partialName ? `${parentName}.${partialName}` : parentName)
+      const fullName = parentName
+        ? partialName
+          ? `${parentName}.${partialName}`
+          : parentName
         : partialName;
 
       // Check if terminal or non-terminal
@@ -213,13 +211,13 @@ export class AcroForm {
   }
 }
 
-export type FieldType = 
-  | "text" 
-  | "checkbox" 
-  | "radio" 
-  | "dropdown" 
-  | "listbox" 
-  | "signature" 
+export type FieldType =
+  | "text"
+  | "checkbox"
+  | "radio"
+  | "dropdown"
+  | "listbox"
+  | "signature"
   | "button"
   | "unknown";
 ```
@@ -243,7 +241,7 @@ export abstract class FormField {
     ref: PdfRef | null,
     registry: ObjectRegistry,
     acroForm: AcroForm,
-    name: string
+    name: string,
   ) {
     this.dict = dict;
     this.ref = ref;
@@ -378,7 +376,7 @@ export const FieldFlags = {
   DO_NOT_SCROLL: 1 << 23,
   COMB: 1 << 24,
   RICH_TEXT: 1 << 25,
-  RADIOS_IN_UNISON: 1 << 25,  // Same bit as RICH_TEXT, different field type
+  RADIOS_IN_UNISON: 1 << 25, // Same bit as RICH_TEXT, different field type
   COMMIT_ON_SEL_CHANGE: 1 << 26,
 } as const;
 ```
@@ -413,8 +411,7 @@ export class TextField extends FormField {
 
   /** Text alignment (0=left, 1=center, 2=right) */
   get alignment(): number {
-    return this.getInheritable<PdfNumber>("Q")?.value 
-      ?? this.acroForm.defaultQuadding;
+    return this.getInheritable<PdfNumber>("Q")?.value ?? this.acroForm.defaultQuadding;
   }
 
   getValue(): string {
@@ -450,14 +447,14 @@ export class CheckboxField extends FormField {
    */
   getOnValues(): string[] {
     const values = new Set<string>();
-    
+
     for (const widget of this.getWidgets()) {
       const onValue = widget.getOnValue();
       if (onValue && onValue !== "Off") {
         values.add(onValue);
       }
     }
-    
+
     return Array.from(values);
   }
 
@@ -509,14 +506,14 @@ export class RadioField extends FormField {
    */
   getOptions(): string[] {
     const options = new Set<string>();
-    
+
     for (const widget of this.getWidgets()) {
       const onValue = widget.getOnValue();
       if (onValue && onValue !== "Off") {
         options.add(onValue);
       }
     }
-    
+
     return Array.from(options);
   }
 
@@ -592,14 +589,14 @@ export class ListBoxField extends FormField {
     // Fall back to /V
     const v = this.getInheritable<PdfObject>("V");
     if (!v) return [];
-    
+
     if (v instanceof PdfArray) {
       return v.items.map(item => {
         if (item instanceof PdfString) return item.decodeText();
         return item.toString();
       });
     }
-    
+
     if (v instanceof PdfString) return [v.decodeText()];
     return [v.toString()];
   }
@@ -655,12 +652,16 @@ function parseChoiceOptions(opt: PdfArray | null): Array<{ value: string; displa
       const exportVal = item.get(0);
       const displayVal = item.get(1);
       return {
-        value: exportVal instanceof PdfString ? exportVal.decodeText() : exportVal?.toString() ?? "",
-        display: displayVal instanceof PdfString ? displayVal.decodeText() : displayVal?.toString() ?? "",
+        value:
+          exportVal instanceof PdfString ? exportVal.decodeText() : (exportVal?.toString() ?? ""),
+        display:
+          displayVal instanceof PdfString
+            ? displayVal.decodeText()
+            : (displayVal?.toString() ?? ""),
       };
     }
     // Simple string - same value and display
-    const text = item instanceof PdfString ? item.decodeText() : item?.toString() ?? "";
+    const text = item instanceof PdfString ? item.decodeText() : (item?.toString() ?? "");
     return { value: text, display: text };
   });
 }
@@ -677,7 +678,7 @@ export class FormFieldFactory {
     ref: PdfRef | null,
     registry: ObjectRegistry,
     acroForm: AcroForm,
-    name: string
+    name: string,
   ): FormField {
     const ft = this.getInheritableString(dict, "FT", registry);
     const ff = this.getInheritableNumber(dict, "Ff", registry);
@@ -712,7 +713,7 @@ export class FormFieldFactory {
   private static getInheritableString(
     dict: PdfDict,
     key: string,
-    registry: ObjectRegistry
+    registry: ObjectRegistry,
   ): string | null {
     let current: PdfDict | null = dict;
     const visited = new Set<string>();
@@ -736,7 +737,7 @@ export class FormFieldFactory {
   private static getInheritableNumber(
     dict: PdfDict,
     key: string,
-    registry: ObjectRegistry
+    registry: ObjectRegistry,
   ): number {
     let current: PdfDict | null = dict;
     const visited = new Set<string>();
@@ -859,7 +860,7 @@ export class WidgetAnnotation {
     if (resolved instanceof PdfDict) {
       const stateKey = state ?? this.appearanceState ?? "Off";
       const stateStream = resolved.get(stateKey);
-      return stateStream ? this.registry.resolve(stateStream) as PdfStream : null;
+      return stateStream ? (this.registry.resolve(stateStream) as PdfStream) : null;
     }
 
     return null;
@@ -987,12 +988,14 @@ src/api/
 ### Reading Values
 
 #### TextField
+
 1. /V present → returns string
 2. /V absent → returns empty string
 3. /V with special characters → decoded correctly
 4. /DV → getDefaultValue() works
 
 #### CheckboxField
+
 1. /V /Yes → isChecked() true
 2. /V /Off → isChecked() false
 3. Custom on-value (/V /1) → isChecked() true
@@ -1001,23 +1004,27 @@ src/api/
 6. Grouped checkbox → isGroup true
 
 #### RadioField
+
 1. /V with option → getValue() returns option
 2. /V /Off → getValue() returns null
 3. Multiple widgets → getOptions() returns all values
 
 #### DropdownField
+
 1. /V present → getValue() returns selection
 2. /Opt with simple strings → getOptions() parses correctly
 3. /Opt with [export, display] pairs → both accessible
 4. Editable flag → isEditable true
 
 #### ListBoxField
+
 1. Single selection → getValue() returns [value]
 2. Multi-select via /V array → getValue() returns all
 3. Multi-select via /I indices → getValue() uses indices
 4. /I takes precedence over /V
 
 #### SignatureField
+
 1. /V present → isSigned() true
 2. /V absent → isSigned() false
 3. getSignatureDict() returns dict when signed
@@ -1048,6 +1055,7 @@ src/api/
 ## Test Fixtures
 
 Use existing and new fixtures:
+
 - `fixtures/forms/sample_form.pdf` - various field types
 - `fixtures/forms/fancy_fields.pdf` - complex fields
 - `fixtures/forms/with_combed_fields.pdf` - comb text fields

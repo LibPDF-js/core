@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it } from "vitest";
+
 import { ObjectStreamParser } from "./object-stream-parser";
 
 /**

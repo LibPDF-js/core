@@ -6,13 +6,13 @@ Extend `PageTree` and `PDF` to support adding, removing, and reordering pages. T
 
 ## Operations
 
-| Method | Description |
-|--------|-------------|
-| `insertPage(index, pageRef)` | Insert existing page at position |
-| `removePage(index)` | Remove page at position |
-| `movePage(from, to)` | Reorder page within document |
-| `addPage(options?)` | Create and append a new blank page |
-| `copyPagesFrom(srcPdf, indices, options?)` | Copy pages from another document |
+| Method                                     | Description                        |
+| ------------------------------------------ | ---------------------------------- |
+| `insertPage(index, pageRef)`               | Insert existing page at position   |
+| `removePage(index)`                        | Remove page at position            |
+| `movePage(from, to)`                       | Reorder page within document       |
+| `addPage(options?)`                        | Create and append a new blank page |
+| `copyPagesFrom(srcPdf, indices, options?)` | Copy pages from another document   |
 
 ## PDF Page Tree Structure
 
@@ -32,6 +32,7 @@ Catalog
 ```
 
 Key invariants:
+
 - Every `/Pages` node has `/Count` = total leaf pages under it
 - Every `/Page` has `/Parent` pointing to its parent `/Pages` node
 - `/Kids` arrays are ordered (document page order)
@@ -45,32 +46,32 @@ Key invariants:
 
 export class PageTree {
   // ...existing from Plan 015...
-  
+
   private readonly rootRef: PdfRef;
   private readonly getObject: (ref: PdfRef) => Promise<PdfObject | null>;
-  private pages: PdfRef[];  // Mutable for modifications
-  
+  private pages: PdfRef[]; // Mutable for modifications
+
   /** Whether the tree has been flattened for modification */
   private flattened: boolean = false;
-  
+
   /**
    * Insert a page reference at the given index.
    * Flattens nested tree structure on first modification.
    */
   insertPage(index: number, pageRef: PdfRef): void;
-  
+
   /**
    * Remove the page at the given index.
    * Flattens nested tree structure on first modification.
    */
   removePage(index: number): PdfRef;
-  
+
   /**
    * Move a page from one index to another.
    * Flattens nested tree structure on first modification.
    */
   movePage(fromIndex: number, toIndex: number): void;
-  
+
   /**
    * Rebuild internal page list from tree.
    * Call after external modifications to the tree.
@@ -86,31 +87,31 @@ export class PageTree {
 
 export class PDF {
   // ...existing...
-  
+
   /**
    * Insert a page at the given index.
    * @param index Position to insert (0 = first, -1 or length = last)
    * @param page The page dict or ref to insert
    */
   insertPage(index: number, page: PdfDict | PdfRef): void;
-  
+
   /**
    * Remove the page at the given index.
    * @returns The removed page reference
    */
   removePage(index: number): PdfRef;
-  
+
   /**
    * Move a page from one position to another.
    */
   movePage(fromIndex: number, toIndex: number): void;
-  
+
   /**
    * Add a new blank page at the end.
    * @param options Page size, rotation, etc.
    */
   addPage(options?: AddPageOptions): PdfRef;
-  
+
   /**
    * Copy pages from another PDF into this one.
    * Pages are deep-copied with all resources.
@@ -165,14 +166,14 @@ This preserves the original tree structure for read-only operations while simpli
 ```typescript
 private flattenIfNeeded(): void {
   if (this.flattened) return;
-  
+
   // Get root Pages dict
   const root = this.root; // Loaded during PageTree.load()
-  
+
   // Replace Kids with flat page list
   root.set("Kids", new PdfArray(this.pages));
   root.set("Count", PdfNumber.of(this.pages.length));
-  
+
   // Update Parent on each page to point to root
   for (const pageRef of this.pages) {
     const page = this.loadedPages.get(pageRef.toString());
@@ -180,9 +181,9 @@ private flattenIfNeeded(): void {
       page.set("Parent", this.rootRef);
     }
   }
-  
+
   this.flattened = true;
-  
+
   // Add warning for transparency
   this.warnings.push("Page tree flattened during modification");
 }
@@ -197,21 +198,21 @@ insertPage(index: number, pageRef: PdfRef): void {
   if (index > this.pages.length) {
     throw new RangeError(`Index ${index} out of bounds (0-${this.pages.length})`);
   }
-  
+
   // Flatten tree if this is first modification
   this.flattenIfNeeded();
-  
+
   // Update internal list
   this.pages.splice(index, 0, pageRef);
-  
+
   // Update tree structure (now guaranteed flat)
   const kids = this.root.getArray("Kids")!;
   kids.insert(index, pageRef);
-  
+
   // Update Count
   const count = this.root.getNumber("Count")?.value ?? 0;
   this.root.set("Count", PdfNumber.of(count + 1));
-  
+
   // Set Parent on the page
   const page = /* get page dict */;
   page.set("Parent", this.rootRef);
@@ -225,23 +226,23 @@ removePage(index: number): PdfRef {
   if (index < 0 || index >= this.pages.length) {
     throw new RangeError(`Index ${index} out of bounds (0-${this.pages.length - 1})`);
   }
-  
+
   // Flatten tree if this is first modification
   this.flattenIfNeeded();
-  
+
   const pageRef = this.pages[index];
-  
+
   // Update internal list
   this.pages.splice(index, 1);
-  
+
   // Update tree structure
   const kids = this.root.getArray("Kids")!;
   kids.remove(index);
-  
+
   // Update Count
   const count = this.root.getNumber("Count")?.value ?? 0;
   this.root.set("Count", PdfNumber.of(count - 1));
-  
+
   return pageRef;
 }
 ```
@@ -257,16 +258,16 @@ movePage(fromIndex: number, toIndex: number): void {
     throw new RangeError(`toIndex ${toIndex} out of bounds`);
   }
   if (fromIndex === toIndex) return;
-  
+
   // Flatten tree if this is first modification
   this.flattenIfNeeded();
-  
+
   const pageRef = this.pages[fromIndex];
-  
+
   // Update internal list
   this.pages.splice(fromIndex, 1);
   this.pages.splice(toIndex, 0, pageRef);
-  
+
   // Replace Kids with reordered list
   // No Count update needed - total unchanged
   this.root.set("Kids", new PdfArray(this.pages));
@@ -280,7 +281,7 @@ movePage(fromIndex: number, toIndex: number): void {
 addPage(options: AddPageOptions = {}): PdfRef {
   const { width, height } = resolvePageSize(options);
   const rotate = options.rotate ?? 0;
-  
+
   // Create minimal page dict
   const page = PdfDict.of({
     Type: PdfName.Page,
@@ -292,16 +293,16 @@ addPage(options: AddPageOptions = {}): PdfRef {
     ]),
     Resources: new PdfDict(),
   });
-  
+
   if (rotate !== 0) {
     page.set("Rotate", PdfNumber.of(rotate));
   }
-  
+
   // Register and insert
   const pageRef = this.register(page);
   const index = options.insertAt ?? this.getPageCount();
   this._pages.insertPage(index, pageRef);
-  
+
   return pageRef;
 }
 
@@ -314,7 +315,7 @@ const PAGE_SIZES = {
 function resolvePageSize(options: AddPageOptions): { width: number; height: number } {
   let width: number;
   let height: number;
-  
+
   if (options.width && options.height) {
     width = options.width;
     height = options.height;
@@ -323,12 +324,12 @@ function resolvePageSize(options: AddPageOptions): { width: number; height: numb
     width = preset.width;
     height = preset.height;
   }
-  
+
   // Swap dimensions for landscape orientation
   if (options.orientation === "landscape") {
     [width, height] = [height, width];
   }
-  
+
   return { width, height };
 }
 ```
@@ -338,8 +339,8 @@ function resolvePageSize(options: AddPageOptions): { width: number; height: numb
 ```typescript
 // In PDF class
 copyPagesFrom(
-  source: PDF, 
-  indices: number[], 
+  source: PDF,
+  indices: number[],
   options: CopyPagesOptions = {}
 ): PdfRef[] {
   const copier = new ObjectCopier(source, this, {
@@ -348,20 +349,20 @@ copyPagesFrom(
     includeThumbnails: options.includeThumbnails ?? false,
     includeStructure: options.includeStructure ?? false,
   });
-  
+
   const copiedRefs: PdfRef[] = [];
-  
+
   // Fail-fast: any error aborts the entire operation
   for (const index of indices) {
     const srcPageRef = source.getPage(index);
     if (!srcPageRef) {
       throw new Error(`Source page ${index} not found`);
     }
-    
+
     const copiedPageRef = copier.copyPage(srcPageRef);
     copiedRefs.push(copiedPageRef);
   }
-  
+
   return copiedRefs;
 }
 ```
@@ -384,31 +385,31 @@ export class ObjectCopier {
   private readonly source: PDF;
   private readonly dest: PDF;
   private readonly options: ObjectCopierOptions;
-  
+
   /** Maps source ref string -> dest ref */
   private readonly refMap = new Map<string, PdfRef>();
-  
+
   /** Track visited refs to detect circular references */
   private readonly visiting = new Set<string>();
-  
+
   constructor(source: PDF, dest: PDF, options: ObjectCopierOptions);
-  
+
   /**
    * Copy a page and all its resources.
    * Flattens inherited attributes into the page.
    */
   copyPage(srcPageRef: PdfRef): PdfRef;
-  
+
   /**
    * Deep copy any object, remapping refs.
    */
   private copyObject(obj: PdfObject): PdfObject;
-  
+
   /**
    * Copy a reference, creating new object in dest if needed.
    */
   private copyRef(ref: PdfRef): PdfRef;
-  
+
   /**
    * Copy a stream, handling encryption state.
    */
@@ -424,10 +425,10 @@ copyPage(srcPageRef: PdfRef): PdfRef {
   if (!srcPage) {
     throw new Error(`Page object not found: ${srcPageRef}`);
   }
-  
+
   // Clone the dict (shallow)
   const cloned = this.cloneDict(srcPage);
-  
+
   // Flatten inherited attributes
   for (const key of ["Resources", "MediaBox", "CropBox", "Rotate"]) {
     if (!cloned.has(key)) {
@@ -437,7 +438,7 @@ copyPage(srcPageRef: PdfRef): PdfRef {
       }
     }
   }
-  
+
   // Handle optional page-associated objects
   if (!this.options.includeBeads) {
     cloned.delete("B");
@@ -448,33 +449,33 @@ copyPage(srcPageRef: PdfRef): PdfRef {
   if (!this.options.includeStructure) {
     cloned.delete("StructParents");
   }
-  
+
   // Annotations are always included (already in page dict as /Annots)
   // They'll be deep-copied when we copy the dict values
-  
+
   // Remove Parent - will be set when inserted into dest tree
   cloned.delete("Parent");
-  
+
   // Deep copy all values, remapping refs
   const copied = this.copyDictValues(cloned);
-  
+
   // Register in destination
   return this.dest.register(copied);
 }
 
 private getInheritedAttribute(page: PdfDict, key: string): PdfObject | null {
   let current: PdfDict | null = page;
-  
+
   while (current) {
     const value = current.get(key);
     if (value) return value;
-    
+
     const parentRef = current.getRef("Parent");
     if (!parentRef) break;
-    
+
     current = this.source.getObject(parentRef) as PdfDict | null;
   }
-  
+
   return null;
 }
 ```
@@ -487,7 +488,7 @@ private getInheritedAttribute(page: PdfDict, key: string): PdfObject | null {
 private copyStream(srcStream: PdfStream): PdfStream {
   // Check if source document was encrypted
   const sourceWasEncrypted = this.source.isEncrypted;
-  
+
   if (!sourceWasEncrypted) {
     // Source wasn't encrypted - we can copy raw encoded bytes
     // This preserves exact encoding and is fastest
@@ -499,11 +500,11 @@ private copyStream(srcStream: PdfStream): PdfStream {
     // Must re-encode since we can't access original encrypted bytes
     const decodedData = srcStream.getDecodedData();
     const dictCopy = this.copyDictValues(this.cloneDict(srcStream));
-    
+
     // Get original filters to re-apply
     const filters = srcStream.get("Filter");
     const params = srcStream.get("DecodeParms");
-    
+
     if (filters) {
       // Re-encode with same filters
       const encodedData = this.encodeWithFilters(decodedData, filters, params);
@@ -520,8 +521,8 @@ private copyStream(srcStream: PdfStream): PdfStream {
 }
 
 private encodeWithFilters(
-  data: Uint8Array, 
-  filters: PdfObject, 
+  data: Uint8Array,
+  filters: PdfObject,
   params: PdfObject | undefined
 ): Uint8Array {
   // Use FilterPipeline to re-encode
@@ -537,30 +538,30 @@ private encodeWithFilters(
 
 ## Sync vs Async
 
-Per Plan 015's philosophy, we want sync operations after load. 
+Per Plan 015's philosophy, we want sync operations after load.
 
 **Approach**: Load root Pages dict during `PDF.load()`:
 
 ```typescript
 export class PageTree {
   private readonly rootRef: PdfRef;
-  private readonly root: PdfDict;  // Loaded during construction
+  private readonly root: PdfDict; // Loaded during construction
   private pages: PdfRef[];
   private flattened: boolean = false;
-  
+
   /** Warnings generated during operations */
   readonly warnings: string[] = [];
-  
+
   static async load(
     pagesRef: PdfRef,
     getObject: (ref: PdfRef) => Promise<PdfObject | null>,
   ): Promise<PageTree> {
     // Walk tree to collect pages (existing logic)
     const pages = await walkPageTree(pagesRef, getObject);
-    
+
     // Also load and cache the root dict
-    const root = await getObject(pagesRef) as PdfDict;
-    
+    const root = (await getObject(pagesRef)) as PdfDict;
+
     return new PageTree(pagesRef, root, pages, getObject);
   }
 }
@@ -569,6 +570,7 @@ export class PageTree {
 All modification methods are then sync since we have the root dict in memory.
 
 **Note**: `copyPagesFrom` needs object access which is currently async. Options:
+
 1. Make it async (breaks sync-after-load philosophy for this one method)
 2. Require pages to be pre-loaded before copy
 3. Accept that cross-document operations are inherently async
@@ -582,36 +584,43 @@ async copyPagesFrom(source: PDF, indices: number[], options?: CopyPagesOptions):
 ## Edge Cases
 
 ### Empty Document
+
 - `removePage()` on empty doc throws `RangeError`
 - `movePage()` on empty doc throws `RangeError`
 - `addPage()` on empty doc works (creates first page)
 
 ### Last Page Removal
+
 - Allowed - results in 0-page document
 - Some PDF readers may not like this, but it's valid per spec
 
 ### Index Normalization
+
 - Negative indices for `insertPage`: `-1` means append (same as `length`)
 - Negative indices for `removePage`/`movePage`: throw `RangeError` (explicit is better)
 - Out of bounds: throw `RangeError` with descriptive message
 
 ### Nested Page Trees
+
 - Preserved for read-only operations
 - Flattened on first modification (insert/remove/move)
 - Warning added to `warnings` array: "Page tree flattened during modification"
 - Intermediate `/Pages` nodes become orphaned (not removed, just unreferenced)
 
 ### Circular References in Source (for copy)
+
 - Track visiting refs in `ObjectCopier.visiting` Set
 - If we encounter a ref we're currently visiting, throw an error
 - Already-copied refs (in `refMap`) are fine - just return the mapped ref
 
 ### Annotations During Copy
+
 - `/Annots` array is deep-copied with the page
 - Each annotation dict is copied with remapped refs
 - Form field annotations may have broken `/Parent` refs to AcroForm - this is expected; form functionality requires additional work
 
 ### Same-Document Copy
+
 - `pdf.copyPagesFrom(pdf, [0])` duplicates page 0
 - Works with same `ObjectCopier` logic
 - Creates new objects with new refs
@@ -685,12 +694,14 @@ clone(): PdfDict {
 ### PdfStream additions
 
 May need:
+
 - `getRawData()` - get original encoded bytes (for unencrypted copy)
 - Ensure `getDecodedData()` exists (it does in current impl)
 
 ## Test Plan
 
 ### Insertion
+
 1. Insert at beginning (index 0)
 2. Insert at end (index = length)
 3. Insert in middle
@@ -702,6 +713,7 @@ May need:
 9. Verify tree flattened on first insert (check warning)
 
 ### Removal
+
 1. Remove first page
 2. Remove last page
 3. Remove middle page
@@ -713,6 +725,7 @@ May need:
 9. Verify tree flattened on first remove
 
 ### Reordering
+
 1. Move page forward (index 0 → 2)
 2. Move page backward (index 2 → 0)
 3. Move to same position (no-op)
@@ -720,6 +733,7 @@ May need:
 5. Move out of bounds throws `RangeError`
 
 ### Adding Blank Pages
+
 1. Default size (letter, portrait)
 2. Custom dimensions
 3. Preset sizes (a4, legal)
@@ -728,6 +742,7 @@ May need:
 6. With insertAt option
 
 ### Cross-Document Copy
+
 1. Copy single page
 2. Copy multiple pages
 3. Copy page with embedded images (stream copying)
@@ -743,11 +758,13 @@ May need:
 13. Same-document copy (duplication)
 
 ### Round-Trip
+
 1. Load → modify pages → save → reload → verify structure
 2. Load nested tree → modify → save → verify flattened
 3. Load → copy from another → insert → save → reload
 
 ### Edge Cases
+
 1. Circular reference in source document during copy
 2. Very large streams (memory handling)
 3. Page with missing /Type (lenient handling)

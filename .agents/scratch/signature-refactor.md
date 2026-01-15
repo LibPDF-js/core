@@ -5,6 +5,7 @@
 **In Progress**
 
 ### Completed
+
 - [x] `PDF.reload(bytes)` - Added to pdf.ts
 - [ ] `PDFForm.createSignatureField()` - In progress
 - [ ] `PDFSignature` class
@@ -13,6 +14,7 @@
 ## Problem
 
 The current signature implementation is a mess:
+
 - String building for signature dictionaries
 - Custom placeholder patching logic
 - Confused byte offset calculations
@@ -29,12 +31,12 @@ Use the existing patterns we already have:
 ```typescript
 class PDFForm {
   // Existing
-  async getFields(): Promise<FormField[]>
-  
+  async getFields(): Promise<FormField[]>;
+
   // New factory methods
-  createTextField(name: string, options?: TextFieldOptions): TextField
-  createCheckbox(name: string, options?: CheckboxOptions): Checkbox
-  createSignatureField(name: string, options?: SignatureFieldOptions): SignatureField
+  createTextField(name: string, options?: TextFieldOptions): TextField;
+  createCheckbox(name: string, options?: CheckboxOptions): Checkbox;
+  createSignatureField(name: string, options?: SignatureFieldOptions): SignatureField;
 }
 ```
 
@@ -48,7 +50,7 @@ New class that handles the signing ceremony:
 class PDFSignature {
   constructor(
     private ctx: PDFContext,
-    private pdf: PDF
+    private pdf: PDF,
   ) {}
 
   /**
@@ -138,6 +140,7 @@ class PDFSignature {
 ### 6. Key Insight: No String Building
 
 Everything uses proper PDF objects:
+
 - `PdfDict` for dictionaries
 - `PdfStream` for binary data
 - `PdfRaw` ONLY for the ByteRange/Contents placeholders that need patching

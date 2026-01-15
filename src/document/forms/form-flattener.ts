@@ -29,6 +29,7 @@ import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
+
 import type { ObjectRegistry } from "../object-registry";
 import type { TerminalField } from "./fields";
 import type { FormFont } from "./form-font";

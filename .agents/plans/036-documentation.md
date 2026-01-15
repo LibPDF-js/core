@@ -94,16 +94,16 @@ These principles guide all documentation writing. Reference them when creating o
 Feature matrix showing capabilities at a glance:
 
 ```markdown
-| Feature | Status | Notes |
-|---------|--------|-------|
-| PDF 1.0-1.7 | ✅ Full | Read and write |
-| PDF 2.0 | ✅ Read | Write planned |
-| Encrypted PDFs | ✅ Full | RC4, AES-128, AES-256 |
-| AcroForms | ✅ Full | Read, fill, flatten |
-| Digital Signatures | ✅ Sign | PAdES B-B through B-LTA |
-| Text Extraction | ✅ Full | With positions and search |
-| Font Embedding | ✅ Full | TTF/OTF with subsetting |
-| Incremental Saves | ✅ Full | Preserves signatures |
+| Feature            | Status  | Notes                     |
+| ------------------ | ------- | ------------------------- |
+| PDF 1.0-1.7        | ✅ Full | Read and write            |
+| PDF 2.0            | ✅ Read | Write planned             |
+| Encrypted PDFs     | ✅ Full | RC4, AES-128, AES-256     |
+| AcroForms          | ✅ Full | Read, fill, flatten       |
+| Digital Signatures | ✅ Sign | PAdES B-B through B-LTA   |
+| Text Extraction    | ✅ Full | With positions and search |
+| Font Embedding     | ✅ Full | TTF/OTF with subsetting   |
+| Incremental Saves  | ✅ Full | Preserves signatures      |
 ```
 
 Hero example (5-7 lines):
@@ -151,8 +151,8 @@ console.log(pdf.pageCount);
 console.log(pdf.getTitle());
 
 // With password
-const encrypted = await PDF.load(bytes, { 
-  password: "secret" 
+const encrypted = await PDF.load(bytes, {
+  password: "secret",
 });
 
 // Extract text
@@ -200,10 +200,10 @@ Cover the full page lifecycle:
 
 Include gotcha table:
 
-| Issue | Solution |
-|-------|----------|
+| Issue                         | Solution                                                       |
+| ----------------------------- | -------------------------------------------------------------- |
 | Pages appear blank after copy | Resources (fonts, images) must be copied too—use `copyPages()` |
-| Page order wrong after merge | Check source document page indices |
+| Page order wrong after merge  | Check source document page indices                             |
 
 ### 2.2 Text Extraction (`/docs/guides/text-extraction`)
 
@@ -238,7 +238,7 @@ form.fill({
   "First Name": "John",
   "Last Name": "Doe",
   "Agree to Terms": true,
-  "Country": "United States",
+  Country: "United States",
 });
 
 // Or fill individual fields
@@ -251,21 +251,22 @@ form.flatten();
 
 Field type reference table:
 
-| Type | Read | Write | Methods |
-|------|------|-------|---------|
-| Text | ✅ | ✅ | `getText()`, `setText()` |
-| Checkbox | ✅ | ✅ | `isChecked()`, `check()`, `uncheck()` |
-| Radio | ✅ | ✅ | `getSelected()`, `select()` |
-| Dropdown | ✅ | ✅ | `getSelected()`, `select()`, `getOptions()` |
-| Listbox | ✅ | ✅ | `getSelected()`, `select()` (multi) |
-| Signature | ✅ | ✅ | See Signatures guide |
+| Type      | Read | Write | Methods                                     |
+| --------- | ---- | ----- | ------------------------------------------- |
+| Text      | ✅   | ✅    | `getText()`, `setText()`                    |
+| Checkbox  | ✅   | ✅    | `isChecked()`, `check()`, `uncheck()`       |
+| Radio     | ✅   | ✅    | `getSelected()`, `select()`                 |
+| Dropdown  | ✅   | ✅    | `getSelected()`, `select()`, `getOptions()` |
+| Listbox   | ✅   | ✅    | `getSelected()`, `select()` (multi)         |
+| Signature | ✅   | ✅    | See Signatures guide                        |
 
 ### 2.4 Drawing (`/docs/guides/drawing`)
 
 ```typescript
 // Text with options
 page.drawText("Hello", {
-  x: 50, y: 700,
+  x: 50,
+  y: 700,
   size: 16,
   font: await pdf.embedFont(fontBytes),
   color: rgb(0, 0, 0),
@@ -273,8 +274,10 @@ page.drawText("Hello", {
 
 // Shapes
 page.drawRectangle({
-  x: 50, y: 500,
-  width: 200, height: 100,
+  x: 50,
+  y: 500,
+  width: 200,
+  height: 100,
   color: rgb(0.9, 0.9, 0.9),
   borderColor: rgb(0, 0, 0),
   borderWidth: 1,
@@ -283,7 +286,8 @@ page.drawRectangle({
 // Images
 const image = await pdf.embedImage(pngBytes);
 page.drawImage(image, {
-  x: 50, y: 300,
+  x: 50,
+  y: 300,
   width: 200,
   height: 150,
 });
@@ -311,11 +315,11 @@ await pdf.save();
 Encryption support matrix:
 
 | Algorithm | Key Length | Read | Write |
-|-----------|------------|------|-------|
-| RC4 | 40-bit | ✅ | ✅ |
-| RC4 | 128-bit | ✅ | ✅ |
-| AES | 128-bit | ✅ | ✅ |
-| AES | 256-bit | ✅ | ✅ |
+| --------- | ---------- | ---- | ----- |
+| RC4       | 40-bit     | ✅   | ✅    |
+| RC4       | 128-bit    | ✅   | ✅    |
+| AES       | 128-bit    | ✅   | ✅    |
+| AES       | 256-bit    | ✅   | ✅    |
 
 ### 2.6 Digital Signatures (`/docs/guides/signatures`)
 
@@ -339,12 +343,12 @@ await pdf.save({ incremental: true });
 
 PAdES conformance levels:
 
-| Level | Description | Timestamp | LTV |
-|-------|-------------|-----------|-----|
-| B-B | Basic signature | ❌ | ❌ |
-| B-T | With timestamp | ✅ | ❌ |
-| B-LT | Long-term validation | ✅ | ✅ |
-| B-LTA | Long-term archival | ✅ | ✅ + archived |
+| Level | Description          | Timestamp | LTV           |
+| ----- | -------------------- | --------- | ------------- |
+| B-B   | Basic signature      | ❌        | ❌            |
+| B-T   | With timestamp       | ✅        | ❌            |
+| B-LT  | Long-term validation | ✅        | ✅            |
+| B-LTA | Long-term archival   | ✅        | ✅ + archived |
 
 ---
 
@@ -356,30 +360,34 @@ PAdES conformance levels:
 
 Use Sharp's nested parameter table pattern:
 
-```markdown
+````markdown
 ### PDF.load(bytes, options?)
 
 Load an existing PDF document.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `bytes` | `Uint8Array` | required | PDF file bytes |
-| `[options]` | `LoadOptions` | | |
-| `[options.password]` | `string` | | User or owner password |
-| `[options.ignoreEncryption]` | `boolean` | `false` | Load without decrypting |
-| `[options.updateMetadata]` | `boolean` | `true` | Update ModDate on save |
+| Param                        | Type          | Default  | Description             |
+| ---------------------------- | ------------- | -------- | ----------------------- |
+| `bytes`                      | `Uint8Array`  | required | PDF file bytes          |
+| `[options]`                  | `LoadOptions` |          |                         |
+| `[options.password]`         | `string`      |          | User or owner password  |
+| `[options.ignoreEncryption]` | `boolean`     | `false`  | Load without decrypting |
+| `[options.updateMetadata]`   | `boolean`     | `true`   | Update ModDate on save  |
 
 **Returns**: `Promise<PDF>`
 
 **Throws**:
+
 - `PasswordError` — Wrong password or password required
 - `ParseError` — Malformed PDF structure
 
 **Example**:
+
 ```ts
 const pdf = await PDF.load(bytes, { password: "secret" });
 ```
-```
+````
+
+````
 
 ### 3.2 Error Reference (`/docs/api/errors`)
 
@@ -416,7 +424,7 @@ Provided password is incorrect.
 
 ### InvalidObjectError
 Referenced object is malformed or missing.
-```
+````
 
 ---
 
@@ -433,8 +441,8 @@ Use Three.js-style analogies:
 
 Think of a PDF as a **book with an index at the back**.
 
-In a regular book, you read front-to-back. But PDF readers start at the 
-*end* of the file, reading the **cross-reference table** (xref) that 
+In a regular book, you read front-to-back. But PDF readers start at the
+_end_ of the file, reading the **cross-reference table** (xref) that
 tells them where every object lives.
 
 ### The Four Parts of a PDF
@@ -446,11 +454,11 @@ tells them where every object lives.
 
 ### Why This Matters
 
-This backwards design enables **incremental updates**. When you modify 
-a PDF, you don't rewrite the whole file—you append changes at the end 
+This backwards design enables **incremental updates**. When you modify
+a PDF, you don't rewrite the whole file—you append changes at the end
 and add a new xref table. The original content stays untouched.
 
-This is why `pdf.save({ incremental: true })` preserves existing 
+This is why `pdf.save({ incremental: true })` preserves existing
 signatures and keeps file history intact.
 ```
 
@@ -459,33 +467,34 @@ signatures and keeps file history intact.
 ```markdown
 ## The Object Model
 
-Every piece of data in a PDF is an object. @libpdf/core represents 
+Every piece of data in a PDF is an object. @libpdf/core represents
 these as TypeScript classes:
 
-| PDF Type | Class | Example |
-|----------|-------|---------|
-| Boolean | `boolean` | `true` |
-| Integer | `number` | `42` |
-| Real | `number` | `3.14` |
-| String | `PdfString` | `(Hello)` |
-| Name | `PdfName` | `/Type` |
-| Array | `PdfArray` | `[1 2 3]` |
-| Dictionary | `PdfDict` | `<< /Type /Page >>` |
-| Stream | `PdfStream` | Content streams |
-| Null | `null` | `null` |
-| Reference | `PdfRef` | `1 0 R` |
+| PDF Type   | Class       | Example             |
+| ---------- | ----------- | ------------------- |
+| Boolean    | `boolean`   | `true`              |
+| Integer    | `number`    | `42`                |
+| Real       | `number`    | `3.14`              |
+| String     | `PdfString` | `(Hello)`           |
+| Name       | `PdfName`   | `/Type`             |
+| Array      | `PdfArray`  | `[1 2 3]`           |
+| Dictionary | `PdfDict`   | `<< /Type /Page >>` |
+| Stream     | `PdfStream` | Content streams     |
+| Null       | `null`      | `null`              |
+| Reference  | `PdfRef`    | `1 0 R`             |
 
 ### Indirect Objects
 
 Most objects are stored as **indirect objects** with an ID:
-
 ```
+
 1 0 obj
 << /Type /Page /MediaBox [0 0 612 792] >>
 endobj
+
 ```
 
-This `1 0` is the object number and generation. References like 
+This `1 0` is the object number and generation. References like
 `1 0 R` point to this object. @libpdf/core handles this automatically.
 ```
 
@@ -499,15 +508,16 @@ This `1 0` is the object number and generation. References like
 
 Follow Zod's pattern:
 
-```markdown
+````markdown
 ## For Library Authors
 
-Building a library on top of @libpdf/core? This guide covers 
+Building a library on top of @libpdf/core? This guide covers
 integration patterns and best practices.
 
 ### Dependency Strategy
 
 **Peer dependency** (recommended for wrappers):
+
 ```json
 {
   "peerDependencies": {
@@ -515,8 +525,10 @@ integration patterns and best practices.
   }
 }
 ```
+````
 
 **Direct dependency** (for internal use):
+
 ```json
 {
   "dependencies": {
@@ -552,7 +564,8 @@ const pageDict = registry.resolve(pageRef);
 ```
 
 ⚠️ **Warning**: Low-level APIs may change between minor versions.
-```
+
+````
 
 ### 5.2 Migration from pdf-lib (`/docs/migration/from-pdf-lib`)
 
@@ -583,19 +596,21 @@ Features @libpdf/core adds:
 | Digital signatures | ❌ | `pdf.sign({ ... })` |
 | Malformed PDF handling | Strict | Lenient by default |
 | Encrypted PDF support | Limited | Full (R2-R6) |
-```
+````
 
 ---
 
 ## Implementation Phases
 
 ### Phase 1: Foundation (Week 1)
+
 - [ ] Landing page with feature matrix
 - [ ] Installation guide
 - [ ] Quick start: Parse a PDF
 - [ ] Quick start: Create a PDF
 
 ### Phase 2: Core Guides (Weeks 2-3)
+
 - [ ] Pages guide (add, remove, copy, merge, split)
 - [ ] Text extraction guide
 - [ ] Forms guide
@@ -604,11 +619,13 @@ Features @libpdf/core adds:
 - [ ] Images guide
 
 ### Phase 3: Security Guides (Week 4)
+
 - [ ] Encryption guide
 - [ ] Digital signatures guide
 - [ ] Metadata and attachments guides
 
 ### Phase 4: API Reference (Weeks 5-6)
+
 - [ ] PDF class reference
 - [ ] PDFPage class reference
 - [ ] PDFForm and field references
@@ -616,6 +633,7 @@ Features @libpdf/core adds:
 - [ ] Error reference
 
 ### Phase 5: Concepts & Advanced (Weeks 7-8)
+
 - [ ] PDF structure concept guide
 - [ ] Object model concept guide
 - [ ] Incremental saves concept guide

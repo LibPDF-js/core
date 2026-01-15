@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ASCII85Filter } from "./ascii85-filter";
 
 describe("ASCII85Filter", () => {

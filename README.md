@@ -20,20 +20,20 @@ We kept adding workarounds. A patch here for a malformed xref table. A hack ther
 
 ## Features
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Parse any PDF | Yes | Graceful fallback for malformed documents |
-| Create PDFs | Yes | From scratch or modify existing |
-| Encryption | Yes | RC4, AES-128, AES-256 (R2-R6) |
-| Digital Signatures | Yes | PAdES B-B, B-T, B-LT, B-LTA |
-| Form Filling | Yes | Text, checkbox, radio, dropdown, signature |
-| Form Flattening | Yes | Bake fields into page content |
-| Merge & Split | Yes | Combine or extract pages |
-| Attachments | Yes | Embed and extract files |
-| Text Extraction | Yes | With position information |
-| Font Embedding | Yes | TTF/OpenType with subsetting |
-| Images | Yes | JPEG, PNG (with alpha) |
-| Incremental Saves | Yes | Append changes, preserve signatures |
+| Feature            | Status | Notes                                      |
+| ------------------ | ------ | ------------------------------------------ |
+| Parse any PDF      | Yes    | Graceful fallback for malformed documents  |
+| Create PDFs        | Yes    | From scratch or modify existing            |
+| Encryption         | Yes    | RC4, AES-128, AES-256 (R2-R6)              |
+| Digital Signatures | Yes    | PAdES B-B, B-T, B-LT, B-LTA                |
+| Form Filling       | Yes    | Text, checkbox, radio, dropdown, signature |
+| Form Flattening    | Yes    | Bake fields into page content              |
+| Merge & Split      | Yes    | Combine or extract pages                   |
+| Attachments        | Yes    | Embed and extract files                    |
+| Text Extraction    | Yes    | With position information                  |
+| Font Embedding     | Yes    | TTF/OpenType with subsetting               |
+| Images             | Yes    | JPEG, PNG (with alpha)                     |
+| Incremental Saves  | Yes    | Append changes, preserve signatures        |
 
 ## Installation
 
@@ -137,7 +137,7 @@ LibPDF runs everywhere:
 
 ### Be lenient
 
-Real-world PDFs are messy. Export a document through three different tools and you'll get three slightly different interpretations of the spec. LibPDF prioritizes *opening your document* over strict compliance. When standard parsing fails, we fall back to brute-force recovery, scanning the entire file to rebuild the structure.
+Real-world PDFs are messy. Export a document through three different tools and you'll get three slightly different interpretations of the spec. LibPDF prioritizes _opening your document_ over strict compliance. When standard parsing fails, we fall back to brute-force recovery, scanning the entire file to rebuild the structure.
 
 ### Two API layers
 
@@ -180,5 +180,3 @@ bun run typecheck
 [MIT](LICENSE)
 
 The `src/fontbox/` directory is licensed under [Apache-2.0](src/fontbox/LICENSE) as it is derived from [Apache PDFBox](https://pdfbox.apache.org/).
-
-

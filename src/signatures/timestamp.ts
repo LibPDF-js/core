@@ -7,6 +7,7 @@
  * RFC 3161: Internet X.509 Public Key Infrastructure Time-Stamp Protocol (TSP)
  */
 
+import { bytesToHex, toArrayBuffer } from "#src/helpers/buffer.ts";
 import {
   Boolean as AsnBoolean,
   fromBER,
@@ -15,7 +16,7 @@ import {
   OctetString,
   Sequence,
 } from "asn1js";
-import { bytesToHex, toArrayBuffer } from "#src/helpers/buffer.ts";
+
 import { OID_SHA256, OID_SHA384, OID_SHA512 } from "./oids";
 import type { DigestAlgorithm, TimestampAuthority } from "./types";
 import { TimestampError } from "./types";

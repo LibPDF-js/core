@@ -109,23 +109,23 @@ private findPageForWidget(widget: WidgetAnnotation): PdfRef | null {
   // This is expensive but needed for widgets without /P
   // Could cache page → annots mapping
   const pages = this.registry.getPageTree();
-  
+
   for (let i = 0; i < pages.pageCount; i++) {
     const pageRef = pages.getPageRef(i);
     const pageDict = this.registry.resolve(pageRef) as PdfDict;
     const annots = pageDict?.getArray("Annots");
-    
+
     if (annots) {
       for (const annotRef of annots) {
-        if (annotRef instanceof PdfRef && 
-            widget.ref && 
+        if (annotRef instanceof PdfRef &&
+            widget.ref &&
             annotRef.equals(widget.ref)) {
           return pageRef;
         }
       }
     }
   }
-  
+
   return null;
 }
 ```
@@ -156,7 +156,7 @@ private flattenWidgetsOnPage(pageRef: PdfRef, widgets: WidgetAnnotation[]): void
 
   for (let i = 0; i < widgets.length; i++) {
     const widget = widgets[i];
-    
+
     // Get appearance stream
     const appearance = widget.getNormalAppearance(
       widget.appearanceState ?? undefined
@@ -203,12 +203,12 @@ private flattenWidgetsOnPage(pageRef: PdfRef, widgets: WidgetAnnotation[]): void
 ```typescript
 /**
  * Calculate transformation matrix to position appearance in widget rect.
- * 
+ *
  * The appearance stream has a BBox defining its coordinate system.
  * We need to transform this to fit in the widget's Rect on the page.
  */
 private calculateTransformMatrix(
-  widget: WidgetAnnotation, 
+  widget: WidgetAnnotation,
   appearance: PdfStream
 ): TransformMatrix {
   // Widget rectangle on page
@@ -339,11 +339,11 @@ private removeAnnotations(page: PdfDict, toRemove: Set<string>): void {
 private isWidgetHidden(widget: WidgetAnnotation): boolean {
   // Check annotation flags
   const flags = widget.dict.getNumber("F")?.value ?? 0;
-  
+
   const HIDDEN = 1 << 1;      // Bit 2: Hidden
   const INVISIBLE = 1 << 0;   // Bit 1: Invisible
   const NO_VIEW = 1 << 5;     // Bit 6: NoView
-  
+
   return (flags & (HIDDEN | INVISIBLE | NO_VIEW)) !== 0;
 }
 ```
@@ -359,7 +359,7 @@ private isWidgetHidden(widget: WidgetAnnotation): boolean {
 async flattenForm(): Promise<void> {
   const form = this.getForm();
   if (!form) return;
-  
+
   form.flatten();
 }
 ```

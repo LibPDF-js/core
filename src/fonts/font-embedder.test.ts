@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { EmbeddedFont } from "./embedded-font";
 import { createFontObjects, generateSubsetTag, registerFontObjects } from "./font-embedder";
 

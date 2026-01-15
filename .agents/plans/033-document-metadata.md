@@ -15,6 +15,7 @@ Users need an easy way to read and set document metadata (title, author, subject
 ## Scope
 
 ### In Scope
+
 - Standard Info dictionary fields (Title, Author, Subject, Keywords, Creator, Producer, CreationDate, ModDate, Trapped)
 - Language setting (stored in Catalog, not Info)
 - ViewerPreferences for "display title in window title bar"
@@ -22,6 +23,7 @@ Users need an easy way to read and set document metadata (title, author, subject
 - Writing metadata to new and existing PDFs
 
 ### Out of Scope
+
 - XMP metadata streams (complex XML, rarely needed by most users)
 - Custom metadata fields (non-standard keys)
 - Encryption metadata fields (handled by security layer)
@@ -35,8 +37,8 @@ import { PDF } from "@libpdf/core";
 
 // Creating a new PDF - Producer and Creator auto-set to "@libpdf/core"
 const pdf = PDF.create();
-pdf.getProducer();  // "@libpdf/core"
-pdf.getCreator();   // "@libpdf/core"
+pdf.getProducer(); // "@libpdf/core"
+pdf.getCreator(); // "@libpdf/core"
 
 // Set other metadata
 pdf.setTitle("Quarterly Report Q4 2024");
@@ -53,16 +55,16 @@ pdf.setTitle("My Document", { showInWindowTitleBar: true });
 
 // Reading metadata from existing PDF
 const loaded = await PDF.load(bytes);
-const title = loaded.getTitle();           // string | undefined
-const author = loaded.getAuthor();         // string | undefined
-const subject = loaded.getSubject();       // string | undefined
-const keywords = loaded.getKeywords();     // string[] | undefined
-const creator = loaded.getCreator();       // string | undefined
-const producer = loaded.getProducer();     // string | undefined
-const created = loaded.getCreationDate();  // Date | undefined
+const title = loaded.getTitle(); // string | undefined
+const author = loaded.getAuthor(); // string | undefined
+const subject = loaded.getSubject(); // string | undefined
+const keywords = loaded.getKeywords(); // string[] | undefined
+const creator = loaded.getCreator(); // string | undefined
+const producer = loaded.getProducer(); // string | undefined
+const created = loaded.getCreationDate(); // Date | undefined
 const modified = loaded.getModificationDate(); // Date | undefined
-const trapped = loaded.getTrapped();       // "True" | "False" | "Unknown" | undefined
-const language = loaded.getLanguage();     // string | undefined
+const trapped = loaded.getTrapped(); // "True" | "False" | "Unknown" | undefined
+const language = loaded.getLanguage(); // string | undefined
 
 // Bulk operations
 const allMetadata = loaded.getMetadata();
@@ -138,34 +140,41 @@ interface DocumentMetadata {
 ## Implementation Notes
 
 ### Info Dictionary Location
+
 - The Info dictionary is referenced from the trailer: `/Info 5 0 R`
 - If no Info dictionary exists, one must be created and registered
 - The trailer reference must be updated
 
 ### String Encoding
+
 - Use hex strings (`<FEFF...>`) with UTF-16BE BOM for full Unicode support
 - This matches pdf-lib's approach and ensures special characters work
 
 ### Date Format
+
 - PDF dates use format: `D:YYYYMMDDHHmmSSOHH'mm'`
 - Example: `D:20240115143052+05'30'`
 - Should parse lenient (many PDFs have non-conforming dates)
 
 ### Keywords
+
 - Stored as single space-separated string in PDF
 - API presents as array for convenience
 - `getKeywords()` splits on whitespace
 - `setKeywords()` joins with spaces
 
 ### Language
+
 - Unlike other metadata, language is stored in Catalog (`/Lang`), not Info
 - This is per PDF spec (Table 28, Catalog dictionary)
 
 ### Trapped
+
 - `/Trapped` is a name, not a string: `/Trapped /True`
 - Valid values: `/True`, `/False`, `/Unknown`
 
 ### ViewerPreferences
+
 - `showInWindowTitleBar` sets `/ViewerPreferences << /DisplayDocTitle true >>`
 - Must create ViewerPreferences dict if it doesn't exist
 

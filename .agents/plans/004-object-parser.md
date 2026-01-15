@@ -19,12 +19,14 @@ BruteForceParser     ← Recovery fallback (future, separate spec)
 ## Scope
 
 **In scope:**
+
 - Parsing direct objects: null, bool, number, name, string, array, dict, ref
 - 2-token lookahead for `N M R` reference detection
 - Recovery mode for partial results on malformed input
 - Stream detection (peek for `stream` keyword after dict)
 
 **Out of scope (handled by higher layers):**
+
 - Indirect object wrapper (`N M obj ... endobj`)
 - Stream binary data (needs Length from xref resolution)
 - XRef tables and trailers
@@ -33,14 +35,12 @@ BruteForceParser     ← Recovery fallback (future, separate spec)
 ## API
 
 ```typescript
-type ParseResult =
-  | { object: PdfObject; hasStream: false }
-  | { object: PdfDict; hasStream: true };
+type ParseResult = { object: PdfObject; hasStream: false } | { object: PdfDict; hasStream: true };
 
 type WarningCallback = (message: string, position: number) => void;
 
 class ObjectParser {
-  constructor(reader: TokenReader)
+  constructor(reader: TokenReader);
 
   /**
    * Parse a single object at current position.
@@ -48,25 +48,26 @@ class ObjectParser {
    * Returns { object, hasStream } where hasStream indicates
    * the 'stream' keyword follows (caller must read binary data).
    */
-  parseObject(): ParseResult | null
+  parseObject(): ParseResult | null;
 
   /**
    * Enable recovery mode for lenient parsing.
    * When true, returns partial results instead of throwing.
    */
-  recoveryMode: boolean
+  recoveryMode: boolean;
 
   /**
    * Optional callback for warnings during parsing.
    * Called for recoverable issues like invalid dict keys.
    */
-  onWarning: WarningCallback | null
+  onWarning: WarningCallback | null;
 }
 ```
 
 ## 2-Token Lookahead
 
 PDF syntax is ambiguous:
+
 - `1 0 R` → indirect reference to object 1, generation 0
 - `1 0` → two separate numbers
 
@@ -85,25 +86,27 @@ After reading an integer:
 
 ### Primitives
 
-| Token | Result |
-|-------|--------|
-| `keyword "null"` | `PdfNull.instance` |
-| `keyword "true"` | `PdfBool.TRUE` |
-| `keyword "false"` | `PdfBool.FALSE` |
-| `number` | `PdfNumber.of(value)` |
-| `name` | `PdfName.of(value)` |
-| `string` | `new PdfString(bytes, format)` |
-| EOF | `null` (no object to parse) |
+| Token             | Result                         |
+| ----------------- | ------------------------------ |
+| `keyword "null"`  | `PdfNull.instance`             |
+| `keyword "true"`  | `PdfBool.TRUE`                 |
+| `keyword "false"` | `PdfBool.FALSE`                |
+| `number`          | `PdfNumber.of(value)`          |
+| `name`            | `PdfName.of(value)`            |
+| `string`          | `new PdfString(bytes, format)` |
+| EOF               | `null` (no object to parse)    |
 
 ### References
 
 When current token is an integer:
+
 1. Check if `buf1` (next token) is also an integer
 2. Check if `buf2` (token after that) is keyword `"R"`
 3. If both true → `PdfRef.of(objNum, genNum)`, consume all three tokens
 4. Otherwise → return just the number
 
 **Validation:**
+
 - Normal mode: Reject negative objNum, negative genNum, or genNum > 65535
 - Recovery mode: Accept any integers, call `onWarning` for invalid values
 
@@ -122,6 +125,7 @@ Result: PdfRef.of(10, 0)
 ### Arrays
 
 On `[` delimiter:
+
 1. Create empty array
 2. Loop: call `parseObject()` until `]` delimiter or EOF
 3. On EOF in recovery mode: return partial array, call `onWarning`
@@ -135,6 +139,7 @@ Result: PdfArray containing [PdfNumber(1), PdfNumber(2), PdfName("Name")]
 ### Dictionaries
 
 On `<<` delimiter:
+
 1. Create empty dict
 2. Loop until `>>` or EOF:
    - Read key (must be name token)
@@ -152,10 +157,12 @@ Result: PdfDict { Type: PdfName("Page"), Count: PdfNumber(5) }
 ### Stream Detection
 
 After parsing a dictionary, peek at the next token:
+
 - If `keyword "stream"` → return `{ object: dict, hasStream: true }`
 - Otherwise → return `{ object: dict, hasStream: false }`
 
 The `stream` keyword is NOT consumed. Caller (DocumentParser) is responsible for:
+
 1. Consuming the `stream` keyword
 2. Resolving `/Length` if it's an indirect reference
 3. Reading the binary data
@@ -167,13 +174,13 @@ The `stream` keyword is NOT consumed. Caller (DocumentParser) is responsible for
 
 When `recoveryMode = true`:
 
-| Situation | Normal | Recovery |
-|-----------|--------|----------|
-| EOF in array | throw | return partial array + warn |
-| EOF in dict | throw | return partial dict + warn |
-| Invalid dict key | throw | skip to next name + warn |
-| Invalid reference values | throw | accept + warn |
-| Unexpected token | throw | skip + warn |
+| Situation                | Normal | Recovery                    |
+| ------------------------ | ------ | --------------------------- |
+| EOF in array             | throw  | return partial array + warn |
+| EOF in dict              | throw  | return partial dict + warn  |
+| Invalid dict key         | throw  | skip to next name + warn    |
+| Invalid reference values | throw  | accept + warn               |
+| Unexpected token         | throw  | skip + warn                 |
 
 All warnings go through the `onWarning` callback with message and byte position.
 
@@ -227,6 +234,7 @@ class ObjectParser {
 ## Test Cases
 
 ### Primitives
+
 - `null` → PdfNull
 - `true`, `false` → PdfBool
 - `42`, `-3.14`, `.5` → PdfNumber
@@ -235,12 +243,14 @@ class ObjectParser {
 - (empty input) → null
 
 ### References
+
 - `1 0 R` → PdfRef(1, 0)
 - `1 0` (no R) → PdfNumber(1), then PdfNumber(0) on next call
 - `-1 0 R` in normal mode → throw
 - `-1 0 R` in recovery mode → PdfRef(-1, 0) + warning
 
 ### Arrays
+
 - `[]` → empty array
 - `[1 2 3]` → array of numbers
 - `[/Name (string) 1 0 R]` → mixed types
@@ -248,6 +258,7 @@ class ObjectParser {
 - `[1 2` (missing `]`) in recovery → partial array + warning
 
 ### Dictionaries
+
 - `<< >>` → empty dict
 - `<< /Type /Page >>` → simple dict
 - `<< /Kids [1 0 R 2 0 R] >>` → dict with array value
@@ -255,10 +266,12 @@ class ObjectParser {
 - `<< /Type /Page` (missing `>>`) in recovery → partial dict + warning
 
 ### Stream Detection
+
 - `<< /Length 5 >> stream` → { object: dict, hasStream: true }
 - `<< /Type /Page >>` → { object: dict, hasStream: false }
 
 ### Edge Cases
+
 - Deeply nested structures (recursion limit)
 - 500+ nesting levels → throw
 

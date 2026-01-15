@@ -30,26 +30,26 @@ Research into how pdf-lib, PDFBox, and pdf.js handle PDF content stream generati
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `src/api/PDFPage.ts` | High-level page class with draw methods |
-| `src/api/operations.ts` | Drawing operations (pure functions → Operator[]) |
-| `src/api/operators.ts` | Low-level PDF operators as factory functions |
-| `src/api/colors.ts` | Color types (RGB, CMYK, Grayscale) |
-| `src/api/PDFFont.ts` | Font wrapper with encoding/measurement |
-| `src/api/PDFImage.ts` | Image wrapper with dimension helpers |
-| `src/core/structures/PDFPageLeaf.ts` | Resource dictionary management |
+| File                                 | Purpose                                          |
+| ------------------------------------ | ------------------------------------------------ |
+| `src/api/PDFPage.ts`                 | High-level page class with draw methods          |
+| `src/api/operations.ts`              | Drawing operations (pure functions → Operator[]) |
+| `src/api/operators.ts`               | Low-level PDF operators as factory functions     |
+| `src/api/colors.ts`                  | Color types (RGB, CMYK, Grayscale)               |
+| `src/api/PDFFont.ts`                 | Font wrapper with encoding/measurement           |
+| `src/api/PDFImage.ts`                | Image wrapper with dimension helpers             |
+| `src/core/structures/PDFPageLeaf.ts` | Resource dictionary management                   |
 
 ### PDFPage State
 
 ```typescript
 class PDFPage {
-  private fontKey?: PDFName;        // Current font resource name
-  private font?: PDFFont;           // Current font object
+  private fontKey?: PDFName; // Current font resource name
+  private font?: PDFFont; // Current font object
   private fontSize = 24;
   private fontColor = rgb(0, 0, 0);
   private lineHeight = 24;
-  private x = 0;                    // Current position
+  private x = 0; // Current position
   private y = 0;
   private contentStream?: PDFContentStream;
 }
@@ -58,6 +58,7 @@ class PDFPage {
 ### Drawing Pattern
 
 Every draw method follows this pattern:
+
 1. Validate options
 2. Register resources (fonts, images, graphics states) if needed
 3. Get/create content stream
@@ -75,7 +76,7 @@ export const drawImage = (name, { x, y, width, height, rotate, xSkew, ySkew, gra
     pushGraphicsState(),                              // q
     graphicsState && setGraphicsState(graphicsState), // gs
     translate(x, y),                                  // cm
-    rotateRadians(toRadians(rotate)),                 // cm  
+    rotateRadians(toRadians(rotate)),                 // cm
     scale(width, height),                             // cm
     skewRadians(toRadians(xSkew), toRadians(ySkew)), // cm
     drawObject(name),                                 // Do
@@ -106,9 +107,9 @@ Resources are auto-named and added to page's `/Resources` dictionary:
 
 ```typescript
 // In PDFPage
-const xObjectKey = this.node.newXObject('Image', image.ref);  // Returns /Image1
-const fontKey = this.node.newFontDictionary(font.name, font.ref);  // Returns /F1
-const gsKey = this.node.newExtGState('GS', gsDict);  // Returns /GS1
+const xObjectKey = this.node.newXObject("Image", image.ref); // Returns /Image1
+const fontKey = this.node.newFontDictionary(font.name, font.ref); // Returns /F1
+const gsKey = this.node.newExtGState("GS", gsDict); // Returns /GS1
 ```
 
 ### Pros
@@ -140,19 +141,20 @@ PDAbstractContentStream (abstract base)
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `pdmodel/PDAbstractContentStream.java` | Base class (1759 lines) |
-| `pdmodel/PDPageContentStream.java` | Main page drawing API |
-| `pdmodel/PDAppearanceContentStream.java` | Annotation appearances |
-| `pdmodel/PDResources.java` | Resource dictionary management |
-| `contentstream/operator/OperatorName.java` | All 73 PDF operators |
+| File                                       | Purpose                        |
+| ------------------------------------------ | ------------------------------ |
+| `pdmodel/PDAbstractContentStream.java`     | Base class (1759 lines)        |
+| `pdmodel/PDPageContentStream.java`         | Main page drawing API          |
+| `pdmodel/PDAppearanceContentStream.java`   | Annotation appearances         |
+| `pdmodel/PDResources.java`                 | Resource dictionary management |
+| `contentstream/operator/OperatorName.java` | All 73 PDF operators           |
 
 ### API Surface (Complete)
 
 PDFBox exposes ALL PDF operators directly:
 
 **Text Operations:**
+
 ```java
 void beginText()                                    // BT
 void endText()                                      // ET
@@ -166,6 +168,7 @@ void setWordSpacing(float spacing)                  // Tw
 ```
 
 **Path Operations:**
+
 ```java
 void moveTo(float x, float y)                       // m
 void lineTo(float x, float y)                       // l
@@ -178,6 +181,7 @@ void clip()                                         // W
 ```
 
 **Image Operations:**
+
 ```java
 void drawImage(PDImageXObject img, float x, float y)
 void drawImage(PDImageXObject img, float x, y, width, height)
@@ -186,6 +190,7 @@ void drawForm(PDFormXObject form)                   // Do
 ```
 
 **Color Operations:**
+
 ```java
 void setStrokingColor(float r, g, b)                // RG (DeviceRGB)
 void setNonStrokingColor(float r, g, b)             // rg
@@ -238,12 +243,12 @@ pdf.js is a parser/renderer, not a generator, but its internal representation is
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `core/evaluator.js` | Parses content streams → operator list |
-| `core/operator_list.js` | OperatorList structure |
-| `shared/util.js` | OPS enum (all operators as numbers) |
-| `display/canvas.js` | Renders operators to Canvas |
+| File                    | Purpose                                |
+| ----------------------- | -------------------------------------- |
+| `core/evaluator.js`     | Parses content streams → operator list |
+| `core/operator_list.js` | OperatorList structure                 |
+| `shared/util.js`        | OPS enum (all operators as numbers)    |
+| `display/canvas.js`     | Renders operators to Canvas            |
 
 ### Operator Representation
 
@@ -251,8 +256,8 @@ Operators are stored as parallel arrays (efficient for rendering):
 
 ```javascript
 class OperatorList {
-  fnArray = [];     // Array of OPS enum values
-  argsArray = [];   // Array of argument arrays
+  fnArray = []; // Array of OPS enum values
+  argsArray = []; // Array of argument arrays
 }
 
 operatorList.addOp(OPS.setFillRGBColor, [r, g, b]);
@@ -266,19 +271,33 @@ All PDF operators are numbered constants:
 ```javascript
 const OPS = {
   // Graphics state (1-12)
-  setLineWidth: 2, setLineCap: 3, save: 10, restore: 11, transform: 12,
-  
+  setLineWidth: 2,
+  setLineCap: 3,
+  save: 10,
+  restore: 11,
+  transform: 12,
+
   // Path (13-30)
-  moveTo: 13, lineTo: 14, curveTo: 15, rectangle: 19, stroke: 20, fill: 22,
-  
+  moveTo: 13,
+  lineTo: 14,
+  curveTo: 15,
+  rectangle: 19,
+  stroke: 20,
+  fill: 22,
+
   // Text (31-49)
-  beginText: 31, endText: 32, setFont: 37, showText: 44,
-  
+  beginText: 31,
+  endText: 32,
+  setFont: 37,
+  showText: 44,
+
   // Color (50-61)
-  setFillRGBColor: 59, setStrokeRGBColor: 58,
-  
+  setFillRGBColor: 59,
+  setStrokeRGBColor: 58,
+
   // XObjects (62-93)
-  paintXObject: 66, paintImageXObject: 85,
+  paintXObject: 66,
+  paintImageXObject: 85,
 };
 ```
 
@@ -306,13 +325,13 @@ class EvalState {
 
 ### What We Have
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `Operator` class | `src/content/operators.ts` | Single operator with args |
-| Operator factories | `src/helpers/operators.ts` | All PDF operators as functions |
-| `ContentStreamBuilder` | `src/content/content-stream.ts` | Builds operator arrays → bytes |
-| `ContentStreamSerializer` | `src/content/parsing/` | Serializes operators to PDF syntax |
-| `PDFPage.drawPage()` | `src/api/pdf-page.ts` | Only drawing method so far |
+| Component                 | Location                        | Purpose                            |
+| ------------------------- | ------------------------------- | ---------------------------------- |
+| `Operator` class          | `src/content/operators.ts`      | Single operator with args          |
+| Operator factories        | `src/helpers/operators.ts`      | All PDF operators as functions     |
+| `ContentStreamBuilder`    | `src/content/content-stream.ts` | Builds operator arrays → bytes     |
+| `ContentStreamSerializer` | `src/content/parsing/`          | Serializes operators to PDF syntax |
+| `PDFPage.drawPage()`      | `src/api/pdf-page.ts`           | Only drawing method so far         |
 
 ### Existing Operator Factories
 
@@ -345,16 +364,16 @@ drawPage(embedded: PDFEmbeddedPage, options: DrawPageOptions = {}): void {
   // Manual string building (should use ContentStreamBuilder)
   const ops: string[] = [];
   ops.push("q");
-  
+
   if (options.opacity !== undefined) {
     const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
     ops.push(`/${gsName} gs`);
   }
-  
+
   ops.push(`${scaleX} 0 0 ${scaleY} ${x} ${y} cm`);
   ops.push(`/${xobjectName} Do`);
   ops.push("Q");
-  
+
   this.appendContent(ops.join("\n"));
 }
 ```
@@ -388,7 +407,7 @@ Add these methods to `PDFPage`:
 // Text
 drawText(text: string, options?: DrawTextOptions): void
 
-// Images  
+// Images
 drawImage(image: PDFImage, options?: DrawImageOptions): void
 
 // Shapes
@@ -465,6 +484,7 @@ class PDFPage {
 ### 5. Image Embedding
 
 Need a `PDFImage` class that:
+
 - Parses JPEG/PNG into PDF image XObject
 - Handles color space detection
 - Supports alpha channel (via SMask)
@@ -476,7 +496,7 @@ Fonts need a `measureText()` method for layout:
 
 ```typescript
 interface PDFFont {
-  encodeText(text: string): PdfString;  // Already have via font embedding
+  encodeText(text: string): PdfString; // Already have via font embedding
   measureText(text: string, fontSize: number): { width: number; height: number };
 }
 ```
@@ -524,8 +544,8 @@ interface DrawRectangleOptions {
   y: number;
   width: number;
   height: number;
-  color?: Color;          // Fill color
-  borderColor?: Color;    // Stroke color
+  color?: Color; // Fill color
+  borderColor?: Color; // Stroke color
   borderWidth?: number;
   opacity?: number;
   borderOpacity?: number;

@@ -9,8 +9,9 @@
  * @see PDF 1.7 Specification, Section 7.6.3.4 (Algorithm 3 - Owner password)
  */
 
-import { md5 } from "@noble/hashes/legacy.js";
 import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
+import { md5 } from "@noble/hashes/legacy.js";
+
 import { RC4Cipher } from "../ciphers/rc4";
 
 /**

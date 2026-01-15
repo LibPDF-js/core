@@ -96,7 +96,7 @@ page.drawPage(embedded, { x: 50, y: 100, scale: 0.5, opacity: 0.3 });
 
 // Forms
 const form = await pdf.getForm();
-form?.fill({ "name": "John", "agreed": true });
+form?.fill({ name: "John", agreed: true });
 await form?.flatten();
 
 // Fonts
@@ -108,7 +108,7 @@ await pdf.addAttachment("doc.pdf", data, { description: "Attached PDF" });
 const attachment = await pdf.getAttachment("doc.pdf");
 
 // Saving
-const bytes = await pdf.save();                      // Full rewrite
+const bytes = await pdf.save(); // Full rewrite
 const bytes = await pdf.save({ incremental: true }); // Append only
 ```
 
@@ -118,9 +118,9 @@ Wrapper for individual pages with dimension and drawing methods.
 
 ```typescript
 // Dimensions
-page.width;      // Points, rotation-aware
+page.width; // Points, rotation-aware
 page.height;
-page.rotation;   // 0, 90, 180, 270
+page.rotation; // 0, 90, 180, 270
 
 // Box accessors
 page.getMediaBox();
@@ -152,9 +152,9 @@ const dropdown = form.getDropdown("country");
 
 // Bulk fill
 form.fill({
-  "name": "John Doe",
-  "agree": true,
-  "options": "option1",
+  name: "John Doe",
+  agree: true,
+  options: "option1",
 });
 
 // Read values
@@ -179,7 +179,7 @@ const attachments = pdf.attachments;
 await attachments.add("file.pdf", data, { description: "..." });
 await attachments.get("file.pdf");
 await attachments.remove("file.pdf");
-await attachments.list();  // Map<string, AttachmentInfo>
+await attachments.list(); // Map<string, AttachmentInfo>
 ```
 
 ### PDFEmbeddedPage Class
@@ -188,10 +188,10 @@ Represents a page embedded as a Form XObject (for overlays/watermarks).
 
 ```typescript
 const embedded = await pdf.embedPage(sourcePdf, 0);
-embedded.ref;     // PdfRef to the XObject
-embedded.width;   // Original page width
-embedded.height;  // Original page height
-embedded.box;     // Bounding box
+embedded.ref; // PdfRef to the XObject
+embedded.width; // Original page width
+embedded.height; // Original page height
+embedded.box; // Bounding box
 ```
 
 ---
@@ -222,7 +222,8 @@ const embedded = await pdf.embedPage(sourcePdf, 0);
 page.drawPage(embedded, { x, y, scale, opacity, background });
 
 // Custom paths
-page.drawPath()
+page
+  .drawPath()
   .moveTo(100, 100)
   .lineTo(200, 150)
   .curveTo(250, 200, 300, 150, 350, 100)
@@ -232,21 +233,21 @@ page.drawPath()
 
 ### Text Features
 
-| Feature | Description |
-|---------|-------------|
-| `maxWidth` | Automatic word wrapping at specified width |
-| `lineHeight` | Line spacing multiplier |
-| `align` | Text alignment: "left", "center", "right", "justify" |
-| `rotate` | Rotation in degrees around origin |
+| Feature      | Description                                          |
+| ------------ | ---------------------------------------------------- |
+| `maxWidth`   | Automatic word wrapping at specified width           |
+| `lineHeight` | Line spacing multiplier                              |
+| `align`      | Text alignment: "left", "center", "right", "justify" |
+| `rotate`     | Rotation in degrees around origin                    |
 
 ### Color Helpers
 
 ```typescript
 import { rgb, cmyk, grayscale } from "@libpdf/core";
 
-rgb(1, 0, 0)           // Red in RGB
-cmyk(0, 1, 1, 0)       // Red in CMYK
-grayscale(0.5)         // 50% gray
+rgb(1, 0, 0); // Red in RGB
+cmyk(0, 1, 1, 0); // Red in CMYK
+grayscale(0.5); // 50% gray
 ```
 
 ---
@@ -283,14 +284,14 @@ Tracks modifications for incremental saves.
 
 ### Forms Subsystem (`src/document/forms/`)
 
-| Component | Purpose |
-|-----------|---------|
-| `AcroForm` | Low-level AcroForm dictionary access |
-| `FieldTree` | Traverses form field hierarchy |
-| `FormFlattener` | Renders fields to page content and removes interactivity |
-| `AppearanceGenerator` | Creates visual appearances for fields |
-| `WidgetAnnotation` | Widget annotation wrapper |
-| `FormFont` | Font resolution for form fields |
+| Component             | Purpose                                                  |
+| --------------------- | -------------------------------------------------------- |
+| `AcroForm`            | Low-level AcroForm dictionary access                     |
+| `FieldTree`           | Traverses form field hierarchy                           |
+| `FormFlattener`       | Renders fields to page content and removes interactivity |
+| `AppearanceGenerator` | Creates visual appearances for fields                    |
+| `WidgetAnnotation`    | Widget annotation wrapper                                |
+| `FormFont`            | Font resolution for form fields                          |
 
 ---
 
@@ -300,12 +301,12 @@ PDF font handling for both reading existing fonts and embedding new ones.
 
 ### Font Types
 
-| Class | Description |
-|-------|-------------|
-| `SimpleFont` | Type1, TrueType, and Standard 14 fonts |
+| Class           | Description                                |
+| --------------- | ------------------------------------------ |
+| `SimpleFont`    | Type1, TrueType, and Standard 14 fonts     |
 | `CompositeFont` | Type0 (CID) fonts with CIDFont descendants |
-| `CIDFont` | CIDFontType0 (CFF) and CIDFontType2 (TTF) |
-| `EmbeddedFont` | In-memory font prepared for embedding |
+| `CIDFont`       | CIDFontType0 (CFF) and CIDFontType2 (TTF)  |
+| `EmbeddedFont`  | In-memory font prepared for embedding      |
 
 ### FontFactory
 
@@ -328,14 +329,14 @@ Creates PDF objects for embedding TrueType/OpenType fonts.
 
 ### Supporting Components
 
-| Component | Purpose |
-|-----------|---------|
-| `CMap` | Character code to CID/Unicode mapping |
-| `ToUnicode` | ToUnicode CMap parsing |
-| `ToUnicodeBuilder` | ToUnicode CMap generation |
-| `WidthsBuilder` | W array generation for CID fonts |
-| `FontDescriptor` | Font metrics and flags |
-| `Standard14` | Built-in font metrics (Helvetica, Times, etc.) |
+| Component          | Purpose                                        |
+| ------------------ | ---------------------------------------------- |
+| `CMap`             | Character code to CID/Unicode mapping          |
+| `ToUnicode`        | ToUnicode CMap parsing                         |
+| `ToUnicodeBuilder` | ToUnicode CMap generation                      |
+| `WidthsBuilder`    | W array generation for CID fonts               |
+| `FontDescriptor`   | Font metrics and flags                         |
+| `Standard14`       | Built-in font metrics (Helvetica, Times, etc.) |
 
 ---
 
@@ -347,32 +348,32 @@ Low-level font file parsing and manipulation. Ported from Apache PDFBox.
 
 TrueType and OpenType font parsing.
 
-| Component | Purpose |
-|-----------|---------|
-| `TTFParser` | Parses TrueType font files |
-| `TTFSubsetter` | Creates subsets with selected glyphs |
-| `TrueTypeFont` | Parsed font data structure |
-| Table parsers | head, hhea, hmtx, cmap, name, OS/2, etc. |
+| Component      | Purpose                                  |
+| -------------- | ---------------------------------------- |
+| `TTFParser`    | Parses TrueType font files               |
+| `TTFSubsetter` | Creates subsets with selected glyphs     |
+| `TrueTypeFont` | Parsed font data structure               |
+| Table parsers  | head, hhea, hmtx, cmap, name, OS/2, etc. |
 
 ### CFF Module (`src/fontbox/cff/`)
 
 Compact Font Format parsing (OpenType with CFF outlines).
 
-| Component | Purpose |
-|-----------|---------|
-| `CFFParser` | Parses CFF font data |
-| `CFFSubsetter` | Creates CFF subsets |
-| `CFFFont` | Parsed CFF structure |
+| Component        | Purpose               |
+| ---------------- | --------------------- |
+| `CFFParser`      | Parses CFF font data  |
+| `CFFSubsetter`   | Creates CFF subsets   |
+| `CFFFont`        | Parsed CFF structure  |
 | Type2 charstring | Glyph outline parsing |
 
 ### Type1 Module (`src/fontbox/type1/`)
 
 PostScript Type 1 font support.
 
-| Component | Purpose |
-|-----------|---------|
+| Component     | Purpose                   |
+| ------------- | ------------------------- |
 | `Type1Parser` | Parses PFB/PFA font files |
-| `Type1Font` | Parsed Type1 structure |
+| `Type1Font`   | Parsed Type1 structure    |
 
 ### AFM Module (`src/fontbox/afm/`)
 
@@ -493,19 +494,20 @@ Generates xref tables/streams for output.
 
 PDF's COS (Carousel Object System) object types. All types have a discriminated `type` field.
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `PdfNull` | Null value | `null` |
-| `PdfBool` | Boolean | `true`, `false` |
-| `PdfNumber` | Integer or real | `42`, `-3.14` |
-| `PdfName` | Name (interned) | `/Type`, `/Page` |
-| `PdfString` | Literal or hex string | `(Hello)`, `<48656C6C6F>` |
-| `PdfRef` | Indirect reference (interned) | `1 0 R` |
-| `PdfArray` | Array of objects | `[1 2 3]` |
-| `PdfDict` | Dictionary | `<< /Type /Page >>` |
-| `PdfStream` | Dict + binary data | `<< /Length 5 >> stream...` |
+| Type        | Description                   | Example                     |
+| ----------- | ----------------------------- | --------------------------- |
+| `PdfNull`   | Null value                    | `null`                      |
+| `PdfBool`   | Boolean                       | `true`, `false`             |
+| `PdfNumber` | Integer or real               | `42`, `-3.14`               |
+| `PdfName`   | Name (interned)               | `/Type`, `/Page`            |
+| `PdfString` | Literal or hex string         | `(Hello)`, `<48656C6C6F>`   |
+| `PdfRef`    | Indirect reference (interned) | `1 0 R`                     |
+| `PdfArray`  | Array of objects              | `[1 2 3]`                   |
+| `PdfDict`   | Dictionary                    | `<< /Type /Page >>`         |
+| `PdfStream` | Dict + binary data            | `<< /Length 5 >> stream...` |
 
 **Design decisions:**
+
 - `PdfName` and `PdfRef` use interning for memory efficiency
 - Containers store `PdfRef` directly (no auto-dereferencing)
 - Mutable containers to support PDF modification
@@ -517,17 +519,17 @@ PDF's COS (Carousel Object System) object types. All types have a discriminated 
 
 Stream filter implementations for encoding/decoding.
 
-| Filter | Status | Notes |
-|--------|--------|-------|
-| FlateDecode | Full | zlib compression with predictor support |
-| LZWDecode | Full | Including /EarlyChange parameter |
-| ASCII85Decode | Full | |
-| ASCIIHexDecode | Full | |
-| RunLengthDecode | Full | |
-| DCTDecode | Passthrough | JPEG — returns raw data |
-| CCITTFaxDecode | Passthrough | Fax — returns raw data |
-| JBIG2Decode | Passthrough | Returns raw data |
-| JPXDecode | Passthrough | JPEG2000 — returns raw data |
+| Filter          | Status      | Notes                                   |
+| --------------- | ----------- | --------------------------------------- |
+| FlateDecode     | Full        | zlib compression with predictor support |
+| LZWDecode       | Full        | Including /EarlyChange parameter        |
+| ASCII85Decode   | Full        |                                         |
+| ASCIIHexDecode  | Full        |                                         |
+| RunLengthDecode | Full        |                                         |
+| DCTDecode       | Passthrough | JPEG — returns raw data                 |
+| CCITTFaxDecode  | Passthrough | Fax — returns raw data                  |
+| JBIG2Decode     | Passthrough | Returns raw data                        |
+| JPXDecode       | Passthrough | JPEG2000 — returns raw data             |
 
 **FilterPipeline** orchestrates filter chains. Filters are applied in order for decoding, reverse order for encoding.
 
@@ -539,30 +541,34 @@ Handles PDF encryption and decryption for the Standard security handler.
 
 ### Encryption Revisions
 
-| Revision | Algorithm | Key Size | Notes |
-|----------|-----------|----------|-------|
-| R2 | RC4 | 40-bit | PDF 1.1, legacy |
-| R3 | RC4 | 40-128 bit | PDF 1.4 |
-| R4 | RC4 or AES-128 | 128-bit | PDF 1.5, crypt filters |
-| R5 | AES-256 | 256-bit | PDF 1.7 ext 3 (deprecated) |
-| R6 | AES-256 | 256-bit | PDF 2.0, current standard |
+| Revision | Algorithm      | Key Size   | Notes                      |
+| -------- | -------------- | ---------- | -------------------------- |
+| R2       | RC4            | 40-bit     | PDF 1.1, legacy            |
+| R3       | RC4            | 40-128 bit | PDF 1.4                    |
+| R4       | RC4 or AES-128 | 128-bit    | PDF 1.5, crypt filters     |
+| R5       | AES-256        | 256-bit    | PDF 1.7 ext 3 (deprecated) |
+| R6       | AES-256        | 256-bit    | PDF 2.0, current standard  |
 
 ### Key Components
 
 **StandardSecurityHandler** — Main entry point for encryption/decryption.
+
 - Authenticates user/owner passwords
 - Provides `decryptString()` and `decryptStream()` methods
 - Tracks permission flags
 
 **Ciphers** (`src/security/ciphers/`)
+
 - `RC4Cipher` — Stream cipher for R2-R4
 - `AESCipher` — Block cipher for R4+ (CBC mode with PKCS7 padding)
 
 **Key Derivation** (`src/security/key-derivation/`)
+
 - `md5-based.ts` — R2-R4 key derivation using MD5 + RC4
 - `sha-based.ts` — R5-R6 key derivation using SHA-256/384/512
 
 **Handlers** (`src/security/handlers/`)
+
 - `AbstractSecurityHandler` — Interface for encryption handlers
 - `RC4Handler` — R2-R4 with per-object key derivation
 - `AES128Handler` — R4 AES-128-CBC
@@ -608,47 +614,47 @@ bytes = await (await PDF.load(bytes)).sign({ signer: signer2, fieldName: "Review
 
 ### Signers (`src/signatures/signers/`)
 
-| Component | Purpose |
-|-----------|---------|
-| `Signer` | Interface for signing implementations |
-| `P12Signer` | Signs using PKCS#12 files (.p12/.pfx) |
-| `CryptoKeySigner` | Signs using Web Crypto CryptoKey |
+| Component         | Purpose                               |
+| ----------------- | ------------------------------------- |
+| `Signer`          | Interface for signing implementations |
+| `P12Signer`       | Signs using PKCS#12 files (.p12/.pfx) |
+| `CryptoKeySigner` | Signs using Web Crypto CryptoKey      |
 
 ### Signature Formats (`src/signatures/formats/`)
 
-| Component | Purpose |
-|-----------|---------|
-| `pkcs7-detached.ts` | Legacy `adbe.pkcs7.detached` format |
+| Component           | Purpose                                     |
+| ------------------- | ------------------------------------------- |
+| `pkcs7-detached.ts` | Legacy `adbe.pkcs7.detached` format         |
 | `cades-detached.ts` | Modern `ETSI.CAdES.detached` format (PAdES) |
 
 ### Supporting Components
 
-| Component | Purpose |
-|-----------|---------|
-| `placeholder.ts` | ByteRange/Contents placeholder handling |
-| `timestamp.ts` | RFC 3161 timestamp authority client |
-| `revocation.ts` | OCSP/CRL fetching for certificate validation |
-| `dss.ts` | Document Security Store for LTV data |
-| `aia.ts` | Authority Information Access chain building |
-| `sign.ts` | Main signing orchestration |
+| Component        | Purpose                                      |
+| ---------------- | -------------------------------------------- |
+| `placeholder.ts` | ByteRange/Contents placeholder handling      |
+| `timestamp.ts`   | RFC 3161 timestamp authority client          |
+| `revocation.ts`  | OCSP/CRL fetching for certificate validation |
+| `dss.ts`         | Document Security Store for LTV data         |
+| `aia.ts`         | Authority Information Access chain building  |
+| `sign.ts`        | Main signing orchestration                   |
 
 ### Crypto Utilities (`src/signatures/crypto/`)
 
 Legacy cryptographic implementations for PKCS#12 parsing (Web Crypto doesn't support these older algorithms):
 
-| Component | Purpose |
-|-----------|---------|
+| Component       | Purpose                         |
+| --------------- | ------------------------------- |
 | `pkcs12-kdf.ts` | PKCS#12 key derivation function |
-| `rc2.ts` | RC2 cipher (legacy P12 files) |
-| `triple-des.ts` | 3DES cipher (legacy P12 files) |
+| `rc2.ts`        | RC2 cipher (legacy P12 files)   |
+| `triple-des.ts` | 3DES cipher (legacy P12 files)  |
 
 ### PAdES Compliance Levels
 
-| Level | Features |
-|-------|----------|
-| B-B | Basic signature with certificate |
-| B-T | + RFC 3161 timestamp |
-| B-LT | + DSS with OCSP/CRL data |
+| Level | Features                          |
+| ----- | --------------------------------- |
+| B-B   | Basic signature with certificate  |
+| B-T   | + RFC 3161 timestamp              |
+| B-LT  | + DSS with OCSP/CRL data          |
 | B-LTA | + Document timestamp for archival |
 
 ---
@@ -674,10 +680,10 @@ Legacy cryptographic implementations for PKCS#12 parsing (Web Crypto doesn't sup
 
 Content stream parsing and operators.
 
-| Component | Purpose |
-|-----------|---------|
-| `ContentStream` | Parses page content streams into operators |
-| `operators.ts` | PDF operator definitions and argument parsing |
+| Component       | Purpose                                       |
+| --------------- | --------------------------------------------- |
+| `ContentStream` | Parses page content streams into operators    |
+| `operators.ts`  | PDF operator definitions and argument parsing |
 
 ---
 
@@ -690,13 +696,13 @@ Image embedding for JPEG and PNG formats.
 Represents an embedded image that can be drawn on pages.
 
 ```typescript
-const image = await pdf.embedImage(bytes);   // Auto-detect format
-const image = await pdf.embedJpeg(bytes);    // Force JPEG
-const image = await pdf.embedPng(bytes);     // Force PNG
+const image = await pdf.embedImage(bytes); // Auto-detect format
+const image = await pdf.embedJpeg(bytes); // Force JPEG
+const image = await pdf.embedPng(bytes); // Force PNG
 
-image.ref;      // PdfRef to the XObject
-image.width;    // Original image width
-image.height;   // Original image height
+image.ref; // PdfRef to the XObject
+image.width; // Original image width
+image.height; // Original image height
 ```
 
 ### JPEG Handling
@@ -722,7 +728,7 @@ Optional Content Groups (layers) detection and flattening.
 if (pdf.hasLayers()) {
   const layers = await pdf.getLayers();
   // Returns: [{ name, visible, locked, intent }, ...]
-  
+
   // Flatten to make all content visible and remove OCG
   await pdf.flattenLayers();
 }
@@ -736,10 +742,10 @@ if (pdf.hasLayers()) {
 
 Embedded file specification handling.
 
-| Component | Purpose |
-|-----------|---------|
+| Component  | Purpose                                        |
+| ---------- | ---------------------------------------------- |
 | `FileSpec` | Parses/creates file specification dictionaries |
-| `types.ts` | Attachment metadata types |
+| `types.ts` | Attachment metadata types                      |
 
 ---
 
@@ -824,30 +830,38 @@ PDF.save()
 ## Design Principles
 
 ### Lenient Parsing
+
 Be super lenient with malformed PDFs. Fall back to brute-force parsing when standard parsing fails. Prioritize opening files over strict spec compliance.
 
 ### Layered Recovery
+
 1. **Normal path**: Follow xref chain from `startxref`
 2. **Lenient xref**: Skip corrupted entries, continue with valid ones
 3. **Brute-force**: Scan entire file, rebuild xref from scratch
 
 ### Lazy Loading
+
 Parse objects on-demand, not all at once. Opening a 1000-page PDF should be instant.
 
 ### No Proxy Magic
+
 Collections use explicit methods like `.at(index)` rather than Proxy-based bracket notation.
 
 ### Incremental Updates
+
 Support appending changes without rewriting the entire file. Critical for preserving digital signatures.
 
 ### Two API Layers
+
 - **High-level**: `PDF`, `PDFPage`, `PDFForm` — simple, task-focused
 - **Low-level**: `PdfDict`, `PdfArray`, `PdfStream` — full control
 
 ### Async-First
+
 All I/O and decompression operations return Promises.
 
 ### Memory Efficiency
+
 - Interning for frequently repeated values (`PdfName`, `PdfRef`)
 - Lazy object loading with caching
 - Object stream parsing only when needed
@@ -859,10 +873,10 @@ All I/O and decompression operations return Promises.
 
 When implementing, consult the reference libraries in `checkouts/`:
 
-| Area | Best Reference |
-|------|----------------|
-| Parsing, malformed PDFs | pdf.js (`src/core/`) |
-| TypeScript API patterns | pdf-lib (`src/`) |
+| Area                         | Best Reference                   |
+| ---------------------------- | -------------------------------- |
+| Parsing, malformed PDFs      | pdf.js (`src/core/`)             |
+| TypeScript API patterns      | pdf-lib (`src/`)                 |
 | Feature coverage, edge cases | PDFBox (`pdfbox/src/main/java/`) |
 
 ---
@@ -870,6 +884,7 @@ When implementing, consult the reference libraries in `checkouts/`:
 ## Status
 
 ### Complete
+
 - [x] I/O Layer (Scanner, BinaryWriter)
 - [x] Objects Layer (PdfDict, PdfArray, PdfStream, etc.)
 - [x] Filters (Flate, LZW, ASCII85, ASCIIHex, RunLength)
@@ -898,10 +913,12 @@ When implementing, consult the reference libraries in `checkouts/`:
 - [x] Layer (OCG) detection and flattening
 
 ### Partial / In Progress
+
 - [ ] Linearized PDF fast-open (detection only, no optimization)
 - [ ] Text extraction (fonts decode, but no layout analysis)
 
 ### Not Yet Built
+
 - [ ] Annotation support (read/write/flatten)
 - [ ] Digital signature verification
 - [ ] Certificate-based decryption (/Adobe.PubSec handler)

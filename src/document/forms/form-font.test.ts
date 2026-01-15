@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { ExistingFont, isEmbeddedFont, isExistingFont } from "./form-font";
 
 describe("ExistingFont", () => {

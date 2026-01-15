@@ -20,7 +20,7 @@ const doc = await parser.parse({ credentials: "secret" });
 
 // With explicit credential type
 const doc = await parser.parse({
-  credentials: { type: "password", password: "secret" }
+  credentials: { type: "password", password: "secret" },
 });
 
 // Check if we have full access
@@ -95,9 +95,9 @@ import { PDF } from "@libpdf/core";
 const pdf = await PDF.load(bytes, { credentials: "secret" });
 
 // Check encryption
-console.log(pdf.isEncrypted);           // true
-console.log(pdf.encryption?.revision);  // 6
-console.log(pdf.permissions.print);     // true
+console.log(pdf.isEncrypted); // true
+console.log(pdf.encryption?.revision); // 6
+console.log(pdf.permissions.print); // true
 
 // Remove encryption (requires owner access)
 pdf.removeProtection();
@@ -113,7 +113,7 @@ pdf.setProtection({
     modify: false,
     annotate: true,
     fillForms: true,
-  }
+  },
 });
 await pdf.save();
 ```
@@ -124,13 +124,13 @@ await pdf.save();
 
 PDF encryption protects document content using symmetric encryption (RC4 or AES) with keys derived from passwords or public key certificates. The encryption system has evolved through 6 revisions:
 
-| Revision | PDF Version | Algorithm | Key Length | Notes |
-|----------|-------------|-----------|------------|-------|
-| 2 | 1.3 | RC4 | 40-bit | Legacy, weak |
-| 3 | 1.4 | RC4 | 40-128 bit | Variable key length |
-| 4 | 1.5 | RC4 or AES-128 | 128-bit | Crypt filters |
-| 5 | 1.7 ext 3 | AES-256 | 256-bit | PDF 2.0 draft |
-| 6 | 2.0 | AES-256 | 256-bit | PDF 2.0 final |
+| Revision | PDF Version | Algorithm      | Key Length | Notes               |
+| -------- | ----------- | -------------- | ---------- | ------------------- |
+| 2        | 1.3         | RC4            | 40-bit     | Legacy, weak        |
+| 3        | 1.4         | RC4            | 40-128 bit | Variable key length |
+| 4        | 1.5         | RC4 or AES-128 | 128-bit    | Crypt filters       |
+| 5        | 1.7 ext 3   | AES-256        | 256-bit    | PDF 2.0 draft       |
+| 6        | 2.0         | AES-256        | 256-bit    | PDF 2.0 final       |
 
 ---
 
@@ -140,12 +140,13 @@ PDF encryption protects document content using symmetric encryption (RC4 or AES)
 
 Password-based encryption with two password tiers:
 
-| Password | Purpose | Grants |
-|----------|---------|--------|
-| **User Password** | Open document | Limited by permission flags |
-| **Owner Password** | Full access | All permissions, can recover user password |
+| Password           | Purpose       | Grants                                     |
+| ------------------ | ------------- | ------------------------------------------ |
+| **User Password**  | Open document | Limited by permission flags                |
+| **Owner Password** | Full access   | All permissions, can recover user password |
 
 A document can have:
+
 - Both passwords (common)
 - Only owner password (document opens without password but has restrictions)
 - Only user password (rare, non-standard)
@@ -153,6 +154,7 @@ A document can have:
 ### Public Key Security Handler (`/Filter /Adobe.PubSec`)
 
 Certificate-based encryption for enterprise use:
+
 - Recipients specified by X.509 certificates
 - Per-recipient permissions possible
 - Uses PKCS#7 enveloped data
@@ -187,6 +189,7 @@ Located in trailer at `/Encrypt`. Key entries:
 ```
 
 For R6 (AES-256), additional entries:
+
 ```
   /OE <32 bytes>              % Owner encryption key
   /UE <32 bytes>              % User encryption key
@@ -199,16 +202,16 @@ For R6 (AES-256), additional entries:
 
 Stored in `/P` as a signed 32-bit integer. Bits 1-2 must be 0, bits 7-8 must be 1.
 
-| Bit | Flag | Description |
-|-----|------|-------------|
-| 3 | `PRINT` | Print the document |
-| 4 | `MODIFY` | Modify document contents |
-| 5 | `COPY` | Copy or extract text/graphics |
-| 6 | `ANNOTATE` | Add or modify annotations |
-| 9 | `FILL_FORMS` | Fill in form fields |
-| 10 | `ACCESSIBILITY` | Extract for accessibility |
-| 11 | `ASSEMBLE` | Insert, delete, rotate pages |
-| 12 | `PRINT_HIGH_QUALITY` | Print at full resolution |
+| Bit | Flag                 | Description                   |
+| --- | -------------------- | ----------------------------- |
+| 3   | `PRINT`              | Print the document            |
+| 4   | `MODIFY`             | Modify document contents      |
+| 5   | `COPY`               | Copy or extract text/graphics |
+| 6   | `ANNOTATE`           | Add or modify annotations     |
+| 9   | `FILL_FORMS`         | Fill in form fields           |
+| 10  | `ACCESSIBILITY`      | Extract for accessibility     |
+| 11  | `ASSEMBLE`           | Insert, delete, rotate pages  |
+| 12  | `PRINT_HIGH_QUALITY` | Print at full resolution      |
 
 **Default behavior**: If encrypted with only owner password (empty user password), document opens but respects permission flags.
 
@@ -219,6 +222,7 @@ Stored in `/P` as a signed 32-bit integer. Bits 1-2 must be 0, bits 7-8 must be 
 ### Key Derivation
 
 **R2-R4 (MD5-based)**:
+
 ```
 1. Pad password to 32 bytes using standard padding
 2. Concatenate: padded_password + O + P + file_id[0]
@@ -228,6 +232,7 @@ Stored in `/P` as a signed 32-bit integer. Bits 1-2 must be 0, bits 7-8 must be 
 ```
 
 **R5-R6 (SHA-based)**:
+
 ```
 1. UTF-8 encode password (truncate to 127 bytes)
 2. Hash: SHA-256(password + validation_salt + user_key)
@@ -240,12 +245,14 @@ Stored in `/P` as a signed 32-bit integer. Bits 1-2 must be 0, bits 7-8 must be 
 Each object gets a unique key derived from the document key:
 
 **R2-R4**:
+
 ```
 object_key = MD5(doc_key + object_number + generation + "sAlT")
 truncate to min(doc_key_length + 5, 16) bytes
 ```
 
 **R5-R6**:
+
 ```
 object_key = doc_key (no per-object derivation)
 ```
@@ -253,11 +260,13 @@ object_key = doc_key (no per-object derivation)
 ### Ciphers
 
 **RC4** (R2-R4):
+
 - Stream cipher, XOR-based
 - Same key encrypts and decrypts
 - No IV needed
 
 **AES-CBC** (R4-R6):
+
 - 16-byte IV prepended to ciphertext
 - PKCS#5 padding
 - Separate encrypt/decrypt operations
@@ -274,7 +283,7 @@ object_key = doc_key (no per-object derivation)
  */
 type DecryptionCredential =
   | { type: "password"; password: string }
-  | { type: "certificate"; certificate: Uint8Array; privateKey: Uint8Array };  // Future
+  | { type: "certificate"; certificate: Uint8Array; privateKey: Uint8Array }; // Future
 
 interface ParseOptions {
   lenient?: boolean;
@@ -343,11 +352,11 @@ class EncryptionError extends Error {
 }
 ```
 
-| Code | When |
-|------|------|
-| `NEED_CREDENTIALS` | Encrypted document, no credentials provided |
-| `INVALID_CREDENTIALS` | Wrong password or invalid certificate |
-| `UNSUPPORTED_ENCRYPTION` | Unknown handler or unsupported algorithm |
+| Code                     | When                                        |
+| ------------------------ | ------------------------------------------- |
+| `NEED_CREDENTIALS`       | Encrypted document, no credentials provided |
+| `INVALID_CREDENTIALS`    | Wrong password or invalid certificate       |
+| `UNSUPPORTED_ENCRYPTION` | Unknown handler or unsupported algorithm    |
 
 ---
 
@@ -371,6 +380,7 @@ src/security/
 ```
 
 No barrel files — import directly from each module:
+
 ```typescript
 import { createSecurityHandler } from "#src/security/security-factory";
 import { RC4Cipher } from "#src/security/ciphers/rc4";
@@ -382,6 +392,7 @@ import { deriveKeyMD5 } from "#src/security/key-derivation/md5-based";
 **1. DocumentParser** — Detect encryption, create handler
 
 After parsing the trailer:
+
 ```typescript
 import { createSecurityHandler } from "#src/security/security-factory";
 
@@ -395,6 +406,7 @@ if (encryptRef) {
 **2. getObject()** — Pass handler for decryption
 
 The security handler is captured in the closure and passed to IndirectObjectParser:
+
 ```typescript
 const getObject = async (ref: PdfRef): Promise<PdfObject | null> => {
   const parser = new IndirectObjectParser(scanner, lengthResolver, securityHandler);
@@ -405,6 +417,7 @@ const getObject = async (ref: PdfRef): Promise<PdfObject | null> => {
 **3. IndirectObjectParser** — Decrypt strings and streams
 
 During parsing:
+
 ```typescript
 // For strings
 if (securityHandler && !securityHandler.isIdentity) {
@@ -461,12 +474,14 @@ IndirectObjectParser.parseObjectAt(offset)
 ## Implementation Plan
 
 ### Phase 1: Detection & Permissions (read-only)
+
 - [ ] Parse `/Encrypt` dictionary
 - [ ] Parse permission flags from `/P`
 - [ ] Add `isEncrypted`, `encryption`, `permissions` to ParsedDocument
 - [ ] Throw `EncryptionError('NEED_CREDENTIALS')` for encrypted documents
 
 ### Phase 2: Standard Handler R2-R4 (RC4, AES-128)
+
 - [ ] RC4 cipher implementation
 - [ ] AES-128 CBC implementation
 - [ ] MD5-based key derivation (Algorithm 2)
@@ -476,18 +491,21 @@ IndirectObjectParser.parseObjectAt(offset)
 - [ ] Handle `/EncryptMetadata` flag
 
 ### Phase 3: Standard Handler R5-R6 (AES-256)
+
 - [ ] SHA-256/384/512 for key derivation
 - [ ] R6 iterative algorithm (Algorithm 2.B)
 - [ ] AES-256 CBC implementation
 - [ ] `/Perms` validation
 
 ### Phase 4: Writing Encrypted Documents
+
 - [ ] Encrypt strings during serialization
 - [ ] Encrypt streams during serialization
 - [ ] Generate `/Encrypt` dictionary
 - [ ] Generate /O, /U, /OE, /UE, /Perms
 
 ### Phase 5: Public Key Handler (Future)
+
 - [ ] PKCS#7 parsing
 - [ ] Certificate/recipient handling
 - [ ] Per-recipient permissions

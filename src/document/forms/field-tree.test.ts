@@ -2,9 +2,10 @@
  * Tests for FieldTree - safe field hierarchy iteration.
  */
 
-import { describe, expect, it } from "vitest";
 import { PDF } from "#src/api/pdf";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { NonTerminalField } from "./fields";
 
 describe("FieldTree", () => {

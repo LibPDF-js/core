@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { RC4Cipher, rc4 } from "./rc4";
 
 describe("RC4Cipher", () => {

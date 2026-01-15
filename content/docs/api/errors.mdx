@@ -8,8 +8,8 @@ description: Error classes thrown by LibPDF, organized by category.
 LibPDF uses typed error classes to help you handle failures appropriately. Errors are organized into categories based on when they occur.
 
 ```typescript
-import { 
-  SecurityError, 
+import {
+  SecurityError,
   PermissionDeniedError,
   SignatureError,
   SignerError,
@@ -60,6 +60,7 @@ try {
 Cross-reference table parsing failed.
 
 **Common causes**:
+
 - Corrupted xref table
 - Invalid xref stream
 - Missing startxref marker
@@ -73,6 +74,7 @@ Cross-reference table parsing failed.
 Object parsing failed.
 
 **Common causes**:
+
 - Malformed object syntax
 - Invalid object number
 - Truncated object data
@@ -86,6 +88,7 @@ Object parsing failed.
 Stream decompression failed.
 
 **Common causes**:
+
 - Corrupted compressed data
 - Unknown filter type
 - Missing decode parameters
@@ -99,6 +102,7 @@ Stream decompression failed.
 PDF structure is invalid.
 
 **Common causes**:
+
 - Missing required dictionary keys
 - Invalid object references
 - Circular references
@@ -149,12 +153,13 @@ try {
 
 Operation requires permissions the user doesn't have.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `code` | `"PERMISSION_DENIED"` | Error code |
+| Property             | Type                  | Description       |
+| -------------------- | --------------------- | ----------------- |
+| `code`               | `"PERMISSION_DENIED"` | Error code        |
 | `requiredPermission` | `string \| undefined` | Permission needed |
 
 **Common causes**:
+
 - Calling `removeProtection()` without owner access
 - Calling `setProtection()` without owner access
 - Modifying document without modify permission
@@ -184,17 +189,17 @@ Encryption method or credential type is not supported.
 
 > **Note**: This error class is internal. Use `error.name` to identify it, or catch `SecurityError`.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `code` | `EncryptionErrorCode` | Specific error type |
+| Property | Type                  | Description         |
+| -------- | --------------------- | ------------------- |
+| `code`   | `EncryptionErrorCode` | Specific error type |
 
 **Error Codes**:
 
-| Code | Description |
-|------|-------------|
-| `NEED_CREDENTIALS` | Document is encrypted, password required |
-| `INVALID_CREDENTIALS` | Password is incorrect |
-| `UNSUPPORTED_ENCRYPTION` | Unknown security handler or algorithm |
+| Code                      | Description                               |
+| ------------------------- | ----------------------------------------- |
+| `NEED_CREDENTIALS`        | Document is encrypted, password required  |
+| `INVALID_CREDENTIALS`     | Password is incorrect                     |
+| `UNSUPPORTED_ENCRYPTION`  | Unknown security handler or algorithm     |
 | `UNSUPPORTED_CREDENTIALS` | Certificate credentials not yet supported |
 
 ```typescript
@@ -221,6 +226,7 @@ try {
 Password verification failed.
 
 **Common causes**:
+
 - Incorrect password
 - Missing required encryption fields
 - Corrupted encryption dictionary
@@ -234,6 +240,7 @@ Password verification failed.
 Decryption operation failed.
 
 **Common causes**:
+
 - Wrong decryption key
 - Corrupted encrypted data
 - Invalid padding
@@ -247,6 +254,7 @@ Decryption operation failed.
 Encryption dictionary is malformed.
 
 **Common causes**:
+
 - Missing required /V or /R values
 - Invalid /CF dictionary
 - Unsupported encryption version
@@ -261,9 +269,9 @@ Thrown during digital signature operations.
 
 Base class for all signature-related errors.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `code` | `string` | Error code |
+| Property | Type     | Description |
+| -------- | -------- | ----------- |
+| `code`   | `string` | Error code  |
 
 ```typescript
 import { SignatureError } from "@libpdf/core";
@@ -288,6 +296,7 @@ try {
 Problem with the signer (P12Signer or CryptoKeySigner).
 
 **Common causes**:
+
 - Invalid P12 password
 - Corrupted P12 file
 - Private key not available
@@ -316,6 +325,7 @@ try {
 Timestamp server operation failed.
 
 **Common causes**:
+
 - Timestamp server unreachable
 - Invalid timestamp response
 - Server returned error status
@@ -349,6 +359,7 @@ try {
 Failed to fetch revocation data (OCSP or CRL).
 
 **Common causes**:
+
 - OCSP responder unreachable
 - CRL download failed
 - Invalid revocation response
@@ -379,6 +390,7 @@ try {
 Problem with the certificate chain.
 
 **Common causes**:
+
 - Incomplete certificate chain
 - Certificate expired
 - Self-signed certificate (chain of 1)
@@ -406,9 +418,9 @@ try {
 
 Signature placeholder is too small for the signature data.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `requiredSize` | `number` | Bytes needed |
+| Property        | Type     | Description     |
+| --------------- | -------- | --------------- |
+| `requiredSize`  | `number` | Bytes needed    |
 | `availableSize` | `number` | Bytes available |
 
 This error typically indicates an internal issue. Contact support if you encounter it.
@@ -509,7 +521,7 @@ async function loadWithRetry(bytes: Uint8Array, password?: string) {
 
 ## Error Hierarchy
 
-**Bold** = exported from `@libpdf/core`, *italic* = internal (use `error.name` to identify)
+**Bold** = exported from `@libpdf/core`, _italic_ = internal (use `error.name` to identify)
 
 ```
 Error

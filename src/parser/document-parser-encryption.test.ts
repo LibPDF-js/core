@@ -6,9 +6,10 @@
  * - PasswordSample-*.pdf: owner="owner", user="user"
  */
 
-import { describe, expect, it } from "vitest";
 import { Scanner } from "#src/io/scanner";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { DocumentParser } from "./document-parser";
 
 describe("DocumentParser encryption", () => {

@@ -50,16 +50,16 @@ type SignatureAlgorithm = "RSASSA-PKCS1-v1_5" | "RSA-PSS" | "ECDSA";
 interface Signer {
   /** DER-encoded X.509 signing certificate */
   readonly certificate: Uint8Array;
-  
+
   /** Optional certificate chain [intermediate, ..., root] */
   readonly certificateChain?: Uint8Array[];
-  
+
   /** Key type (RSA or EC) - required for CMS construction */
   readonly keyType: KeyType;
-  
+
   /** Signature algorithm - required for CMS construction */
   readonly signatureAlgorithm: SignatureAlgorithm;
-  
+
   /** Sign a digest, return raw signature bytes */
   sign(digest: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array>;
 }
@@ -88,40 +88,40 @@ type SubFilter = "adbe.pkcs7.detached" | "ETSI.CAdES.detached";
 
 interface SignOptions {
   signer: Signer;
-  
+
   // Metadata
   reason?: string;
   location?: string;
   contactInfo?: string;
-  
+
   /**
    * Signing time to embed in the signature.
    * Defaults to current system time.
-   * 
+   *
    * NOTE: This is NOT cryptographically verified - it's just a claim.
    * The signer's local clock provides this value. For proven time,
    * use a TimestampAuthority (B-T level or higher).
    */
   signingTime?: Date;
-  
+
   // Field configuration
-  fieldName?: string;  // Use existing or create new (auto-generated if omitted)
-  
+  fieldName?: string; // Use existing or create new (auto-generated if omitted)
+
   // Signature format
-  subFilter?: SubFilter;  // default: "ETSI.CAdES.detached"
-  
+  subFilter?: SubFilter; // default: "ETSI.CAdES.detached"
+
   // PAdES level (convenience shorthand, requires CAdES subFilter)
   level?: "B-B" | "B-T" | "B-LT" | "B-LTA";
-  
+
   // Or configure individually:
   timestampAuthority?: TimestampAuthority;
   longTermValidation?: boolean;
   revocationProvider?: RevocationProvider;
   archivalTimestamp?: boolean;
-  
+
   // Advanced
-  digestAlgorithm?: DigestAlgorithm;  // default: SHA-256
-  estimatedSize?: number;              // placeholder size, default: 12KB
+  digestAlgorithm?: DigestAlgorithm; // default: SHA-256
+  estimatedSize?: number; // placeholder size, default: 12KB
 }
 ```
 
@@ -177,9 +177,9 @@ const signedBytes = await pdf.sign({
 
 Two signature formats are supported:
 
-| SubFilter | Use Case |
-|-----------|----------|
-| `adbe.pkcs7.detached` | Legacy/broad compatibility, simple PKCS#7 |
+| SubFilter             | Use Case                                             |
+| --------------------- | ---------------------------------------------------- |
+| `adbe.pkcs7.detached` | Legacy/broad compatibility, simple PKCS#7            |
 | `ETSI.CAdES.detached` | PAdES compliance, EU regulations, long-term archival |
 
 **Default**: `ETSI.CAdES.detached` - it's the modern standard and required for PAdES levels.
@@ -240,6 +240,7 @@ src/
 Core infrastructure for creating valid signed PDFs.
 
 **Components:**
+
 - `Signer` interface and `P12Signer` implementation
 - Placeholder mechanism (reserve ByteRange/Contents space)
 - CMS SignedData generation (using pkijs)
@@ -248,6 +249,7 @@ Core infrastructure for creating valid signed PDFs.
 - `pdf.sign()` API integration
 
 **Internal Flow:**
+
 1. Create signature field + widget (or use existing)
 2. Create signature dictionary with placeholders
 3. Write incremental update to buffer
@@ -264,11 +266,13 @@ Core infrastructure for creating valid signed PDFs.
 Add RFC 3161 timestamp support.
 
 **Components:**
+
 - `TimestampAuthority` interface
 - `HttpTimestampAuthority` - HTTP TSA client
 - Timestamp token embedding in CMS SignerInfo
 
 **Flow addition:**
+
 - After creating signature, hash the signature value
 - Request timestamp from TSA
 - Embed timestamp token as unsigned attribute in SignerInfo
@@ -278,6 +282,7 @@ Add RFC 3161 timestamp support.
 Embed validation data for offline verification.
 
 **Components:**
+
 - `RevocationProvider` interface
 - `DefaultRevocationProvider` - fetches from certificate URLs
 - DSS dictionary builder
@@ -287,6 +292,7 @@ Embed validation data for offline verification.
 - AIA chain building (fetch missing intermediates)
 
 **Flow addition:**
+
 - After signature, collect all certificates in chain
 - If chain incomplete, attempt AIA chain building (throw if fails)
 - Fetch OCSP/CRL for each certificate
@@ -299,10 +305,12 @@ Embed validation data for offline verification.
 Document timestamps for long-term archival.
 
 **Components:**
+
 - Document timestamp signature (`/SubFilter /ETSI.RFC3161`)
 - Re-timestamping support (experimental)
 
 **Flow addition:**
+
 - After DSS update, create document timestamp
 - Document timestamp covers entire PDF including DSS
 - Written as third incremental update
@@ -312,6 +320,7 @@ Document timestamps for long-term archival.
 Verify existing signatures.
 
 **Components:**
+
 - Signature dictionary parsing
 - ByteRange extraction and hash computation
 - CMS signature verification
@@ -321,6 +330,7 @@ Verify existing signatures.
 - Modification detection and categorization
 
 **API:**
+
 ```typescript
 const results = await pdf.verifySignatures();
 // Returns array of SignatureVerificationResult
@@ -332,15 +342,15 @@ const results = await pdf.verifySignatures();
 
 All errors throw. No graceful degradation or fallback behavior.
 
-| Scenario | Behavior |
-|----------|----------|
-| Placeholder too small | Throw `SignatureError` with details on required vs available size |
-| TSA unavailable | Throw `TimestampError` - signing fails entirely |
-| OCSP/CRL fetch fails | Throw `RevocationError` - B-LT/B-LTA signing fails |
+| Scenario                     | Behavior                                                                |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| Placeholder too small        | Throw `SignatureError` with details on required vs available size       |
+| TSA unavailable              | Throw `TimestampError` - signing fails entirely                         |
+| OCSP/CRL fetch fails         | Throw `RevocationError` - B-LT/B-LTA signing fails                      |
 | Certificate chain incomplete | Attempt AIA chain building; throw `CertificateChainError` if that fails |
-| AIA fetch fails | Throw `CertificateChainError` |
-| Invalid P12 password | Throw `SignerError` |
-| MDP violation | Warn but proceed (see Certification Signatures section) |
+| AIA fetch fails              | Throw `CertificateChainError`                                           |
+| Invalid P12 password         | Throw `SignerError`                                                     |
+| MDP violation                | Warn but proceed (see Certification Signatures section)                 |
 
 Error types inherit from base `SignatureError`:
 
@@ -406,6 +416,7 @@ If `signer.certificateChain` is incomplete or missing:
 ### Chain Embedding
 
 All certificates (signer + chain) are embedded in:
+
 - The CMS SignedData structure
 - The DSS dictionary (for B-LT+)
 
@@ -420,38 +431,38 @@ type VerificationStatus = "valid" | "invalid" | "indeterminate";
 
 interface CheckResult {
   status: VerificationStatus;
-  message?: string;        // Human-readable explanation
-  details?: unknown;       // Additional structured data
+  message?: string; // Human-readable explanation
+  details?: unknown; // Additional structured data
 }
 
 interface SignatureVerificationResult {
   /** Signature field name */
   fieldName: string;
-  
+
   /** Overall status */
   overallStatus: VerificationStatus;
-  
+
   /** Individual check results */
   checks: {
     /** Does the hash match the signed bytes? */
     integrityCheck: CheckResult;
-    
+
     /** Is the certificate valid and trusted? */
     certificateCheck: CheckResult;
-    
+
     /** Is the timestamp valid (if present)? */
     timestampCheck: CheckResult;
-    
+
     /** Is revocation data available and certificate not revoked? */
     revocationCheck: CheckResult;
   };
-  
+
   /** Signing time (from timestamp if available, otherwise claimed time) */
   signingTime?: Date;
-  
+
   /** Signer's common name from certificate */
   signerName?: string;
-  
+
   /** Reason stated in signature */
   reason?: string;
 }
@@ -468,20 +479,21 @@ interface SignatureVerificationResult {
 Modifications after signing are categorized:
 
 ```typescript
-type ModificationCategory = 
-  | "none"                    // No changes after this signature
-  | "allowed_only"            // Only allowed changes (new signatures, DSS, permitted annotations)
-  | "disallowed_detected";    // Page content, form values, or other disallowed changes
+type ModificationCategory =
+  | "none" // No changes after this signature
+  | "allowed_only" // Only allowed changes (new signatures, DSS, permitted annotations)
+  | "disallowed_detected"; // Page content, form values, or other disallowed changes
 
 interface SignatureVerificationResult {
   // ... other fields ...
-  
+
   /** What was modified after this signature */
   modificationsAfterSigning: ModificationCategory;
 }
 ```
 
 Categorization logic:
+
 - Parse incremental updates after the signature
 - "Allowed" changes: new signature fields, DSS dictionary, annotations (if permitted by DocMDP)
 - "Disallowed" changes: page content streams, form field values, document structure
@@ -493,10 +505,12 @@ Categorization logic:
 ### Background
 
 PDF supports two signature types:
+
 - **Approval signatures**: Multiple allowed, just attest to document
 - **Certification signature**: First signature, sets modification permissions
 
 Certification signatures include a DocMDP transform with permission level:
+
 - P=1: No changes allowed
 - P=2: Form fill-in and signing allowed
 - P=3: Form fill-in, signing, and annotations allowed
@@ -542,6 +556,7 @@ When loading a PDF with existing signatures and adding a new one:
 - **Don't modify existing bytes** - Ensures prior signatures remain valid
 
 This means:
+
 - We can sign documents with signatures in unknown/legacy formats
 - We don't guarantee existing signatures are valid
 - Users should verify existing signatures separately if needed
@@ -555,6 +570,7 @@ The core challenge: signature bytes must be in the PDF, but we sign the PDF byte
 ### Solution
 
 1. **Reserve space** with padded placeholders:
+
    ```
    /ByteRange [0 /********** /********** /**********]
    /Contents <0000...0000>  % 12KB of zeros
@@ -565,6 +581,7 @@ The core challenge: signature bytes must be in the PDF, but we sign the PDF byte
 3. **Locate placeholders** - scan for byte positions
 
 4. **Patch ByteRange** with actual values (space-padded):
+
    ```
    /ByteRange [0 1234       5678       9012      ]
    ```
@@ -578,6 +595,7 @@ The core challenge: signature bytes must be in the PDF, but we sign the PDF byte
 ### Placeholder Size
 
 Default 12KB. Must accommodate:
+
 - CMS structure overhead (~100 bytes)
 - Signing certificate (~1-2KB)
 - Certificate chain (~2-6KB)
@@ -657,12 +675,12 @@ class P12Signer implements Signer {
    * @param password - Password to decrypt the file
    */
   static async create(p12Bytes: Uint8Array, password?: string = ""): Promise<P12Signer>;
-  
+
   readonly certificate: Uint8Array;
   readonly certificateChain: Uint8Array[];
   readonly keyType: KeyType;
   readonly signatureAlgorithm: SignatureAlgorithm;
-  
+
   sign(digest: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array>;
 }
 ```
@@ -682,7 +700,7 @@ class CryptoKeySigner implements Signer {
     certificate: Uint8Array,
     keyType: KeyType,
     signatureAlgorithm: SignatureAlgorithm,
-    certificateChain?: Uint8Array[]
+    certificateChain?: Uint8Array[],
   );
 }
 ```
@@ -700,20 +718,24 @@ class HttpTimestampAuthority implements TimestampAuthority {
    * @param url - TSA endpoint URL
    * @param options - Optional configuration
    */
-  constructor(url: string, options?: {
-    /** Custom headers (e.g., Authorization) */
-    headers?: Record<string, string>;
-    /** Request timeout in ms (default: 30000) */
-    timeout?: number;
-    /** Custom fetch implementation for advanced auth/middleware */
-    fetch?: typeof fetch;
-  });
-  
+  constructor(
+    url: string,
+    options?: {
+      /** Custom headers (e.g., Authorization) */
+      headers?: Record<string, string>;
+      /** Request timeout in ms (default: 30000) */
+      timeout?: number;
+      /** Custom fetch implementation for advanced auth/middleware */
+      fetch?: typeof fetch;
+    },
+  );
+
   timestamp(digest: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array>;
 }
 ```
 
 **Authentication**: For TSAs requiring authentication, either:
+
 1. Pass headers directly: `{ headers: { "Authorization": "Bearer token" } }`
 2. Provide custom fetch with auth middleware: `{ fetch: myAuthenticatedFetch }`
 
@@ -727,7 +749,7 @@ For maintaining B-LTA signatures over time, documents need periodic re-timestamp
 /**
  * Add a document timestamp to an existing signed PDF.
  * This extends the archival lifetime of existing signatures.
- * 
+ *
  * @experimental This API may change in future versions.
  */
 async addDocumentTimestamp(options: {
@@ -737,6 +759,7 @@ async addDocumentTimestamp(options: {
 ```
 
 Usage:
+
 ```typescript
 const pdf = await PDF.load(existingSignedBytes);
 const { bytes } = await pdf.addDocumentTimestamp({
@@ -780,26 +803,26 @@ This creates a new incremental update with a document timestamp signature (`/Sub
 
 ## Open Questions (Resolved)
 
-| Question | Decision |
-|----------|----------|
-| pkijs vs minimal custom | Use pkijs. CMS is complex, correctness matters. |
-| Algorithm support | SHA-256, SHA-384, SHA-512. Default SHA-256. |
-| Key types | RSA and ECDSA. Both common. |
-| Visible signatures | Separate plan. This plan is cryptographic only. |
-| Default subFilter | CAdES. Modern standard, required for PAdES. |
-| Key type discovery | Signer interface has `keyType` and `signatureAlgorithm` getters. |
-| Error handling | Fail fast, throw on all errors. |
-| Certificate chain | AIA chain building, throw if fetch fails. |
-| Field creation | Smart handling with auto-generated names. |
-| Modification detection | Categorize as none/allowed/disallowed. |
-| TSA authentication | Headers option + custom fetch option. |
-| P12 password | Simple string, document security implications. |
-| Bundle size | Accept ~200KB, no code splitting. |
-| Signing time | Configurable via option, defaults to system clock. |
-| Existing signatures | Preserve bytes exactly, don't parse/validate. |
-| Widget placement | Zero-size on page 1 for invisible signatures. |
-| Certification signatures | Warn but proceed on MDP violation. |
-| Re-timestamping | Include as experimental API. |
+| Question                 | Decision                                                         |
+| ------------------------ | ---------------------------------------------------------------- |
+| pkijs vs minimal custom  | Use pkijs. CMS is complex, correctness matters.                  |
+| Algorithm support        | SHA-256, SHA-384, SHA-512. Default SHA-256.                      |
+| Key types                | RSA and ECDSA. Both common.                                      |
+| Visible signatures       | Separate plan. This plan is cryptographic only.                  |
+| Default subFilter        | CAdES. Modern standard, required for PAdES.                      |
+| Key type discovery       | Signer interface has `keyType` and `signatureAlgorithm` getters. |
+| Error handling           | Fail fast, throw on all errors.                                  |
+| Certificate chain        | AIA chain building, throw if fetch fails.                        |
+| Field creation           | Smart handling with auto-generated names.                        |
+| Modification detection   | Categorize as none/allowed/disallowed.                           |
+| TSA authentication       | Headers option + custom fetch option.                            |
+| P12 password             | Simple string, document security implications.                   |
+| Bundle size              | Accept ~200KB, no code splitting.                                |
+| Signing time             | Configurable via option, defaults to system clock.               |
+| Existing signatures      | Preserve bytes exactly, don't parse/validate.                    |
+| Widget placement         | Zero-size on page 1 for invisible signatures.                    |
+| Certification signatures | Warn but proceed on MDP violation.                               |
+| Re-timestamping          | Include as experimental API.                                     |
 
 ---
 

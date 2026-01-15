@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { RunLengthFilter } from "./run-length-filter";
 
 describe("RunLengthFilter", () => {

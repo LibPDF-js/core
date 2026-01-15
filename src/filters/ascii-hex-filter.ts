@@ -1,6 +1,7 @@
 import { CR, hexValue, LF, SPACE, TAB } from "#src/helpers/chars";
 import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
+
 import type { Filter } from "./filter";
 
 /**

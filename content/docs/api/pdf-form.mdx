@@ -98,9 +98,9 @@ const names = form.getFieldNames();
 
 Get a field by name (untyped).
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `name` | `string` | Field name |
+| Param  | Type     | Description |
+| ------ | -------- | ----------- |
+| `name` | `string` | Field name  |
 
 **Returns**: `FormField | undefined`
 
@@ -117,9 +117,9 @@ if (field?.type === "text") {
 
 Check if a field exists.
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `name` | `string` | Field name |
+| Param  | Type     | Description |
+| ------ | -------- | ----------- |
+| `name` | `string` | Field name  |
 
 **Returns**: `boolean`
 
@@ -296,8 +296,8 @@ Get all buttons.
 
 Fill multiple fields at once.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param    | Type                         | Description           |
+| -------- | ---------------------------- | --------------------- |
 | `values` | `Record<string, FieldValue>` | Field names to values |
 
 **Returns**: `Promise<{ filled: string[], skipped: string[] }>`
@@ -310,25 +310,25 @@ This method is **lenient**: fields that don't exist are silently skipped.
 const result = await form.fill({
   name: "John Doe",
   email: "john@example.com",
-  agree: true,           // checkbox
-  country: "USA",        // dropdown
+  agree: true, // checkbox
+  country: "USA", // dropdown
   colors: ["red", "blue"], // listbox
   nonexistent: "ignored",
 });
 
-console.log(result.filled);  // ["name", "email", "agree", "country", "colors"]
+console.log(result.filled); // ["name", "email", "agree", "country", "colors"]
 console.log(result.skipped); // ["nonexistent"]
 ```
 
 **FieldValue Types**:
 
-| Field Type | Value Type |
-|------------|------------|
-| Text | `string` |
-| Checkbox | `boolean` or `string` |
-| Radio | `string` or `null` |
-| Dropdown | `string` |
-| Listbox | `string[]` |
+| Field Type | Value Type            |
+| ---------- | --------------------- |
+| Text       | `string`              |
+| Checkbox   | `boolean` or `string` |
+| Radio      | `string` or `null`    |
+| Dropdown   | `string`              |
+| Listbox    | `string[]`            |
 
 ---
 
@@ -348,22 +348,22 @@ await form.resetAll();
 
 Create a new text field.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `name` | `string` | required | Unique field name |
-| `[options]` | `TextFieldOptions` | | |
-| `[options.font]` | `EmbeddedFont` | | Font for text |
-| `[options.fontSize]` | `number` | `0` (auto) | Font size |
-| `[options.color]` | `Color` | black | Text color |
-| `[options.maxLength]` | `number` | | Max characters |
-| `[options.multiline]` | `boolean` | `false` | Multiline input |
-| `[options.password]` | `boolean` | `false` | Mask input |
-| `[options.comb]` | `boolean` | `false` | Fixed-width cells |
-| `[options.alignment]` | `TextAlignment` | `Left` | Text alignment |
-| `[options.defaultValue]` | `string` | | Default value |
-| `[options.backgroundColor]` | `Color` | | Background |
-| `[options.borderColor]` | `Color` | | Border |
-| `[options.borderWidth]` | `number` | `1` | Border width |
+| Param                       | Type               | Default    | Description       |
+| --------------------------- | ------------------ | ---------- | ----------------- |
+| `name`                      | `string`           | required   | Unique field name |
+| `[options]`                 | `TextFieldOptions` |            |                   |
+| `[options.font]`            | `EmbeddedFont`     |            | Font for text     |
+| `[options.fontSize]`        | `number`           | `0` (auto) | Font size         |
+| `[options.color]`           | `Color`            | black      | Text color        |
+| `[options.maxLength]`       | `number`           |            | Max characters    |
+| `[options.multiline]`       | `boolean`          | `false`    | Multiline input   |
+| `[options.password]`        | `boolean`          | `false`    | Mask input        |
+| `[options.comb]`            | `boolean`          | `false`    | Fixed-width cells |
+| `[options.alignment]`       | `TextAlignment`    | `Left`     | Text alignment    |
+| `[options.defaultValue]`    | `string`           |            | Default value     |
+| `[options.backgroundColor]` | `Color`            |            | Background        |
+| `[options.borderColor]`     | `Color`            |            | Border            |
+| `[options.borderWidth]`     | `number`           | `1`        | Border width      |
 
 **Returns**: `TextField`
 
@@ -391,16 +391,16 @@ await page.drawField(nameField, {
 
 Create a new checkbox field.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `name` | `string` | required | Unique field name |
-| `[options]` | `CheckboxOptions` | | |
-| `[options.onValue]` | `string` | `"Yes"` | Value when checked |
-| `[options.symbol]` | `CheckboxSymbol` | `"check"` | Symbol style |
-| `[options.defaultChecked]` | `boolean` | `false` | Initially checked |
-| `[options.backgroundColor]` | `Color` | | Background |
-| `[options.borderColor]` | `Color` | | Border |
-| `[options.borderWidth]` | `number` | `1` | Border width |
+| Param                       | Type              | Default   | Description        |
+| --------------------------- | ----------------- | --------- | ------------------ |
+| `name`                      | `string`          | required  | Unique field name  |
+| `[options]`                 | `CheckboxOptions` |           |                    |
+| `[options.onValue]`         | `string`          | `"Yes"`   | Value when checked |
+| `[options.symbol]`          | `CheckboxSymbol`  | `"check"` | Symbol style       |
+| `[options.defaultChecked]`  | `boolean`         | `false`   | Initially checked  |
+| `[options.backgroundColor]` | `Color`           |           | Background         |
+| `[options.borderColor]`     | `Color`           |           | Border             |
+| `[options.borderWidth]`     | `number`          | `1`       | Border width       |
 
 **Returns**: `CheckboxField`
 
@@ -427,20 +427,21 @@ await page.drawField(agree, {
 
 Create a new radio button group.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `name` | `string` | required | Unique field name |
-| `options` | `RadioGroupOptions` | required | |
-| `options.options` | `string[]` | required | Available values |
-| `[options.symbol]` | `RadioSymbol` | `"circle"` | Symbol style |
-| `[options.defaultValue]` | `string` | | Initially selected |
-| `[options.backgroundColor]` | `Color` | | Background |
-| `[options.borderColor]` | `Color` | | Border |
-| `[options.borderWidth]` | `number` | `1` | Border width |
+| Param                       | Type                | Default    | Description        |
+| --------------------------- | ------------------- | ---------- | ------------------ |
+| `name`                      | `string`            | required   | Unique field name  |
+| `options`                   | `RadioGroupOptions` | required   |                    |
+| `options.options`           | `string[]`          | required   | Available values   |
+| `[options.symbol]`          | `RadioSymbol`       | `"circle"` | Symbol style       |
+| `[options.defaultValue]`    | `string`            |            | Initially selected |
+| `[options.backgroundColor]` | `Color`             |            | Background         |
+| `[options.borderColor]`     | `Color`             |            | Border             |
+| `[options.borderWidth]`     | `number`            | `1`        | Border width       |
 
 **Returns**: `RadioField`
 
 **Throws**:
+
 - `Error` - If field name already exists
 - `Error` - If options array is empty
 
@@ -482,18 +483,18 @@ await page.drawField(payment, {
 
 Create a new dropdown (combo box) field.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `name` | `string` | required | Unique field name |
-| `options` | `DropdownOptions` | required | |
-| `options.options` | `string[]` | required | Available values |
-| `[options.font]` | `EmbeddedFont` | | Font for text |
-| `[options.fontSize]` | `number` | | Font size |
-| `[options.color]` | `Color` | | Text color |
-| `[options.editable]` | `boolean` | `false` | Allow custom input |
-| `[options.defaultValue]` | `string` | | Initially selected |
-| `[options.backgroundColor]` | `Color` | | Background |
-| `[options.borderColor]` | `Color` | | Border |
+| Param                       | Type              | Default  | Description        |
+| --------------------------- | ----------------- | -------- | ------------------ |
+| `name`                      | `string`          | required | Unique field name  |
+| `options`                   | `DropdownOptions` | required |                    |
+| `options.options`           | `string[]`        | required | Available values   |
+| `[options.font]`            | `EmbeddedFont`    |          | Font for text      |
+| `[options.fontSize]`        | `number`          |          | Font size          |
+| `[options.color]`           | `Color`           |          | Text color         |
+| `[options.editable]`        | `boolean`         | `false`  | Allow custom input |
+| `[options.defaultValue]`    | `string`          |          | Initially selected |
+| `[options.backgroundColor]` | `Color`           |          | Background         |
+| `[options.borderColor]`     | `Color`           |          | Border             |
 
 **Returns**: `DropdownField`
 
@@ -520,18 +521,18 @@ await page.drawField(country, {
 
 Create a new list box field.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `name` | `string` | required | Unique field name |
-| `options` | `ListboxOptions` | required | |
-| `options.options` | `string[]` | required | Available values |
-| `[options.font]` | `EmbeddedFont` | | Font for text |
-| `[options.fontSize]` | `number` | | Font size |
-| `[options.color]` | `Color` | | Text color |
-| `[options.multiSelect]` | `boolean` | `false` | Allow multiple selection |
-| `[options.defaultValue]` | `string[]` | | Initially selected |
-| `[options.backgroundColor]` | `Color` | | Background |
-| `[options.borderColor]` | `Color` | | Border |
+| Param                       | Type             | Default  | Description              |
+| --------------------------- | ---------------- | -------- | ------------------------ |
+| `name`                      | `string`         | required | Unique field name        |
+| `options`                   | `ListboxOptions` | required |                          |
+| `options.options`           | `string[]`       | required | Available values         |
+| `[options.font]`            | `EmbeddedFont`   |          | Font for text            |
+| `[options.fontSize]`        | `number`         |          | Font size                |
+| `[options.color]`           | `Color`          |          | Text color               |
+| `[options.multiSelect]`     | `boolean`        | `false`  | Allow multiple selection |
+| `[options.defaultValue]`    | `string[]`       |          | Initially selected       |
+| `[options.backgroundColor]` | `Color`          |          | Background               |
+| `[options.borderColor]`     | `Color`          |          | Border                   |
 
 **Returns**: `ListBoxField`
 
@@ -558,13 +559,13 @@ await page.drawField(colors, {
 
 Create a new signature field.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `name` | `string` | required | Unique field name |
-| `[options]` | `SignatureFieldOptions` | | |
-| `[options.backgroundColor]` | `Color` | | Background |
-| `[options.borderColor]` | `Color` | | Border |
-| `[options.borderWidth]` | `number` | `1` | Border width |
+| Param                       | Type                    | Default  | Description       |
+| --------------------------- | ----------------------- | -------- | ----------------- |
+| `name`                      | `string`                | required | Unique field name |
+| `[options]`                 | `SignatureFieldOptions` |          |                   |
+| `[options.backgroundColor]` | `Color`                 |          | Background        |
+| `[options.borderColor]`     | `Color`                 |          | Border            |
+| `[options.borderWidth]`     | `number`                | `1`      | Border width      |
 
 **Returns**: `SignatureField`
 
@@ -591,11 +592,12 @@ await form.updateAppearances();
 
 Flatten all form fields into static page content.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `[options]` | `FlattenOptions` | | |
+| Param       | Type             | Default | Description |
+| ----------- | ---------------- | ------- | ----------- |
+| `[options]` | `FlattenOptions` |         |             |
 
 After flattening:
+
 - Field appearances become static page content
 - Widget annotations are removed
 - The form can no longer be edited
@@ -637,70 +639,70 @@ console.log(acroForm.defaultAppearance);
 
 ### TextField
 
-| Method/Property | Returns | Description |
-|-----------------|---------|-------------|
-| `getValue()` | `string` | Get current value |
-| `setValue(value)` | `Promise<void>` | Set value |
-| `maxLength` | `number` | Max length (0 = no limit) |
-| `isMultiline` | `boolean` | Whether multiline |
-| `setFont(font)` | `void` | Set font |
-| `setFontSize(size)` | `void` | Set font size |
-| `setTextColor(r, g, b)` | `void` | Set text color |
+| Method/Property         | Returns         | Description               |
+| ----------------------- | --------------- | ------------------------- |
+| `getValue()`            | `string`        | Get current value         |
+| `setValue(value)`       | `Promise<void>` | Set value                 |
+| `maxLength`             | `number`        | Max length (0 = no limit) |
+| `isMultiline`           | `boolean`       | Whether multiline         |
+| `setFont(font)`         | `void`          | Set font                  |
+| `setFontSize(size)`     | `void`          | Set font size             |
+| `setTextColor(r, g, b)` | `void`          | Set text color            |
 
 ---
 
 ### CheckboxField
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `isChecked()` | `boolean` | Check state |
-| `check()` | `Promise<void>` | Check the box |
-| `uncheck()` | `Promise<void>` | Uncheck the box |
+| Method            | Returns         | Description         |
+| ----------------- | --------------- | ------------------- |
+| `isChecked()`     | `boolean`       | Check state         |
+| `check()`         | `Promise<void>` | Check the box       |
+| `uncheck()`       | `Promise<void>` | Uncheck the box     |
 | `setValue(value)` | `Promise<void>` | Set by value string |
-| `getOnValue()` | `string` | Get the "on" value |
+| `getOnValue()`    | `string`        | Get the "on" value  |
 
 ---
 
 ### RadioField
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getValue()` | `string \| null` | Get selected option |
-| `setValue(value)` | `Promise<void>` | Select option |
-| `getOptions()` | `string[]` | Get available options |
+| Method            | Returns          | Description           |
+| ----------------- | ---------------- | --------------------- |
+| `getValue()`      | `string \| null` | Get selected option   |
+| `setValue(value)` | `Promise<void>`  | Select option         |
+| `getOptions()`    | `string[]`       | Get available options |
 
 ---
 
 ### DropdownField
 
-| Method/Property | Returns | Description |
-|-----------------|---------|-------------|
-| `getValue()` | `string` | Get selected value |
-| `setValue(value)` | `Promise<void>` | Select value |
-| `getOptions()` | `ChoiceOption[]` | Get available options |
-| `isEditable` | `boolean` | Whether editable |
-| `setFont(font)` | `void` | Set font |
-| `setFontSize(size)` | `void` | Set font size |
+| Method/Property     | Returns          | Description           |
+| ------------------- | ---------------- | --------------------- |
+| `getValue()`        | `string`         | Get selected value    |
+| `setValue(value)`   | `Promise<void>`  | Select value          |
+| `getOptions()`      | `ChoiceOption[]` | Get available options |
+| `isEditable`        | `boolean`        | Whether editable      |
+| `setFont(font)`     | `void`           | Set font              |
+| `setFontSize(size)` | `void`           | Set font size         |
 
 ---
 
 ### ListBoxField
 
-| Method/Property | Returns | Description |
-|-----------------|---------|-------------|
-| `getValue()` | `string[]` | Get selected values |
-| `setValue(values)` | `Promise<void>` | Set selected values |
-| `getOptions()` | `ChoiceOption[]` | Get available options |
-| `isMultiSelect` | `boolean` | Whether multi-select |
-| `setFont(font)` | `void` | Set font |
-| `setFontSize(size)` | `void` | Set font size |
+| Method/Property     | Returns          | Description           |
+| ------------------- | ---------------- | --------------------- |
+| `getValue()`        | `string[]`       | Get selected values   |
+| `setValue(values)`  | `Promise<void>`  | Set selected values   |
+| `getOptions()`      | `ChoiceOption[]` | Get available options |
+| `isMultiSelect`     | `boolean`        | Whether multi-select  |
+| `setFont(font)`     | `void`           | Set font              |
+| `setFontSize(size)` | `void`           | Set font size         |
 
 ---
 
 ### SignatureField
 
-| Method | Returns | Description |
-|--------|---------|-------------|
+| Method       | Returns   | Description     |
+| ------------ | --------- | --------------- |
 | `isSigned()` | `boolean` | Check if signed |
 
 ---
@@ -729,7 +731,7 @@ type FieldValue = string | boolean | string[] | null;
 
 ```typescript
 interface ChoiceOption {
-  value: string;   // Export value
+  value: string; // Export value
   display: string; // Display text (may equal value)
 }
 ```
@@ -744,12 +746,5 @@ interface FormField {
   isRequired(): boolean;
 }
 
-type FieldType = 
-  | "text"
-  | "checkbox"
-  | "radio"
-  | "dropdown"
-  | "listbox"
-  | "signature"
-  | "button";
+type FieldType = "text" | "checkbox" | "radio" | "dropdown" | "listbox" | "signature" | "button";
 ```

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { parseCFF } from "./parser";
 import { CFFSubsetter } from "./subsetter";
 

@@ -13,6 +13,7 @@ import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfString } from "#src/objects/pdf-string";
+
 import { PDFMarkupAnnotation } from "./markup";
 import type { Rect, TextMarkupAnnotationOptions } from "./types";
 

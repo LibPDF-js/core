@@ -11,9 +11,10 @@
  * @see PDF 2.0 Specification (ISO 32000-2), Section 7.6.4.3.4 (Algorithm 2.B)
  */
 
+import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
 import { randomBytes } from "@noble/ciphers/utils.js";
 import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
-import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
+
 import { aesDecryptWithIv, aesEcbDecrypt, aesEcbEncrypt, aesEncryptWithIv } from "../ciphers/aes";
 
 /** Maximum password length for R5-R6 (UTF-8 bytes) */

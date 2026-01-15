@@ -1,5 +1,6 @@
 import pako from "pako";
 import { describe, expect, it } from "vitest";
+
 import { FlateFilter } from "./flate-filter";
 
 describe("FlateFilter", () => {

@@ -11,18 +11,18 @@ Every piece of data in a PDF is an **object**. LibPDF represents these objects a
 
 PDF defines eight primitive types plus references:
 
-| PDF Type | TypeScript Class | PDF Syntax | Example |
-|----------|------------------|------------|---------|
-| Boolean | `boolean` | `true` / `false` | `true` |
-| Integer | `number` | `42` | `42` |
-| Real | `number` | `3.14` | `3.14` |
-| String | `PdfString` | `(Hello)` or `<48656C6C6F>` | `(Hello World)` |
-| Name | `PdfName` | `/Type` | `/Page` |
-| Array | `PdfArray` | `[1 2 3]` | `[0 0 612 792]` |
-| Dictionary | `PdfDict` | `<< /Key /Value >>` | `<< /Type /Page >>` |
-| Stream | `PdfStream` | dictionary + binary data | Page content, images |
-| Null | `null` | `null` | `null` |
-| Reference | `PdfRef` | `1 0 R` | `5 0 R` |
+| PDF Type   | TypeScript Class | PDF Syntax                  | Example              |
+| ---------- | ---------------- | --------------------------- | -------------------- |
+| Boolean    | `boolean`        | `true` / `false`            | `true`               |
+| Integer    | `number`         | `42`                        | `42`                 |
+| Real       | `number`         | `3.14`                      | `3.14`               |
+| String     | `PdfString`      | `(Hello)` or `<48656C6C6F>` | `(Hello World)`      |
+| Name       | `PdfName`        | `/Type`                     | `/Page`              |
+| Array      | `PdfArray`       | `[1 2 3]`                   | `[0 0 612 792]`      |
+| Dictionary | `PdfDict`        | `<< /Key /Value >>`         | `<< /Type /Page >>`  |
+| Stream     | `PdfStream`      | dictionary + binary data    | Page content, images |
+| Null       | `null`           | `null`                      | `null`               |
+| Reference  | `PdfRef`         | `1 0 R`                     | `5 0 R`              |
 
 ## Working with Objects
 
@@ -36,20 +36,15 @@ import { PdfDict, PdfName, PdfNumber, PdfString } from "@libpdf/core";
 // Create a dictionary
 const dict = PdfDict.of({
   Type: PdfName.of("Page"),
-  MediaBox: new PdfArray([
-    PdfNumber.of(0),
-    PdfNumber.of(0),
-    PdfNumber.of(612),
-    PdfNumber.of(792),
-  ]),
+  MediaBox: new PdfArray([PdfNumber.of(0), PdfNumber.of(0), PdfNumber.of(612), PdfNumber.of(792)]),
 });
 
 // Read values with typed getters
-const type = dict.getName("Type");        // PdfName | undefined
-const box = dict.getArray("MediaBox");    // PdfArray | undefined
-const count = dict.getNumber("Count");    // PdfNumber | undefined
-const title = dict.getString("Title");    // PdfString | undefined
-const ref = dict.getRef("Pages");         // PdfRef | undefined
+const type = dict.getName("Type"); // PdfName | undefined
+const box = dict.getArray("MediaBox"); // PdfArray | undefined
+const count = dict.getNumber("Count"); // PdfNumber | undefined
+const title = dict.getString("Title"); // PdfString | undefined
+const ref = dict.getRef("Pages"); // PdfRef | undefined
 
 // Generic get (returns PdfObject | undefined)
 const value = dict.get("SomeKey");
@@ -79,16 +74,11 @@ Arrays are ordered collections of objects.
 import { PdfArray, PdfNumber } from "@libpdf/core";
 
 // Create an array
-const arr = PdfArray.of(
-  PdfNumber.of(0),
-  PdfNumber.of(0),
-  PdfNumber.of(612),
-  PdfNumber.of(792),
-);
+const arr = PdfArray.of(PdfNumber.of(0), PdfNumber.of(0), PdfNumber.of(612), PdfNumber.of(792));
 
 // Access by index
-const first = arr.at(0);     // PdfObject | undefined
-const count = arr.length;    // number
+const first = arr.at(0); // PdfObject | undefined
+const count = arr.length; // number
 
 // Add items
 arr.push(PdfNumber.of(100));
@@ -115,7 +105,7 @@ const ref = PdfRef.of(5, 0); // Object 5, generation 0
 
 // References are value objects
 ref.objectNumber; // 5
-ref.generation;   // 0
+ref.generation; // 0
 
 // Compare references (interned, so use ===)
 const same = PdfRef.of(5, 0);
@@ -136,9 +126,9 @@ import { PdfName } from "@libpdf/core";
 const name = PdfName.of("Type");
 
 // Common predefined names
-PdfName.Page;       // /Page
-PdfName.Type;       // /Type
-PdfName.Catalog;    // /Catalog
+PdfName.Page; // /Page
+PdfName.Type; // /Type
+PdfName.Catalog; // /Catalog
 
 // Get the string value
 name.value; // "Type"
@@ -155,7 +145,7 @@ import { PdfString } from "@libpdf/core";
 const str = PdfString.fromString("Hello, World!");
 
 // From raw bytes
-const bytes = new Uint8Array([0x48, 0x65, 0x6C, 0x6C, 0x6F]);
+const bytes = new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f]);
 const str2 = PdfString.fromBytes(bytes);
 
 // Get as JavaScript string
@@ -175,7 +165,7 @@ import { PdfNumber } from "@libpdf/core";
 const int = PdfNumber.of(42);
 const real = PdfNumber.of(3.14159);
 
-int.value;  // 42
+int.value; // 42
 real.value; // 3.14159
 ```
 
@@ -235,7 +225,7 @@ const contentsRef = page.dict.getRef("Contents");
 if (contentsRef) {
   // Resolve to get the actual stream
   const contents = await pdf.context.resolve(contentsRef);
-  
+
   if (contents instanceof PdfStream) {
     const data = await contents.getDecodedData();
     console.log(new TextDecoder().decode(data));
@@ -265,9 +255,9 @@ page.dict.set("MyXObject", ref);
 Check object types at runtime:
 
 ```typescript
-import { 
-  PdfDict, PdfArray, PdfStream, PdfString, 
-  PdfName, PdfNumber, PdfRef 
+import {
+  PdfDict, PdfArray, PdfStream, PdfString,
+  PdfName, PdfNumber, PdfRef
 } from "@libpdf/core";
 
 const obj = dict.get("SomeKey");
@@ -366,17 +356,18 @@ const cached = registry.getObject(PdfRef.of(5, 0));
 
 ## Summary
 
-| Class | Use Case |
-|-------|----------|
-| `PdfDict` | Structured data (pages, fonts, forms) |
-| `PdfArray` | Ordered lists (MediaBox, colors) |
+| Class       | Use Case                                    |
+| ----------- | ------------------------------------------- |
+| `PdfDict`   | Structured data (pages, fonts, forms)       |
+| `PdfArray`  | Ordered lists (MediaBox, colors)            |
 | `PdfStream` | Binary data with metadata (content, images) |
-| `PdfRef` | Pointers to indirect objects |
-| `PdfName` | Dictionary keys, type identifiers |
-| `PdfString` | Text values |
-| `PdfNumber` | Numeric values |
+| `PdfRef`    | Pointers to indirect objects                |
+| `PdfName`   | Dictionary keys, type identifiers           |
+| `PdfString` | Text values                                 |
+| `PdfNumber` | Numeric values                              |
 
 Understanding the object model helps you:
+
 - Debug PDF issues by inspecting raw structures
 - Build custom features using low-level APIs
 - Understand why certain operations work the way they do

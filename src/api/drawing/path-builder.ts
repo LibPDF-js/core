@@ -7,6 +7,7 @@
 
 import type { Operator } from "#src/content/operators";
 import { clip, clipEvenOdd, closePath, curveTo, lineTo, moveTo } from "#src/helpers/operators";
+
 import { wrapPathOps } from "./operations";
 import type { PathOptions } from "./types";
 

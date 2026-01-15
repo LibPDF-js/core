@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { CIDFont, CIDWidthMap } from "./cid-font";
 import { CMap } from "./cmap";
 import { CompositeFont } from "./composite-font";

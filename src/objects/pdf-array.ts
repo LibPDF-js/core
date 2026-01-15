@@ -1,4 +1,5 @@
 import type { ByteWriter } from "#src/io/byte-writer";
+
 import type { PdfObject } from "./pdf-object";
 import type { PdfPrimitive } from "./pdf-primitive";
 

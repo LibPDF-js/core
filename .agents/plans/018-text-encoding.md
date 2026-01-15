@@ -3,6 +3,7 @@
 ## Overview
 
 Implement proper PDF text string encoding/decoding. PDF uses two encodings for text strings:
+
 - **PDFDocEncoding** - Single-byte encoding (similar to Latin-1 with differences)
 - **UTF-16BE with BOM** - For Unicode text outside PDFDocEncoding range
 
@@ -34,12 +35,12 @@ From PDF spec 7.9.2.2:
 
 PDFDocEncoding is identical to Latin-1 (ISO-8859-1) except for bytes 0x80-0x9F and a few others:
 
-| Range | PDFDocEncoding | Latin-1 |
-|-------|---------------|---------|
-| 0x00-0x17 | Undefined | Control chars |
-| 0x18-0x1F | Special chars (˘, ˇ, etc.) | Control chars |
+| Range     | PDFDocEncoding                | Latin-1       |
+| --------- | ----------------------------- | ------------- |
+| 0x00-0x17 | Undefined                     | Control chars |
+| 0x18-0x1F | Special chars (˘, ˇ, etc.)    | Control chars |
 | 0x80-0x9F | Special chars (•, †, ‡, etc.) | Control chars |
-| 0xAD | Undefined | Soft hyphen |
+| 0xAD      | Undefined                     | Soft hyphen   |
 
 ## Implementation
 
@@ -63,43 +64,43 @@ const PDF_DOC_ENCODING_HIGH: Record<number, number> = {
   0x86: 0x0192, // LATIN SMALL LETTER F WITH HOOK
   0x87: 0x2044, // FRACTION SLASH
   0x88: 0x2039, // SINGLE LEFT-POINTING ANGLE QUOTATION MARK
-  0x89: 0x203A, // SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
-  0x8A: 0x2212, // MINUS SIGN
-  0x8B: 0x2030, // PER MILLE SIGN
-  0x8C: 0x201E, // DOUBLE LOW-9 QUOTATION MARK
-  0x8D: 0x201C, // LEFT DOUBLE QUOTATION MARK
-  0x8E: 0x201D, // RIGHT DOUBLE QUOTATION MARK
-  0x8F: 0x2018, // LEFT SINGLE QUOTATION MARK
+  0x89: 0x203a, // SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
+  0x8a: 0x2212, // MINUS SIGN
+  0x8b: 0x2030, // PER MILLE SIGN
+  0x8c: 0x201e, // DOUBLE LOW-9 QUOTATION MARK
+  0x8d: 0x201c, // LEFT DOUBLE QUOTATION MARK
+  0x8e: 0x201d, // RIGHT DOUBLE QUOTATION MARK
+  0x8f: 0x2018, // LEFT SINGLE QUOTATION MARK
   0x90: 0x2019, // RIGHT SINGLE QUOTATION MARK
-  0x91: 0x201A, // SINGLE LOW-9 QUOTATION MARK
+  0x91: 0x201a, // SINGLE LOW-9 QUOTATION MARK
   0x92: 0x2122, // TRADE MARK SIGN
-  0x93: 0xFB01, // LATIN SMALL LIGATURE FI
-  0x94: 0xFB02, // LATIN SMALL LIGATURE FL
+  0x93: 0xfb01, // LATIN SMALL LIGATURE FI
+  0x94: 0xfb02, // LATIN SMALL LIGATURE FL
   0x95: 0x0141, // LATIN CAPITAL LETTER L WITH STROKE
   0x96: 0x0152, // LATIN CAPITAL LIGATURE OE
   0x97: 0x0160, // LATIN CAPITAL LETTER S WITH CARON
   0x98: 0x0178, // LATIN CAPITAL LETTER Y WITH DIAERESIS
-  0x99: 0x017D, // LATIN CAPITAL LETTER Z WITH CARON
-  0x9A: 0x0131, // LATIN SMALL LETTER DOTLESS I
-  0x9B: 0x0142, // LATIN SMALL LETTER L WITH STROKE
-  0x9C: 0x0153, // LATIN SMALL LIGATURE OE
-  0x9D: 0x0161, // LATIN SMALL LETTER S WITH CARON
-  0x9E: 0x017E, // LATIN SMALL LETTER Z WITH CARON
-  0x9F: undefined, // UNDEFINED
-  0xA0: 0x20AC, // EURO SIGN (replaces NBSP in some versions)
+  0x99: 0x017d, // LATIN CAPITAL LETTER Z WITH CARON
+  0x9a: 0x0131, // LATIN SMALL LETTER DOTLESS I
+  0x9b: 0x0142, // LATIN SMALL LETTER L WITH STROKE
+  0x9c: 0x0153, // LATIN SMALL LIGATURE OE
+  0x9d: 0x0161, // LATIN SMALL LETTER S WITH CARON
+  0x9e: 0x017e, // LATIN SMALL LETTER Z WITH CARON
+  0x9f: undefined, // UNDEFINED
+  0xa0: 0x20ac, // EURO SIGN (replaces NBSP in some versions)
   // 0xA1-0xFF map to Unicode 0xA1-0xFF (same as Latin-1)
 };
 
 // Bytes 0x18-0x1F have special mappings
 const PDF_DOC_ENCODING_LOW: Record<number, number> = {
-  0x18: 0x02D8, // BREVE
-  0x19: 0x02C7, // CARON
-  0x1A: 0x02C6, // MODIFIER LETTER CIRCUMFLEX ACCENT
-  0x1B: 0x02D9, // DOT ABOVE
-  0x1C: 0x02DD, // DOUBLE ACUTE ACCENT
-  0x1D: 0x02DB, // OGONEK
-  0x1E: 0x02DA, // RING ABOVE
-  0x1F: 0x02DC, // SMALL TILDE
+  0x18: 0x02d8, // BREVE
+  0x19: 0x02c7, // CARON
+  0x1a: 0x02c6, // MODIFIER LETTER CIRCUMFLEX ACCENT
+  0x1b: 0x02d9, // DOT ABOVE
+  0x1c: 0x02dd, // DOUBLE ACUTE ACCENT
+  0x1d: 0x02db, // OGONEK
+  0x1e: 0x02da, // RING ABOVE
+  0x1f: 0x02dc, // SMALL TILDE
 };
 
 /** Reverse mapping: Unicode to PDFDocEncoding byte */
@@ -115,7 +116,7 @@ const UNICODE_TO_PDF_DOC: Map<number, number>;
  * Check if bytes start with UTF-16BE BOM (0xFE 0xFF).
  */
 export function hasUtf16BOM(bytes: Uint8Array): boolean {
-  return bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF;
+  return bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff;
 }
 
 /**
@@ -124,24 +125,24 @@ export function hasUtf16BOM(bytes: Uint8Array): boolean {
 export function decodeUtf16BE(bytes: Uint8Array): string {
   const start = hasUtf16BOM(bytes) ? 2 : 0;
   const chars: string[] = [];
-  
+
   for (let i = start; i < bytes.length - 1; i += 2) {
     const code = (bytes[i] << 8) | bytes[i + 1];
-    
+
     // Handle surrogate pairs
-    if (code >= 0xD800 && code <= 0xDBFF && i + 2 < bytes.length) {
+    if (code >= 0xd800 && code <= 0xdbff && i + 2 < bytes.length) {
       const low = (bytes[i + 2] << 8) | bytes[i + 3];
-      if (low >= 0xDC00 && low <= 0xDFFF) {
-        const codePoint = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
+      if (low >= 0xdc00 && low <= 0xdfff) {
+        const codePoint = 0x10000 + ((code - 0xd800) << 10) + (low - 0xdc00);
         chars.push(String.fromCodePoint(codePoint));
         i += 2;
         continue;
       }
     }
-    
+
     chars.push(String.fromCharCode(code));
   }
-  
+
   return chars.join("");
 }
 
@@ -150,13 +151,12 @@ export function decodeUtf16BE(bytes: Uint8Array): string {
  */
 export function decodePdfDocEncoding(bytes: Uint8Array): string {
   const chars: string[] = [];
-  
+
   for (const byte of bytes) {
     if (byte < 0x18) {
       // Control chars - skip or replace with space
-      chars.push(byte === 0x09 || byte === 0x0A || byte === 0x0D ? 
-        String.fromCharCode(byte) : "");
-    } else if (byte <= 0x1F) {
+      chars.push(byte === 0x09 || byte === 0x0a || byte === 0x0d ? String.fromCharCode(byte) : "");
+    } else if (byte <= 0x1f) {
       // Special low bytes
       const code = PDF_DOC_ENCODING_LOW[byte];
       chars.push(code ? String.fromCharCode(code) : "");
@@ -169,7 +169,7 @@ export function decodePdfDocEncoding(bytes: Uint8Array): string {
       chars.push(code ? String.fromCharCode(code) : "");
     }
   }
-  
+
   return chars.join("");
 }
 
@@ -195,7 +195,7 @@ export function decodeTextString(bytes: Uint8Array): string {
 export function canEncodePdfDoc(text: string): boolean {
   for (const char of text) {
     const code = char.codePointAt(0)!;
-    if (!UNICODE_TO_PDF_DOC.has(code) && (code < 0x20 || code > 0xFF)) {
+    if (!UNICODE_TO_PDF_DOC.has(code) && (code < 0x20 || code > 0xff)) {
       return false;
     }
   }
@@ -208,24 +208,24 @@ export function canEncodePdfDoc(text: string): boolean {
  */
 export function encodePdfDocEncoding(text: string): Uint8Array {
   const bytes: number[] = [];
-  
+
   for (const char of text) {
     const code = char.codePointAt(0)!;
-    
+
     // Check reverse mapping first (for special chars)
     if (UNICODE_TO_PDF_DOC.has(code)) {
       bytes.push(UNICODE_TO_PDF_DOC.get(code)!);
-    } else if (code >= 0x20 && code <= 0x7F) {
+    } else if (code >= 0x20 && code <= 0x7f) {
       // ASCII
       bytes.push(code);
-    } else if (code >= 0xA1 && code <= 0xFF) {
+    } else if (code >= 0xa1 && code <= 0xff) {
       // Latin-1 supplement (mostly direct)
       bytes.push(code);
     } else {
       throw new Error(`Cannot encode U+${code.toString(16).toUpperCase()} in PDFDocEncoding`);
     }
   }
-  
+
   return new Uint8Array(bytes);
 }
 
@@ -233,23 +233,23 @@ export function encodePdfDocEncoding(text: string): Uint8Array {
  * Encode string as UTF-16BE with BOM.
  */
 export function encodeUtf16BE(text: string): Uint8Array {
-  const bytes: number[] = [0xFE, 0xFF]; // BOM
-  
+  const bytes: number[] = [0xfe, 0xff]; // BOM
+
   for (const char of text) {
     const code = char.codePointAt(0)!;
-    
-    if (code > 0xFFFF) {
+
+    if (code > 0xffff) {
       // Surrogate pair needed
       const adjusted = code - 0x10000;
-      const high = 0xD800 + (adjusted >> 10);
-      const low = 0xDC00 + (adjusted & 0x3FF);
-      bytes.push(high >> 8, high & 0xFF);
-      bytes.push(low >> 8, low & 0xFF);
+      const high = 0xd800 + (adjusted >> 10);
+      const low = 0xdc00 + (adjusted & 0x3ff);
+      bytes.push(high >> 8, high & 0xff);
+      bytes.push(low >> 8, low & 0xff);
     } else {
-      bytes.push(code >> 8, code & 0xFF);
+      bytes.push(code >> 8, code & 0xff);
     }
   }
-  
+
   return new Uint8Array(bytes);
 }
 
@@ -270,11 +270,7 @@ export function encodeTextString(text: string): Uint8Array {
 ```typescript
 // src/objects/pdf-string.ts
 
-import { 
-  decodeTextString, 
-  encodeTextString,
-  canEncodePdfDoc 
-} from "#src/helpers/encoding";
+import { decodeTextString, encodeTextString, canEncodePdfDoc } from "#src/helpers/encoding";
 
 export class PdfString implements PdfPrimitive {
   // ... existing ...

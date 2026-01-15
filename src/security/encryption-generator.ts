@@ -7,12 +7,13 @@
  * @see PDF 2.0 Specification, Section 7.6.4 (Standard Security Handler)
  */
 
-import { randomBytes } from "@noble/ciphers/utils.js";
 import type { ProtectionOptions } from "#src/api/pdf-security";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfString } from "#src/objects/pdf-string";
+import { randomBytes } from "@noble/ciphers/utils.js";
+
 import type { EncryptionDict } from "./encryption-dict";
 import {
   generateOwnerEntries,

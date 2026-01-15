@@ -5,6 +5,7 @@
 import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
+
 import { toArrayBuffer } from "../helpers/buffer";
 import { OID_SIGNED_DATA, OID_TIMESTAMP_TOKEN } from "./oids";
 import type { DigestAlgorithm } from "./types";

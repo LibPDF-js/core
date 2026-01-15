@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { Scanner } from "#src/io/scanner";
+import { describe, expect, it } from "vitest";
+
 import { BruteForceParser } from "./brute-force-parser";
 
 /**

@@ -45,12 +45,12 @@ content/docs/
 
 ### Where to Put Documentation
 
-| Type | Location | When to use |
-|------|----------|-------------|
-| **API Reference** | `content/docs/api/<class>.mdx` | Documenting a class like `PDF`, `PDFPage`, `PDFForm` |
-| **Feature Guide** | `content/docs/guides/<feature>.mdx` | How-to guides for features (forms, signatures, etc.) |
-| **Concept** | `content/docs/concepts/<topic>.mdx` | Explaining PDF concepts (structure, objects, etc.) |
-| **Getting Started** | `content/docs/getting-started/` | Installation and first steps |
+| Type                | Location                            | When to use                                          |
+| ------------------- | ----------------------------------- | ---------------------------------------------------- |
+| **API Reference**   | `content/docs/api/<class>.mdx`      | Documenting a class like `PDF`, `PDFPage`, `PDFForm` |
+| **Feature Guide**   | `content/docs/guides/<feature>.mdx` | How-to guides for features (forms, signatures, etc.) |
+| **Concept**         | `content/docs/concepts/<topic>.mdx` | Explaining PDF concepts (structure, objects, etc.)   |
+| **Getting Started** | `content/docs/getting-started/`     | Installation and first steps                         |
 
 ### Navigation (meta.json)
 
@@ -59,7 +59,16 @@ Each directory has a `meta.json` that controls navigation order:
 ```json
 {
   "title": "API Reference",
-  "pages": ["index", "---Classes---", "pdf", "pdf-page", "pdf-form", "annotations", "---Other---", "errors"]
+  "pages": [
+    "index",
+    "---Classes---",
+    "pdf",
+    "pdf-page",
+    "pdf-form",
+    "annotations",
+    "---Other---",
+    "errors"
+  ]
 }
 ```
 
@@ -74,14 +83,14 @@ title: ModuleName
 description: Brief description for SEO and previews.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from "fumadocs-ui/components/callout";
 
 # ModuleName
 
 Brief description of what this module does and when to use it.
 
 <Callout type="warn" title="my title">
-Use callouts sparingly for important warnings or beta features.
+  Use callouts sparingly for important warnings or beta features.
 </Callout>
 
 ## Quick Start
@@ -97,10 +106,10 @@ import { PDF } from "@libpdf/core";
 
 Description of what the method does.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `param` | `string` | required | What it does |
-| `[optional]` | `number` | `10` | Optional param |
+| Param        | Type     | Default  | Description    |
+| ------------ | -------- | -------- | -------------- |
+| `param`      | `string` | required | What it does   |
+| `[optional]` | `number` | `10`     | Optional param |
 
 **Returns**: `ReturnType`
 
@@ -116,7 +125,7 @@ Description of what the method does.
 
 \`\`\`typescript
 interface TypeName {
-  property: string;
+property: string;
 }
 \`\`\`
 ```
@@ -124,7 +133,7 @@ interface TypeName {
 ### Fumadocs Components
 
 ```mdx
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from "fumadocs-ui/components/callout";
 
 <Callout type="info">Informational note</Callout>
 <Callout type="warn">Warning message</Callout>
@@ -134,29 +143,34 @@ import { Callout } from 'fumadocs-ui/components/callout';
 ## Guidelines
 
 ### Content Quality
+
 - **Be accurate** - Verify behavior by reading the code
 - **Be complete** - Document all public API surface
 - **Be practical** - Include real, working examples
 - **Be concise** - Don't over-explain obvious things
 
 ### Code Examples
+
 - All examples must be valid TypeScript
 - Show imports when not obvious
 - Include expected output in comments where helpful
 - Progress from simple to complex
 
 ### Formatting
+
 - Use `---` horizontal rules between major sections
 - Use code fences with `typescript` language tag
 - Use tables for parameter/option documentation
 - Use Fumadocs `<Callout>` components sparingly
 
 ### Cross-References
+
 - Link to related docs: `[PDFPage](/docs/api/pdf-page)`
 - Add "See Also" sections when helpful
 - Update `meta.json` when adding new pages
 
 ### Maintenance
+
 - Include types inline so docs don't get stale
 - Reference source file locations for complex behavior
 - Use `<Callout type="warn">` for beta/unstable features

@@ -36,6 +36,7 @@ for (const field of fields) {
 ```
 
 Field types:
+
 - `text` - Text input
 - `checkbox` - Checkbox
 - `radio` - Radio button group
@@ -57,9 +58,9 @@ if (!form) return;
 await form.fill({
   "First Name": "John",
   "Last Name": "Doe",
-  "Email": "john@example.com",
+  Email: "john@example.com",
   "Agree to Terms": true,
-  "Country": "United States",
+  Country: "United States",
 });
 
 await pdf.save();
@@ -236,8 +237,8 @@ if (!form) return;
 
 // Fill first
 await form.fill({
-  "Name": "John Doe",
-  "Date": "2024-01-15",
+  Name: "John Doe",
+  Date: "2024-01-15",
 });
 
 // Then flatten
@@ -289,11 +290,11 @@ for (const field of form.getFields()) {
 
 // Fill the form
 await form.fill({
-  "applicant_name": "Jane Smith",
-  "applicant_email": "jane@example.com",
-  "application_date": new Date().toISOString().split("T")[0],
-  "agree_terms": true,
-  "preferred_contact": "Email",
+  applicant_name: "Jane Smith",
+  applicant_email: "jane@example.com",
+  application_date: new Date().toISOString().split("T")[0],
+  agree_terms: true,
+  preferred_contact: "Email",
 });
 
 // Save filled form
@@ -306,23 +307,23 @@ await writeFile("flattened-form.pdf", await pdf.save());
 
 ## Field Reference
 
-| Type | Get Method | Value Methods |
-|------|------------|---------------|
-| Text | `getTextField()` | `getValue()`, `setValue()` |
-| Checkbox | `getCheckbox()` | `isChecked()`, `check()`, `uncheck()` |
-| Radio | `getRadioGroup()` | `getValue()`, `setValue()`, `getOptions()` |
-| Dropdown | `getDropdown()` | `getValue()`, `setValue()`, `getOptions()` |
-| Listbox | `getListBox()` | `getValue()`, `setValue()`, `getOptions()` |
-| Signature | `getSignatureField()` | `isSigned()` |
+| Type      | Get Method            | Value Methods                              |
+| --------- | --------------------- | ------------------------------------------ |
+| Text      | `getTextField()`      | `getValue()`, `setValue()`                 |
+| Checkbox  | `getCheckbox()`       | `isChecked()`, `check()`, `uncheck()`      |
+| Radio     | `getRadioGroup()`     | `getValue()`, `setValue()`, `getOptions()` |
+| Dropdown  | `getDropdown()`       | `getValue()`, `setValue()`, `getOptions()` |
+| Listbox   | `getListBox()`        | `getValue()`, `setValue()`, `getOptions()` |
+| Signature | `getSignatureField()` | `isSigned()`                               |
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| Field not found | Name mismatch | Check exact field names with `getFields()` |
-| Value not visible | Missing appearance | Ensure font is embedded |
-| Wrong font | Default font used | Embed and specify custom font |
-| Checkbox won't toggle | Read-only field | Check `isReadOnly()` |
+| Issue                 | Cause              | Solution                                   |
+| --------------------- | ------------------ | ------------------------------------------ |
+| Field not found       | Name mismatch      | Check exact field names with `getFields()` |
+| Value not visible     | Missing appearance | Ensure font is embedded                    |
+| Wrong font            | Default font used  | Embed and specify custom font              |
+| Checkbox won't toggle | Read-only field    | Check `isReadOnly()`                       |
 
 ## Next Steps
 

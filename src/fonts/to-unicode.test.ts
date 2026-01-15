@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { parseToUnicode, ToUnicodeMap } from "./to-unicode";
 
 /**

@@ -1,5 +1,6 @@
 import { LRUCache } from "#src/helpers/lru-cache";
 import type { ByteWriter } from "#src/io/byte-writer";
+
 import type { PdfPrimitive } from "./pdf-primitive";
 
 /**

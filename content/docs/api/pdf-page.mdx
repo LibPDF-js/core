@@ -144,8 +144,8 @@ Get the ArtBox (meaningful content area). Falls back to CropBox if not defined.
 
 Set the page rotation.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param     | Type                    | Description         |
+| --------- | ----------------------- | ------------------- |
 | `degrees` | `0 \| 90 \| 180 \| 270` | Rotation in degrees |
 
 ```typescript
@@ -160,20 +160,20 @@ page.setRotation(90);
 
 Draw text on the page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `text` | `string` | required | Text to draw |
-| `[options]` | `DrawTextOptions` | | |
-| `[options.x]` | `number` | `0` | X position from left |
-| `[options.y]` | `number` | `0` | Y position from bottom |
-| `[options.font]` | `string \| EmbeddedFont` | `"Helvetica"` | Font to use |
-| `[options.size]` | `number` | `12` | Font size in points |
-| `[options.color]` | `Color` | black | Text color |
-| `[options.opacity]` | `number` | `1` | Opacity (0-1) |
-| `[options.maxWidth]` | `number` | | Enable word wrapping |
-| `[options.lineHeight]` | `number` | `size * 1.2` | Line height |
-| `[options.alignment]` | `"left" \| "center" \| "right" \| "justify"` | `"left"` | Text alignment |
-| `[options.rotate]` | `Rotation` | | Rotation options |
+| Param                  | Type                                         | Default       | Description            |
+| ---------------------- | -------------------------------------------- | ------------- | ---------------------- |
+| `text`                 | `string`                                     | required      | Text to draw           |
+| `[options]`            | `DrawTextOptions`                            |               |                        |
+| `[options.x]`          | `number`                                     | `0`           | X position from left   |
+| `[options.y]`          | `number`                                     | `0`           | Y position from bottom |
+| `[options.font]`       | `string \| EmbeddedFont`                     | `"Helvetica"` | Font to use            |
+| `[options.size]`       | `number`                                     | `12`          | Font size in points    |
+| `[options.color]`      | `Color`                                      | black         | Text color             |
+| `[options.opacity]`    | `number`                                     | `1`           | Opacity (0-1)          |
+| `[options.maxWidth]`   | `number`                                     |               | Enable word wrapping   |
+| `[options.lineHeight]` | `number`                                     | `size * 1.2`  | Line height            |
+| `[options.alignment]`  | `"left" \| "center" \| "right" \| "justify"` | `"left"`      | Text alignment         |
+| `[options.rotate]`     | `Rotation`                                   |               | Rotation options       |
 
 ```typescript
 // Simple text
@@ -205,22 +205,22 @@ page.drawText(longText, {
 
 **Standard 14 Fonts** (built-in, no embedding required):
 
-| Font Name |
-|-----------|
-| `"Helvetica"` |
-| `"Helvetica-Bold"` |
-| `"Helvetica-Oblique"` |
+| Font Name                 |
+| ------------------------- |
+| `"Helvetica"`             |
+| `"Helvetica-Bold"`        |
+| `"Helvetica-Oblique"`     |
 | `"Helvetica-BoldOblique"` |
-| `"Times-Roman"` |
-| `"Times-Bold"` |
-| `"Times-Italic"` |
-| `"Times-BoldItalic"` |
-| `"Courier"` |
-| `"Courier-Bold"` |
-| `"Courier-Oblique"` |
-| `"Courier-BoldOblique"` |
-| `"Symbol"` |
-| `"ZapfDingbats"` |
+| `"Times-Roman"`           |
+| `"Times-Bold"`            |
+| `"Times-Italic"`          |
+| `"Times-BoldItalic"`      |
+| `"Courier"`               |
+| `"Courier-Bold"`          |
+| `"Courier-Oblique"`       |
+| `"Courier-BoldOblique"`   |
+| `"Symbol"`                |
+| `"ZapfDingbats"`          |
 
 ---
 
@@ -230,20 +230,20 @@ page.drawText(longText, {
 
 Draw a rectangle on the page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `options.x` | `number` | required | X position |
-| `options.y` | `number` | required | Y position |
-| `options.width` | `number` | required | Rectangle width |
-| `options.height` | `number` | required | Rectangle height |
-| `[options.color]` | `Color` | | Fill color |
-| `[options.borderColor]` | `Color` | | Border color |
-| `[options.borderWidth]` | `number` | `1` | Border width |
-| `[options.borderDashArray]` | `number[]` | | Dash pattern |
-| `[options.opacity]` | `number` | `1` | Fill opacity |
-| `[options.borderOpacity]` | `number` | `1` | Border opacity |
-| `[options.cornerRadius]` | `number` | | Rounded corners |
-| `[options.rotate]` | `Rotation` | | Rotation |
+| Param                       | Type       | Default  | Description      |
+| --------------------------- | ---------- | -------- | ---------------- |
+| `options.x`                 | `number`   | required | X position       |
+| `options.y`                 | `number`   | required | Y position       |
+| `options.width`             | `number`   | required | Rectangle width  |
+| `options.height`            | `number`   | required | Rectangle height |
+| `[options.color]`           | `Color`    |          | Fill color       |
+| `[options.borderColor]`     | `Color`    |          | Border color     |
+| `[options.borderWidth]`     | `number`   | `1`      | Border width     |
+| `[options.borderDashArray]` | `number[]` |          | Dash pattern     |
+| `[options.opacity]`         | `number`   | `1`      | Fill opacity     |
+| `[options.borderOpacity]`   | `number`   | `1`      | Border opacity   |
+| `[options.cornerRadius]`    | `number`   |          | Rounded corners  |
+| `[options.rotate]`          | `Rotation` |          | Rotation         |
 
 ```typescript
 // Filled rectangle
@@ -273,15 +273,15 @@ page.drawRectangle({
 
 Draw a line on the page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `options.start` | `{ x: number, y: number }` | required | Start point |
-| `options.end` | `{ x: number, y: number }` | required | End point |
-| `[options.color]` | `Color` | black | Line color |
-| `[options.thickness]` | `number` | `1` | Line thickness |
-| `[options.opacity]` | `number` | `1` | Opacity |
-| `[options.dashArray]` | `number[]` | | Dash pattern |
-| `[options.lineCap]` | `LineCap` | `"butt"` | Line cap style |
+| Param                 | Type                       | Default  | Description    |
+| --------------------- | -------------------------- | -------- | -------------- |
+| `options.start`       | `{ x: number, y: number }` | required | Start point    |
+| `options.end`         | `{ x: number, y: number }` | required | End point      |
+| `[options.color]`     | `Color`                    | black    | Line color     |
+| `[options.thickness]` | `number`                   | `1`      | Line thickness |
+| `[options.opacity]`   | `number`                   | `1`      | Opacity        |
+| `[options.dashArray]` | `number[]`                 |          | Dash pattern   |
+| `[options.lineCap]`   | `LineCap`                  | `"butt"` | Line cap style |
 
 ```typescript
 page.drawLine({
@@ -305,16 +305,16 @@ page.drawLine({
 
 Draw a circle on the page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `options.x` | `number` | required | Center X |
-| `options.y` | `number` | required | Center Y |
-| `options.radius` | `number` | required | Radius |
-| `[options.color]` | `Color` | | Fill color |
-| `[options.borderColor]` | `Color` | | Border color |
-| `[options.borderWidth]` | `number` | `1` | Border width |
-| `[options.opacity]` | `number` | `1` | Fill opacity |
-| `[options.borderOpacity]` | `number` | `1` | Border opacity |
+| Param                     | Type     | Default  | Description    |
+| ------------------------- | -------- | -------- | -------------- |
+| `options.x`               | `number` | required | Center X       |
+| `options.y`               | `number` | required | Center Y       |
+| `options.radius`          | `number` | required | Radius         |
+| `[options.color]`         | `Color`  |          | Fill color     |
+| `[options.borderColor]`   | `Color`  |          | Border color   |
+| `[options.borderWidth]`   | `number` | `1`      | Border width   |
+| `[options.opacity]`       | `number` | `1`      | Fill opacity   |
+| `[options.borderOpacity]` | `number` | `1`      | Border opacity |
 
 ```typescript
 page.drawCircle({
@@ -333,18 +333,18 @@ page.drawCircle({
 
 Draw an ellipse on the page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `options.x` | `number` | required | Center X |
-| `options.y` | `number` | required | Center Y |
-| `options.xRadius` | `number` | required | Horizontal radius |
-| `options.yRadius` | `number` | required | Vertical radius |
-| `[options.color]` | `Color` | | Fill color |
-| `[options.borderColor]` | `Color` | | Border color |
-| `[options.borderWidth]` | `number` | `1` | Border width |
-| `[options.opacity]` | `number` | `1` | Fill opacity |
-| `[options.borderOpacity]` | `number` | `1` | Border opacity |
-| `[options.rotate]` | `Rotation` | | Rotation |
+| Param                     | Type       | Default  | Description       |
+| ------------------------- | ---------- | -------- | ----------------- |
+| `options.x`               | `number`   | required | Center X          |
+| `options.y`               | `number`   | required | Center Y          |
+| `options.xRadius`         | `number`   | required | Horizontal radius |
+| `options.yRadius`         | `number`   | required | Vertical radius   |
+| `[options.color]`         | `Color`    |          | Fill color        |
+| `[options.borderColor]`   | `Color`    |          | Border color      |
+| `[options.borderWidth]`   | `number`   | `1`      | Border width      |
+| `[options.opacity]`       | `number`   | `1`      | Fill opacity      |
+| `[options.borderOpacity]` | `number`   | `1`      | Border opacity    |
+| `[options.rotate]`        | `Rotation` |          | Rotation          |
 
 ```typescript
 page.drawEllipse({
@@ -364,16 +364,16 @@ page.drawEllipse({
 
 Draw an image on the page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `image` | `PDFImage` | required | Embedded image |
-| `[options]` | `DrawImageOptions` | | |
-| `[options.x]` | `number` | `0` | X position |
-| `[options.y]` | `number` | `0` | Y position |
-| `[options.width]` | `number` | natural | Target width |
-| `[options.height]` | `number` | natural | Target height |
-| `[options.opacity]` | `number` | `1` | Opacity |
-| `[options.rotate]` | `Rotation` | | Rotation |
+| Param               | Type               | Default  | Description    |
+| ------------------- | ------------------ | -------- | -------------- |
+| `image`             | `PDFImage`         | required | Embedded image |
+| `[options]`         | `DrawImageOptions` |          |                |
+| `[options.x]`       | `number`           | `0`      | X position     |
+| `[options.y]`       | `number`           | `0`      | Y position     |
+| `[options.width]`   | `number`           | natural  | Target width   |
+| `[options.height]`  | `number`           | natural  | Target height  |
+| `[options.opacity]` | `number`           | `1`      | Opacity        |
+| `[options.rotate]`  | `Rotation`         |          | Rotation       |
 
 If only `width` or `height` is specified, aspect ratio is preserved.
 
@@ -404,17 +404,17 @@ page.drawImage(image, {
 
 Draw an embedded page (Form XObject) onto this page.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `embedded` | `PDFEmbeddedPage` | required | Embedded page |
-| `[options]` | `DrawPageOptions` | | |
-| `[options.x]` | `number` | `0` | X position |
-| `[options.y]` | `number` | `0` | Y position |
-| `[options.scale]` | `number` | `1` | Uniform scale |
-| `[options.width]` | `number` | | Target width (overrides scale) |
-| `[options.height]` | `number` | | Target height (overrides scale) |
-| `[options.opacity]` | `number` | `1` | Opacity |
-| `[options.background]` | `boolean` | `false` | Draw behind existing content |
+| Param                  | Type              | Default  | Description                     |
+| ---------------------- | ----------------- | -------- | ------------------------------- |
+| `embedded`             | `PDFEmbeddedPage` | required | Embedded page                   |
+| `[options]`            | `DrawPageOptions` |          |                                 |
+| `[options.x]`          | `number`          | `0`      | X position                      |
+| `[options.y]`          | `number`          | `0`      | Y position                      |
+| `[options.scale]`      | `number`          | `1`      | Uniform scale                   |
+| `[options.width]`      | `number`          |          | Target width (overrides scale)  |
+| `[options.height]`     | `number`          |          | Target height (overrides scale) |
+| `[options.opacity]`    | `number`          | `1`      | Opacity                         |
+| `[options.background]` | `boolean`         | `false`  | Draw behind existing content    |
 
 ```typescript
 const watermarkPdf = await PDF.load(watermarkBytes);
@@ -445,7 +445,8 @@ Start building a custom path with a fluent API.
 
 ```typescript
 // Triangle
-page.drawPath()
+page
+  .drawPath()
   .moveTo(100, 100)
   .lineTo(200, 100)
   .lineTo(150, 200)
@@ -453,7 +454,8 @@ page.drawPath()
   .fill({ color: rgb(1, 0, 0) });
 
 // Complex shape
-page.drawPath()
+page
+  .drawPath()
   .moveTo(50, 50)
   .curveTo(100, 100, 150, 100, 200, 50)
   .lineTo(200, 150)
@@ -466,16 +468,16 @@ page.drawPath()
 
 **PathBuilder Methods**:
 
-| Method | Description |
-|--------|-------------|
-| `moveTo(x, y)` | Move to point |
-| `lineTo(x, y)` | Draw line to point |
-| `curveTo(cp1x, cp1y, cp2x, cp2y, x, y)` | Bezier curve |
-| `quadraticCurveTo(cpx, cpy, x, y)` | Quadratic curve |
-| `close()` | Close the path |
-| `fill(options)` | Fill the path |
-| `stroke(options)` | Stroke the path |
-| `fillAndStroke(options)` | Fill and stroke |
+| Method                                  | Description        |
+| --------------------------------------- | ------------------ |
+| `moveTo(x, y)`                          | Move to point      |
+| `lineTo(x, y)`                          | Draw line to point |
+| `curveTo(cp1x, cp1y, cp2x, cp2y, x, y)` | Bezier curve       |
+| `quadraticCurveTo(cpx, cpy, x, y)`      | Quadratic curve    |
+| `close()`                               | Close the path     |
+| `fill(options)`                         | Fill the path      |
+| `stroke(options)`                       | Stroke the path    |
+| `fillAndStroke(options)`                | Fill and stroke    |
 
 ---
 
@@ -485,16 +487,17 @@ page.drawPath()
 
 Draw a form field widget on this page.
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `field` | `FormField` | Field to draw |
-| `options.x` | `number` | X position |
-| `options.y` | `number` | Y position |
-| `options.width` | `number` | Widget width |
-| `options.height` | `number` | Widget height |
-| `[options.option]` | `string` | Radio option value (required for radio groups) |
+| Param              | Type        | Description                                    |
+| ------------------ | ----------- | ---------------------------------------------- |
+| `field`            | `FormField` | Field to draw                                  |
+| `options.x`        | `number`    | X position                                     |
+| `options.y`        | `number`    | Y position                                     |
+| `options.width`    | `number`    | Widget width                                   |
+| `options.height`   | `number`    | Widget height                                  |
+| `[options.option]` | `string`    | Radio option value (required for radio groups) |
 
 **Throws**:
+
 - `Error` - If field is a signature field
 - `Error` - If radio group option is missing or invalid
 
@@ -563,8 +566,8 @@ const links = await page.getLinkAnnotations();
 
 Extract all text content from the page.
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param       | Type                 | Description        |
+| ----------- | -------------------- | ------------------ |
 | `[options]` | `ExtractTextOptions` | Extraction options |
 
 **Returns**: `Promise<PageText>`
@@ -586,8 +589,8 @@ interface PageText {
   pageIndex: number;
   width: number;
   height: number;
-  text: string;          // Plain text
-  lines: TextLine[];     // Structured lines
+  text: string; // Plain text
+  lines: TextLine[]; // Structured lines
 }
 
 interface TextLine {
@@ -603,12 +606,12 @@ interface TextLine {
 
 Search for text on the page.
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `query` | `string \| RegExp` | Search query |
-| `[options]` | `FindTextOptions` | |
-| `[options.caseSensitive]` | `boolean` | Case-sensitive matching |
-| `[options.wholeWord]` | `boolean` | Match whole words only |
+| Param                     | Type               | Description             |
+| ------------------------- | ------------------ | ----------------------- |
+| `query`                   | `string \| RegExp` | Search query            |
+| `[options]`               | `FindTextOptions`  |                         |
+| `[options.caseSensitive]` | `boolean`          | Case-sensitive matching |
+| `[options.wholeWord]`     | `boolean`          | Match whole words only  |
 
 **Returns**: `Promise<TextMatch[]>`
 
@@ -641,10 +644,10 @@ interface TextMatch {
 
 ```typescript
 interface Rectangle {
-  x1: number;  // Left
-  y1: number;  // Bottom
-  x2: number;  // Right
-  y2: number;  // Top
+  x1: number; // Left
+  y1: number; // Bottom
+  x2: number; // Right
+  y2: number; // Top
 }
 ```
 
@@ -664,8 +667,8 @@ const gray = grayscale(0.5);
 
 ```typescript
 interface Rotation {
-  angle: number;  // Degrees
-  origin?: { x: number; y: number };  // Rotation center
+  angle: number; // Degrees
+  origin?: { x: number; y: number }; // Rotation center
 }
 ```
 

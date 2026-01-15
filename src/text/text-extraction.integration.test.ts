@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { PDF } from "#src/api/pdf";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
 
 describe("Text Extraction Integration", () => {
   describe("extractText", () => {

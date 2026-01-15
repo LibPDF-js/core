@@ -52,8 +52,8 @@ const pdf = await PDF.load(bytes, { credentials: "password" });
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Basic checks (existing)
-pdf.isEncrypted;           // true
-pdf.isAuthenticated;       // true
+pdf.isEncrypted; // true
+pdf.isAuthenticated; // true
 
 // Detailed security info
 const security = pdf.getSecurity();
@@ -115,7 +115,7 @@ pdf.setProtection({
 // With specific algorithm (for compatibility)
 pdf.setProtection({
   userPassword: "secret",
-  algorithm: "AES-128",  // "RC4-40" | "RC4-128" | "AES-128" | "AES-256"
+  algorithm: "AES-128", // "RC4-40" | "RC4-128" | "AES-128" | "AES-256"
 });
 
 // Owner-only protection (document opens without password but has restrictions)
@@ -164,7 +164,7 @@ if (result.authenticated && result.isOwner) {
 ```typescript
 /**
  * Encryption algorithm options.
- * 
+ *
  * - RC4-40: Legacy 40-bit RC4 (PDF 1.1+, weak, avoid)
  * - RC4-128: 128-bit RC4 (PDF 1.4+, deprecated)
  * - AES-128: 128-bit AES-CBC (PDF 1.5+, recommended minimum)
@@ -174,7 +174,7 @@ type EncryptionAlgorithm = "RC4-40" | "RC4-128" | "AES-128" | "AES-256";
 
 /**
  * Document permissions that can be granted or restricted.
- * 
+ *
  * All permissions default to true for unencrypted documents.
  * When encrypted, the owner password grants all permissions regardless of flags.
  */
@@ -212,26 +212,26 @@ interface ProtectionOptions {
    * Empty string or undefined means no password required to open.
    */
   userPassword?: string;
-  
+
   /**
    * Owner password (grants full access, required to change security).
    * If omitted when adding protection, a random password is generated
    * (document can still be unprotected with user password + modify permission).
    */
   ownerPassword?: string;
-  
+
   /**
    * Permission flags.
    * Omitted permissions default to true (allowed).
    */
   permissions?: PermissionOptions;
-  
+
   /**
    * Encryption algorithm.
    * @default "AES-256"
    */
   algorithm?: EncryptionAlgorithm;
-  
+
   /**
    * Whether to encrypt the document metadata stream.
    * @default true
@@ -245,28 +245,28 @@ interface ProtectionOptions {
 interface SecurityInfo {
   /** Whether the document is encrypted */
   isEncrypted: boolean;
-  
+
   /** Encryption algorithm in use (if encrypted) */
   algorithm?: EncryptionAlgorithm;
-  
+
   /** Key length in bits (40, 128, or 256) */
   keyLength?: number;
-  
+
   /** Security handler revision (2-6) */
   revision?: number;
-  
+
   /** Whether a user password is set (non-empty) */
   hasUserPassword?: boolean;
-  
+
   /** Whether an owner password is set (different from user password) */
   hasOwnerPassword?: boolean;
-  
+
   /** How the document was authenticated */
   authenticatedAs?: "user" | "owner" | null;
-  
+
   /** Current permission flags */
   permissions: Permissions;
-  
+
   /** Whether metadata is encrypted */
   encryptMetadata?: boolean;
 }
@@ -292,27 +292,27 @@ interface AuthenticationResult {
 
 ### On `PDF` class
 
-```typescript
+````typescript
 class PDF {
   // ─────────────────────────────────────────────────────────────────────────
   // Existing properties (unchanged)
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   /** Whether the document is encrypted */
   get isEncrypted(): boolean;
-  
+
   /** Whether authentication succeeded (for encrypted docs) */
   get isAuthenticated(): boolean;
-  
+
   // ─────────────────────────────────────────────────────────────────────────
   // New security methods
   // ─────────────────────────────────────────────────────────────────────────
-  
+
   /**
    * Get detailed security information about the document.
-   * 
+   *
    * @returns Security information including encryption details and permissions
-   * 
+   *
    * @example
    * ```typescript
    * const security = pdf.getSecurity();
@@ -321,15 +321,15 @@ class PDF {
    * ```
    */
   getSecurity(): SecurityInfo;
-  
+
   /**
    * Get the current permission flags.
-   * 
+   *
    * Returns all permissions as true for unencrypted documents.
    * For encrypted documents authenticated with owner password, all are true.
-   * 
+   *
    * @returns Current permission flags
-   * 
+   *
    * @example
    * ```typescript
    * const perms = pdf.getPermissions();
@@ -339,26 +339,26 @@ class PDF {
    * ```
    */
   getPermissions(): Permissions;
-  
+
   /**
    * Check if the document was authenticated with owner-level access.
-   * 
+   *
    * Owner access grants all permissions regardless of permission flags.
    * Returns true for unencrypted documents.
-   * 
+   *
    * @returns true if owner access is available
    */
   hasOwnerAccess(): boolean;
-  
+
   /**
    * Attempt to authenticate with a password.
-   * 
+   *
    * Use this to upgrade access (e.g., from user to owner) or to
    * try a different password without reloading the document.
-   * 
+   *
    * @param password - Password to try
    * @returns Authentication result
-   * 
+   *
    * @example
    * ```typescript
    * // Try to get owner access
@@ -369,15 +369,15 @@ class PDF {
    * ```
    */
   authenticate(password: string): AuthenticationResult;
-  
+
   /**
    * Remove all encryption from the document.
-   * 
+   *
    * After calling this, the document will be saved without encryption.
    * Requires owner access, or user access with modify permission.
-   * 
+   *
    * @throws {SecurityError} If insufficient permissions to remove protection
-   * 
+   *
    * @example
    * ```typescript
    * // Remove encryption from a document
@@ -387,16 +387,16 @@ class PDF {
    * ```
    */
   removeProtection(): void;
-  
+
   /**
    * Add or change document encryption.
-   * 
+   *
    * If the document is already encrypted, requires owner access to change.
    * If unencrypted, can be called without restrictions.
-   * 
+   *
    * @param options - Protection options (passwords, permissions, algorithm)
    * @throws {SecurityError} If insufficient permissions to change protection
-   * 
+   *
    * @example
    * ```typescript
    * // Add protection to unencrypted document
@@ -405,7 +405,7 @@ class PDF {
    *   ownerPassword: "admin",
    *   permissions: { copy: false, print: true },
    * });
-   * 
+   *
    * // Change to stronger algorithm
    * pdf.setProtection({
    *   algorithm: "AES-256",
@@ -414,7 +414,7 @@ class PDF {
    */
   setProtection(options: ProtectionOptions): void;
 }
-```
+````
 
 ---
 
@@ -428,7 +428,7 @@ The PDF class needs to track pending security changes:
 class PDF {
   // Existing
   private ctx: PDFContext;
-  
+
   // New: pending security state
   private _pendingSecurity: {
     action: "none" | "remove" | "encrypt";
@@ -442,7 +442,7 @@ class PDF {
 The serializer needs to apply encryption during write:
 
 1. **Remove protection**: Write without encryption dictionary
-2. **Add protection**: 
+2. **Add protection**:
    - Generate encryption key
    - Create /Encrypt dictionary
    - Encrypt strings and streams during serialization
@@ -451,11 +451,13 @@ The serializer needs to apply encryption during write:
 ### Incremental Save Considerations
 
 Encryption changes **cannot** be saved incrementally:
+
 - Removing encryption requires re-encrypting all objects (with no encryption)
 - Adding encryption requires encrypting all existing objects
 - Changing algorithm requires re-encryption
 
 When `setProtection()` or `removeProtection()` is called:
+
 - Mark that incremental save is blocked
 - `canSaveIncrementally()` returns `"encryptionChanged"`
 
@@ -472,9 +474,9 @@ class SecurityError extends Error {
 }
 
 type SecurityErrorCode =
-  | "PERMISSION_DENIED"     // Insufficient permissions for operation
-  | "NOT_AUTHENTICATED"     // Document encrypted but not authenticated
-  | "INVALID_PASSWORD"      // Wrong password
+  | "PERMISSION_DENIED" // Insufficient permissions for operation
+  | "NOT_AUTHENTICATED" // Document encrypted but not authenticated
+  | "INVALID_PASSWORD" // Wrong password
   | "UNSUPPORTED_ENCRYPTION"; // Unsupported algorithm/handler
 
 /**
@@ -488,11 +490,11 @@ class PermissionDeniedError extends SecurityError {
 
 ### Error Scenarios
 
-| Operation | Condition | Error |
-|-----------|-----------|-------|
-| `removeProtection()` | No owner access and no modify permission | `PermissionDeniedError` |
-| `setProtection()` | Encrypted without owner access | `PermissionDeniedError` |
-| Any modification | Encrypted, not authenticated | `SecurityError("NOT_AUTHENTICATED")` |
+| Operation            | Condition                                | Error                                |
+| -------------------- | ---------------------------------------- | ------------------------------------ |
+| `removeProtection()` | No owner access and no modify permission | `PermissionDeniedError`              |
+| `setProtection()`    | Encrypted without owner access           | `PermissionDeniedError`              |
+| Any modification     | Encrypted, not authenticated             | `SecurityError("NOT_AUTHENTICATED")` |
 
 ---
 
@@ -507,6 +509,7 @@ Removing encryption after signing **invalidates** the signature (bytes change).
 ### Form Filling
 
 Form field values are encrypted strings. When filling:
+
 - The handler encrypts new values during write
 - No special handling needed in the form API
 
@@ -532,13 +535,13 @@ canSaveIncrementally(): IncrementalSaveBlocker | null {
 
 ## Default Behaviors
 
-| Scenario | Default |
-|----------|---------|
-| Algorithm (new encryption) | `"AES-256"` |
-| User password (omitted) | Empty string (no password to open) |
-| Owner password (omitted) | Random 32-byte value |
-| Permissions (omitted) | All `true` (no restrictions) |
-| `encryptMetadata` | `true` |
+| Scenario                   | Default                            |
+| -------------------------- | ---------------------------------- |
+| Algorithm (new encryption) | `"AES-256"`                        |
+| User password (omitted)    | Empty string (no password to open) |
+| Owner password (omitted)   | Random 32-byte value               |
+| Permissions (omitted)      | All `true` (no restrictions)       |
+| `encryptMetadata`          | `true`                             |
 
 ---
 
@@ -606,32 +609,35 @@ fixtures/encryption/
 
 ## Open Questions
 
-| Question | Proposed Answer |
-|----------|-----------------|
-| Warn on weak algorithms? | Yes, emit warning for RC4-* but allow for compatibility |
-| Allow empty owner password? | No, always generate random if not provided |
-| Validate password strength? | No, not our responsibility |
-| Auto-upgrade algorithm on save? | No, preserve original unless explicitly changed |
+| Question                        | Proposed Answer                                          |
+| ------------------------------- | -------------------------------------------------------- |
+| Warn on weak algorithms?        | Yes, emit warning for RC4-\* but allow for compatibility |
+| Allow empty owner password?     | No, always generate random if not provided               |
+| Validate password strength?     | No, not our responsibility                               |
+| Auto-upgrade algorithm on save? | No, preserve original unless explicitly changed          |
 
 ---
 
 ## Implementation Phases
 
 ### Phase 1: Security Querying
+
 - [ ] `getSecurity()` method
-- [ ] `getPermissions()` method  
+- [ ] `getPermissions()` method
 - [ ] `hasOwnerAccess()` method
 - [ ] `authenticate()` method for re-authentication
 - [ ] Tests for querying encrypted document state
 
 ### Phase 2: Remove Protection
+
 - [ ] `removeProtection()` method
 - [ ] Permission checking (owner access or modify permission)
 - [ ] Writer support for unencrypted output
 - [ ] Block incremental save when encryption removed
 - [ ] Tests for decryption round-trip
 
-### Phase 3: Add Protection  
+### Phase 3: Add Protection
+
 - [ ] `setProtection()` method
 - [ ] Encryption key generation (R6 algorithm)
 - [ ] Writer integration for encrypting objects
@@ -639,6 +645,7 @@ fixtures/encryption/
 - [ ] Tests for encryption round-trip
 
 ### Phase 4: Change Protection
+
 - [ ] Handle encrypted → encrypted case
 - [ ] Preserve content during re-encryption
 - [ ] Algorithm upgrade/downgrade support

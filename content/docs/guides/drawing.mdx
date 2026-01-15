@@ -10,6 +10,7 @@ This guide covers drawing operations on PDF pages.
 ## Coordinate System
 
 PDF uses a coordinate system where:
+
 - **Origin (0, 0)** is at the **bottom-left** corner
 - **X** increases going **right**
 - **Y** increases going **up**
@@ -64,10 +65,10 @@ page.drawText("Styled Text", {
   y: 650,
   size: 16,
   color: rgb(0.2, 0.4, 0.8),
-  font: customFont,           // Embedded font
-  lineHeight: 24,             // Line height in points
-  maxWidth: 200,              // Word wrap width
-  opacity: 0.8,               // 0-1
+  font: customFont, // Embedded font
+  lineHeight: 24, // Line height in points
+  maxWidth: 200, // Word wrap width
+  opacity: 0.8, // 0-1
 });
 ```
 
@@ -78,20 +79,21 @@ page.drawText("Line 1\nLine 2\nLine 3", {
   x: 50,
   y: 600,
   size: 12,
-  lineHeight: 18,  // Line height in points
+  lineHeight: 18, // Line height in points
 });
 ```
 
 ### Word Wrap
 
 ```ts
-const longText = "This is a very long paragraph that will automatically wrap to fit within the specified maximum width.";
+const longText =
+  "This is a very long paragraph that will automatically wrap to fit within the specified maximum width.";
 
 page.drawText(longText, {
   x: 50,
   y: 550,
   size: 12,
-  maxWidth: 200,  // Wrap at 200 points
+  maxWidth: 200, // Wrap at 200 points
   lineHeight: 16, // Line height in points
 });
 ```
@@ -100,7 +102,7 @@ page.drawText(longText, {
 
 ```ts
 const fontBytes = await readFile("fonts/OpenSans-Regular.ttf");
-const font = pdf.embedFont(fontBytes);  // Synchronous
+const font = pdf.embedFont(fontBytes); // Synchronous
 
 page.drawText("Custom Font", {
   x: 50,
@@ -165,8 +167,8 @@ page.drawRectangle({
 
 ```ts
 page.drawCircle({
-  x: 150,      // Center X
-  y: 500,      // Center Y
+  x: 150, // Center X
+  y: 500, // Center Y
   radius: 50,
   color: rgb(0.8, 0.9, 1),
   borderColor: rgb(0, 0.3, 0.6),
@@ -178,8 +180,8 @@ page.drawCircle({
 
 ```ts
 page.drawEllipse({
-  x: 150,      // Center X
-  y: 400,      // Center Y
+  x: 150, // Center X
+  y: 400, // Center Y
   xRadius: 80,
   yRadius: 40,
   color: rgb(1, 0.9, 0.8),
@@ -204,7 +206,7 @@ page.drawLine({
   end: { x: 250, y: 280 },
   color: rgb(0.5, 0.5, 0.5),
   thickness: 1,
-  dashArray: [5, 3],  // 5pt dash, 3pt gap
+  dashArray: [5, 3], // 5pt dash, 3pt gap
 });
 ```
 
@@ -272,7 +274,8 @@ For complex shapes, use the path builder:
 
 ```ts
 // Triangle using the fluent path API
-page.drawPath()
+page
+  .drawPath()
   .moveTo(100, 100)
   .lineTo(150, 200)
   .lineTo(50, 200)
@@ -288,15 +291,17 @@ page.drawPath()
 
 ```ts
 // Quadratic curve (converted to cubic internally)
-page.drawPath()
+page
+  .drawPath()
   .moveTo(50, 300)
-  .quadraticCurveTo(100, 400, 150, 300)  // Control point, end point
+  .quadraticCurveTo(100, 400, 150, 300) // Control point, end point
   .stroke({ borderColor: rgb(0, 0, 0), borderWidth: 2 });
 
 // Cubic bezier curve
-page.drawPath()
+page
+  .drawPath()
   .moveTo(200, 300)
-  .curveTo(225, 200, 275, 400, 300, 300)  // Two control points, end point
+  .curveTo(225, 200, 275, 400, 300, 300) // Two control points, end point
   .stroke({ borderColor: rgb(0, 0, 0), borderWidth: 2 });
 ```
 
@@ -307,8 +312,10 @@ Content is drawn in order - later drawings appear on top:
 ```ts
 // Background first
 page.drawRectangle({
-  x: 0, y: 0,
-  width: 612, height: 792,
+  x: 0,
+  y: 0,
+  width: 612,
+  height: 792,
   color: rgb(0.95, 0.95, 0.95),
 });
 
@@ -352,7 +359,7 @@ page.drawText("Rotated Text", {
   x: 280,
   y: 400,
   size: 14,
-  rotate: degrees(45),  // 45 degrees counter-clockwise
+  rotate: degrees(45), // 45 degrees counter-clockwise
 });
 ```
 
@@ -368,15 +375,19 @@ const { width, height } = page;
 
 // Background
 page.drawRectangle({
-  x: 0, y: 0,
-  width, height,
+  x: 0,
+  y: 0,
+  width,
+  height,
   color: rgb(0.98, 0.98, 1),
 });
 
 // Header bar
 page.drawRectangle({
-  x: 0, y: height - 60,
-  width, height: 60,
+  x: 0,
+  y: height - 60,
+  width,
+  height: 60,
   color: rgb(0.2, 0.4, 0.8),
 });
 

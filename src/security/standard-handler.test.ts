@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { aesEncrypt } from "./ciphers/aes";
 import { RC4Cipher } from "./ciphers/rc4";
 import type { EncryptionDict } from "./encryption-dict";

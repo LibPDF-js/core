@@ -5,6 +5,7 @@ Analysis of the current API structure and proposed improvements to make it clean
 ## Current State
 
 ### Directory Structure
+
 ```
 src/api/
   pdf.ts           # PDF class (main entry point)
@@ -24,6 +25,7 @@ src/document/
 ### Pain Points
 
 1. **Pages are just `PdfRef`** — No `PDFPage` wrapper class. Users must:
+
    ```typescript
    const pageRef = pdf.getPage(0);
    const pageDict = await pdf.getObject(pageRef); // Returns PdfDict
@@ -54,44 +56,46 @@ export class PDFPage {
 
   /** Page index in document (0-based) */
   get index(): number { ... }
-  
+
   /** Page width in points */
   get width(): number { ... }
-  
+
   /** Page height in points */
   get height(): number { ... }
-  
+
   /** Page rotation in degrees (0, 90, 180, 270) */
   get rotation(): number { ... }
-  
+
   /** Get the MediaBox */
   getMediaBox(): Rectangle { ... }
-  
+
   /** Get the underlying reference */
   getRef(): PdfRef { ... }
-  
+
   /** Get the underlying dictionary */
   getDict(): PdfDict { ... }
-  
+
   /** Draw an embedded page onto this page */
   drawPage(embedded: EmbeddedPage, options?: DrawPageOptions): void { ... }
-  
+
   /** Set rotation */
   setRotation(degrees: 0 | 90 | 180 | 270): void { ... }
 }
 ```
 
 **Benefits:**
+
 - Type-safe page access
 - Convenient dimension/rotation getters
 - Natural place for `drawPage()` method (for overlay/underlay)
 - Consistent with form fields having wrapper classes
 
 **API Changes:**
+
 ```typescript
 // Before
 const pageRef = pdf.getPage(0);
-const pageDict = await pdf.getObject(pageRef) as PdfDict;
+const pageDict = (await pdf.getObject(pageRef)) as PdfDict;
 const mediaBox = pageDict.get("MediaBox");
 
 // After
@@ -111,16 +115,16 @@ export class PDFContext {
   readonly catalog: PDFCatalog;
   readonly pages: PageTree;
   readonly parsed: ParsedDocument;
-  
+
   /** Register a new object */
   register(obj: PdfObject): PdfRef { ... }
-  
+
   /** Resolve a reference */
   resolve(ref: PdfRef): Promise<PdfObject | null> { ... }
-  
+
   /** Get object synchronously (if already loaded) */
   getObject(ref: PdfRef): PdfObject | null { ... }
-  
+
   /** Add a warning */
   addWarning(msg: string): void { ... }
 }
@@ -131,12 +135,13 @@ Then `PDF` becomes a thin wrapper that delegates to `PDFContext`:
 ```typescript
 export class PDF {
   private readonly ctx: PDFContext;
-  
+
   // Existing API unchanged, but internally uses ctx
 }
 ```
 
 **Benefits:**
+
 - Subsystems receive one object instead of 3-4
 - Cleaner initialization: `new PDFForm(ctx)` instead of `PDFForm.load(registry, catalog, pageTree)`
 - Easier to pass context to new operations (ObjectCopier, PageEmbedder, etc.)
@@ -157,6 +162,7 @@ src/api/
 ```
 
 The `src/document/` directory should contain:
+
 - Low-level document structures (acro-form.ts, form-field.ts, page-tree.ts)
 - Object manipulation (object-registry.ts, object-copier.ts)
 - Change tracking (change-collector.ts)
@@ -164,6 +170,7 @@ The `src/document/` directory should contain:
 ### 4. Simplify PDFForm Initialization
 
 Before:
+
 ```typescript
 // In PDF class
 async getForm(): Promise<PDFForm | null> {
@@ -179,6 +186,7 @@ static async load(
 ```
 
 After:
+
 ```typescript
 // In PDF class
 async getForm(): Promise<PDFForm | null> {
@@ -192,12 +200,14 @@ static async load(ctx: PDFContext): Promise<PDFForm | null>
 ### 5. Page Access Returns `PDFPage`
 
 Before:
+
 ```typescript
 getPage(index: number): PdfRef | null
 getPages(): PdfRef[]
 ```
 
 After:
+
 ```typescript
 getPage(index: number): PDFPage | null
 getPages(): PDFPage[]
@@ -210,22 +220,26 @@ Note: `getPages()` could be lazy (returns iterator/proxy) but for simplicity we 
 ## Implementation Order
 
 ### Phase 1: PDFContext
+
 1. Create `src/api/pdf-context.ts` with core context
 2. Refactor `PDF` class to use `PDFContext` internally
 3. No external API changes yet
 
 ### Phase 2: Move PDFCatalog
+
 1. Move `src/document/pdf-catalog.ts` to `src/api/pdf-catalog.ts`
 2. Update imports
 3. PDFCatalog now takes `PDFContext` in constructor
 
 ### Phase 3: Add PDFPage
+
 1. Create `src/api/pdf-page.ts`
 2. Change `PDF.getPage()` to return `PDFPage`
 3. Update `PageTree` to work with `PDFPage`
 4. Preserve `.getRef()` for low-level access
 
 ### Phase 4: Simplify Subsystem Init
+
 1. Update `PDFForm.load()` to take `PDFContext`
 2. Update `PDFAttachments` constructor
 3. Update `PDFFonts` constructor
@@ -260,16 +274,19 @@ Note: `getPages()` could be lazy (returns iterator/proxy) but for simplicity we 
 ## Files to Create/Modify
 
 ### New Files
+
 - `src/api/pdf-context.ts` — Central context
 - `src/api/pdf-page.ts` — Page wrapper
 
 ### Move
+
 - `src/document/pdf-catalog.ts` → `src/api/pdf-catalog.ts`
 
 ### Modify
+
 - `src/api/pdf.ts` — Use PDFDocument, return PDFPage
 - `src/api/pdf-form.ts` — Take PDFDocument
-- `src/api/pdf-attachments.ts` — Take PDFDocument  
+- `src/api/pdf-attachments.ts` — Take PDFDocument
 - `src/api/pdf-fonts.ts` — Take PDFDocument
 - `src/document/page-tree.ts` — Work with PDFPage
 - `src/index.ts` — Export new types
@@ -278,12 +295,12 @@ Note: `getPages()` could be lazy (returns iterator/proxy) but for simplicity we 
 
 ## Summary
 
-| Change | Impact | Priority |
-|--------|--------|----------|
-| Add PDFPage class | High (enables overlay API) | **P0** |
-| Add PDFContext | Medium (cleaner internals) | **P1** |
-| Move PDFCatalog to src/api | Low (organizational) | **P2** |
-| Simplify subsystem init | Low (cleaner code) | **P2** |
+| Change                     | Impact                     | Priority |
+| -------------------------- | -------------------------- | -------- |
+| Add PDFPage class          | High (enables overlay API) | **P0**   |
+| Add PDFContext             | Medium (cleaner internals) | **P1**   |
+| Move PDFCatalog to src/api | Low (organizational)       | **P2**   |
+| Simplify subsystem init    | Low (cleaner code)         | **P2**   |
 
 The PDFPage class is the most important change since it directly enables the merge/split overlay functionality and provides a better user experience for page manipulation.
 
@@ -293,15 +310,16 @@ The PDFPage class is the most important change since it directly enables the mer
 
 The following improvements have been implemented:
 
-| Phase | Status |
-|-------|--------|
-| Phase 1: PDFContext | ✅ Completed |
-| Phase 2: Move PDFCatalog to src/api/ | ✅ Completed |
-| Phase 3: Add PDFPage class | ✅ Completed |
-| Phase 4: Simplify subsystem init | ✅ Completed (part of Phase 1) |
-| Move PageTree to src/api/ | ✅ Completed |
+| Phase                                | Status                         |
+| ------------------------------------ | ------------------------------ |
+| Phase 1: PDFContext                  | ✅ Completed                   |
+| Phase 2: Move PDFCatalog to src/api/ | ✅ Completed                   |
+| Phase 3: Add PDFPage class           | ✅ Completed                   |
+| Phase 4: Simplify subsystem init     | ✅ Completed (part of Phase 1) |
+| Move PageTree to src/api/            | ✅ Completed                   |
 
 Current `src/api/` structure:
+
 ```
 src/api/
   pdf.ts              # Main PDF class
@@ -323,12 +341,14 @@ Analysis of remaining organizational issues and proposed solutions.
 ### 1. Duplicate Operator Files (CRITICAL)
 
 **Problem:** Two files with overlapping purposes:
+
 - `src/content/operators.ts` (184 lines) - `Op` enum and `Operator` class
 - `src/helpers/operators.ts` (199 lines) - Factory functions creating Operators
 
 **Issue:** `helpers/operators.ts` imports from `content/operators.ts`. They belong together.
 
 **Recommendation:**
+
 1. Merge factory functions into `src/content/operators.ts`
 2. Delete `src/helpers/operators.ts`
 3. Update imports throughout codebase
@@ -338,6 +358,7 @@ Analysis of remaining organizational issues and proposed solutions.
 ### 2. Create `src/forms/` Directory (HIGH PRIORITY)
 
 **Problem:** Form-related files are scattered in `src/document/`:
+
 - `acro-form.ts` (1310 lines) - AcroForm implementation
 - `form-field.ts` (1439 lines) - All field classes
 - `appearance-generator.ts` (1663 lines) - Appearance stream generation
@@ -348,6 +369,7 @@ Analysis of remaining organizational issues and proposed solutions.
 These are form-specific, not document-level structures.
 
 **Recommendation:** Create `src/forms/` with subdirectories:
+
 ```
 src/forms/
   acro-form.ts              # Core AcroForm class
@@ -376,6 +398,7 @@ src/forms/
 ```
 
 **Benefits:**
+
 - `document/` is cleaner (only document-level structures)
 - Each field type in its own file (easier to find, modify)
 - Appearance generation split by type (1663 lines → ~300 each)
@@ -385,6 +408,7 @@ src/forms/
 ### 3. What Should Remain in `src/document/`
 
 After moving forms, `src/document/` should contain only:
+
 ```
 src/document/
   object-registry.ts   # Object/reference management
@@ -401,6 +425,7 @@ These are genuine document-level concerns, not feature-specific.
 ### 4. Reorganize `src/helpers/`
 
 **Problem:** `helpers/` is a grab-bag of unrelated utilities:
+
 ```
 src/helpers/
   operators.ts   # Should be in content/ (duplicate)
@@ -413,6 +438,7 @@ src/helpers/
 ```
 
 **Recommendation:**
+
 ```
 src/helpers/
   text/
@@ -431,19 +457,24 @@ src/helpers/
 ### 5. Split Large Files
 
 #### `standard-14.ts` (3170 lines)
+
 Mostly data tables. Consider:
+
 - `standard-14/index.ts` - Core functions
 - `standard-14/widths.ts` - Large width tables
 
 #### `form-field.ts` (1439 lines)
+
 Split by field type (see #2 above).
 
 #### `appearance-generator.ts` (1663 lines)
-**Keep as-is.** One class with shared state (acroForm, registry) and helper methods. 
-Splitting would fragment the class without real benefit - the size is inherent to 
+
+**Keep as-is.** One class with shared state (acroForm, registry) and helper methods.
+Splitting would fragment the class without real benefit - the size is inherent to
 the task (lots of PDF operators for each field type).
 
 #### `acro-form.ts` (1310 lines)
+
 Extract flattening logic to `form-flattener.ts`.
 
 ---
@@ -533,14 +564,14 @@ src/
 
 ## Implementation Priority
 
-| Change | Impact | Effort | Priority |
-|--------|--------|--------|----------|
-| Merge operators.ts files | Fixes confusion | Low | **P0** |
-| Create src/forms/ directory | Major cleanup | Medium | **P1** |
-| Split form-field.ts | Better organization | Medium | **P2** |
-| Split appearance-generator.ts | Better organization | Medium | **P2** |
-| Reorganize helpers/ | Minor cleanup | Low | **P3** |
-| Move form-font.ts | Minor cleanup | Low | **P3** |
+| Change                        | Impact              | Effort | Priority |
+| ----------------------------- | ------------------- | ------ | -------- |
+| Merge operators.ts files      | Fixes confusion     | Low    | **P0**   |
+| Create src/forms/ directory   | Major cleanup       | Medium | **P1**   |
+| Split form-field.ts           | Better organization | Medium | **P2**   |
+| Split appearance-generator.ts | Better organization | Medium | **P2**   |
+| Reorganize helpers/           | Minor cleanup       | Low    | **P3**   |
+| Move form-font.ts             | Minor cleanup       | Low    | **P3**   |
 
 ---
 
@@ -556,6 +587,7 @@ All planned reorganization has been completed:
    - All test files moved alongside their implementations
 
 2. **Split `form-field.ts` (1439 lines) into `src/document/forms/fields/`:**
+
    ```
    fields/
      index.ts           # Re-exports everything

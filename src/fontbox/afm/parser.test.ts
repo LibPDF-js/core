@@ -5,6 +5,7 @@
  */
 
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { loadFixture } from "../../test-utils.ts";
 import type { FontMetrics } from "./index.ts";
 import { parseAFM } from "./parser.ts";

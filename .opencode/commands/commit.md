@@ -43,7 +43,7 @@ $ARGUMENTS
      - Use imperative mood ("add" not "added")
      - Lowercase, no period at end
      - Max 50 characters if possible, 72 hard limit
-   - **Body** (if needed): Explain *why*, not *what*
+   - **Body** (if needed): Explain _why_, not _what_
      - Wrap at 72 characters
      - Separate from subject with blank line
 
@@ -58,11 +58,13 @@ $ARGUMENTS
 ## Examples
 
 Simple change:
+
 ```
 fix(parser): handle empty input without throwing
 ```
 
 With body:
+
 ```
 feat(api): add streaming response support
 

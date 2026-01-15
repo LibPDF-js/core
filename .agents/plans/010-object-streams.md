@@ -32,12 +32,12 @@ endobj
 
 ### Dictionary Entries
 
-| Key | Type | Required | Description |
-|-----|------|----------|-------------|
-| `/Type` | name | Yes | Must be `/ObjStm` |
-| `/N` | integer | Yes | Number of objects in stream |
-| `/First` | integer | Yes | Byte offset of first object (after index) |
-| `/Extends` | reference | No | Reference to another object stream |
+| Key        | Type      | Required | Description                               |
+| ---------- | --------- | -------- | ----------------------------------------- |
+| `/Type`    | name      | Yes      | Must be `/ObjStm`                         |
+| `/N`       | integer   | Yes      | Number of objects in stream               |
+| `/First`   | integer   | Yes      | Byte offset of first object (after index) |
+| `/Extends` | reference | No       | Reference to another object stream        |
 
 ### Stream Format
 
@@ -56,8 +56,8 @@ Object streams are referenced via `type: "compressed"` XRef entries:
 ```typescript
 interface CompressedXRefEntry {
   type: "compressed";
-  streamObjNum: number;    // Object number of the ObjStm
-  indexInStream: number;   // Index within that stream (0-based)
+  streamObjNum: number; // Object number of the ObjStm
+  indexInStream: number; // Index within that stream (0-based)
 }
 ```
 
@@ -71,9 +71,7 @@ class ObjectStreamParser {
   private index: Array<{ objNum: number; offset: number }> | null = null;
   private decodedData: Uint8Array | null = null;
 
-  constructor(
-    private stream: PdfStream
-  ) {}
+  constructor(private stream: PdfStream) {}
 
   /**
    * Parse the object stream's index and cache decoded data.
@@ -245,7 +243,7 @@ class DocumentParser {
 
   private async getCompressedObject(
     streamObjNum: number,
-    indexInStream: number
+    indexInStream: number,
   ): Promise<PdfObject | null> {
     // Get or create cached parser for this object stream
     let parser = this.objectStreamCache.get(streamObjNum);
@@ -323,6 +321,7 @@ XRef stream parsing will be added to XRefParser (spec 006) once filters are impl
 ## Test Cases
 
 ### Object Stream Parsing
+
 - Parse simple object stream with 1 object
 - Parse stream with multiple objects
 - Parse stream with various object types (dict, array, string, number)
@@ -330,6 +329,7 @@ XRef stream parsing will be added to XRefParser (spec 006) once filters are impl
 - Handle invalid index data
 
 ### Compressed Object Resolution
+
 - Resolve single compressed object
 - Resolve multiple objects from same stream
 - Cache object stream parser
@@ -337,6 +337,7 @@ XRef stream parsing will be added to XRefParser (spec 006) once filters are impl
 - Handle out-of-bounds index
 
 ### Integration
+
 - DocumentParser resolves compressed XRef entries
 - Object stream inside object stream (should error - not allowed)
 - Circular reference detection
@@ -358,14 +359,14 @@ src/
 
 ## Error Handling
 
-| Scenario | Behavior |
-|----------|----------|
-| Missing /Type /ObjStm | Throw error |
-| Missing /N or /First | Throw error |
-| Invalid index format | Throw error (or warn in lenient mode) |
-| Index out of bounds | Return null |
-| Decompression failure | Propagate filter error |
-| Nested object stream | Throw error (not allowed per spec) |
+| Scenario              | Behavior                              |
+| --------------------- | ------------------------------------- |
+| Missing /Type /ObjStm | Throw error                           |
+| Missing /N or /First  | Throw error                           |
+| Invalid index format  | Throw error (or warn in lenient mode) |
+| Index out of bounds   | Return null                           |
+| Decompression failure | Propagate filter error                |
+| Nested object stream  | Throw error (not allowed per spec)    |
 
 ## Performance Considerations
 

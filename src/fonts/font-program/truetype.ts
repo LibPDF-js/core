@@ -3,6 +3,7 @@
  */
 
 import type { TrueTypeFont } from "#src/fontbox/ttf/truetype-font.ts";
+
 import type { FontProgram } from "./base.ts";
 
 /**

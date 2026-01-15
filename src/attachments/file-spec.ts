@@ -25,6 +25,7 @@ import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+
 import type { AddAttachmentOptions, AttachmentInfo } from "./types";
 
 /**

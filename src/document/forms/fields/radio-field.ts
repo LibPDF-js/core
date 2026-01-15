@@ -6,6 +6,7 @@
 
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfString } from "#src/objects/pdf-string";
+
 import { TerminalField } from "./base";
 import { FieldFlags } from "./types";
 

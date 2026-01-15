@@ -3,6 +3,7 @@
  */
 
 import type { CFFCIDFont } from "#src/fontbox/cff/parser.ts";
+
 import type { FontProgram } from "./base.ts";
 
 /**

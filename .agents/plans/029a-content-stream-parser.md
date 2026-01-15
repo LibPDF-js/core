@@ -41,6 +41,7 @@ Currently we can only BUILD content streams (via `ContentStreamBuilder`), not PA
 ### Inline Image EI Detection: Port pdf.js
 
 The pdf.js implementation is battle-tested. Key features:
+
 - Filter-specific detection (DCT looks for JPEG EOI `0xFFD9`, ASCII85 looks for `~>`)
 - Default heuristic: scan for `EI` + whitespace, verify next bytes are ASCII, validate a known PDF operator follows with correct argument count
 - Recovery: remember last potential EI position if stream ends unexpectedly
@@ -94,7 +95,7 @@ for (const op of operations) {
 const { operations } = new ContentStreamParser(streamBytes).parse();
 
 // Filter out OC marked content blocks
-const filtered = filterMarkedContent(operations, (tag) => tag === "OC");
+const filtered = filterMarkedContent(operations, tag => tag === "OC");
 
 const newBytes = ContentStreamSerializer.serialize(filtered);
 ```
@@ -182,6 +183,7 @@ Separate from core parser, for common operations:
 ## Test Strategy
 
 ### Unit Tests
+
 - Tokenizer handles all token types
 - Parser bundles operands with operators correctly
 - Inline image parsing with various filters
@@ -189,11 +191,13 @@ Separate from core parser, for common operations:
 - Malformed input triggers warnings, not exceptions
 
 ### Integration Tests
+
 - Parse real content streams from fixtures
 - Layer removal produces valid output
 - Mixed parsed + generated content serializes correctly
 
 ### Fixtures Needed
+
 - Inline images (DCT, ASCII85, raw)
 - Inline images with false-positive `EI` in data
 - Marked content blocks (nested)

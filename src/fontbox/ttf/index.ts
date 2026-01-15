@@ -27,12 +27,7 @@ export {
 } from "./types.ts";
 
 // Tables
-export {
-  parseHeadTable,
-  type HeadTable,
-  MAC_STYLE_BOLD,
-  MAC_STYLE_ITALIC,
-} from "./tables/head.ts";
+export { parseHeadTable, type HeadTable, MAC_STYLE_BOLD, MAC_STYLE_ITALIC } from "./tables/head.ts";
 
 export { parseHheaTable, type HheaTable } from "./tables/hhea.ts";
 

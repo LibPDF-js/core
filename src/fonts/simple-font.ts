@@ -23,6 +23,7 @@ import { PdfArray } from "#src/objects/pdf-array";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number.ts";
 import { PdfRef } from "#src/objects/pdf-ref.ts";
+
 import { type EmbeddedParserOptions, parseEmbeddedProgram } from "./embedded-parser";
 import { DifferencesEncoding } from "./encodings/differences";
 import type { FontEncoding } from "./encodings/encoding";

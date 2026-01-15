@@ -14,6 +14,7 @@ import type { PdfDict } from "#src/objects/pdf-dict.ts";
 import type { PdfName } from "#src/objects/pdf-name.ts";
 import { PdfRef } from "#src/objects/pdf-ref.ts";
 import { PdfStream } from "#src/objects/pdf-stream.ts";
+
 import {
   CFFCIDFontProgram,
   CFFType1FontProgram,

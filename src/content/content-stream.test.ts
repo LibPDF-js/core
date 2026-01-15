@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import {
   closePath,
   lineTo,
@@ -12,6 +11,8 @@ import {
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { describe, expect, it } from "vitest";
+
 import { ContentStreamBuilder } from "./content-stream";
 
 describe("ContentStreamBuilder", () => {

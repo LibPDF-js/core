@@ -16,17 +16,17 @@ The current serializer (`src/writer/serializer.ts`) has several issues:
 
 These decisions were made during the spec interview:
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Incremental save support | ByteWriter initializes with existing bytes | Cleaner API for appending after original PDF |
-| Encryption handling | Encrypt before toBytes() | Keeps ByteWriter and toBytes() simple/pure |
-| XRef writer | Update to use ByteWriter | Consistency across all byte output |
-| formatNumber() location | Move to src/helpers/ | Shared utility, could be reused elsewhere |
-| Large PDF handling | Configurable maxSize limit | Throws if exceeded, prevents runaway memory |
-| ByteWriter reusability | Single-use only | Simpler, avoids state management bugs |
-| Invalid dict values | Skip silently | Lenient, matches parsing philosophy |
-| Indirect /Length refs | Always write direct | We know stream.data.length; original bytes preserved in incremental |
-| Scanner relationship | Keep separate | Different concerns (reading vs writing) |
+| Decision                 | Choice                                     | Rationale                                                           |
+| ------------------------ | ------------------------------------------ | ------------------------------------------------------------------- |
+| Incremental save support | ByteWriter initializes with existing bytes | Cleaner API for appending after original PDF                        |
+| Encryption handling      | Encrypt before toBytes()                   | Keeps ByteWriter and toBytes() simple/pure                          |
+| XRef writer              | Update to use ByteWriter                   | Consistency across all byte output                                  |
+| formatNumber() location  | Move to src/helpers/                       | Shared utility, could be reused elsewhere                           |
+| Large PDF handling       | Configurable maxSize limit                 | Throws if exceeded, prevents runaway memory                         |
+| ByteWriter reusability   | Single-use only                            | Simpler, avoids state management bugs                               |
+| Invalid dict values      | Skip silently                              | Lenient, matches parsing philosophy                                 |
+| Indirect /Length refs    | Always write direct                        | We know stream.data.length; original bytes preserved in incremental |
+| Scanner relationship     | Keep separate                              | Different concerns (reading vs writing)                             |
 
 ## Solution
 
@@ -83,9 +83,7 @@ export class ByteWriter {
     }
 
     if (newSize > this.maxSize) {
-      throw new Error(
-        `ByteWriter exceeded maximum size of ${this.maxSize} bytes`
-      );
+      throw new Error(`ByteWriter exceeded maximum size of ${this.maxSize} bytes`);
     }
 
     const newBuffer = new Uint8Array(newSize);
@@ -209,6 +207,7 @@ Since all classes in the `PdfObject` union implement `PdfPrimitive`, TypeScript 
 ### 4. Implement toBytes() in Each Primitive
 
 **PdfNull**
+
 ```typescript
 toByte(writer: ByteWriter): void {
   writer.writeAscii("null");
@@ -216,6 +215,7 @@ toByte(writer: ByteWriter): void {
 ```
 
 **PdfBool**
+
 ```typescript
 toBytes(writer: ByteWriter): void {
   writer.writeAscii(this.value ? "true" : "false");
@@ -240,9 +240,9 @@ import type { PdfRef } from "#src/objects/pdf-ref";
  */
 export function serializeObject(obj: PdfObject): Uint8Array {
   const writer = new ByteWriter();
-  
+
   obj.toBytes(writer);
-  
+
   return writer.toBytes();
 }
 
@@ -253,9 +253,9 @@ export function serializeObject(obj: PdfObject): Uint8Array {
 export function serializeIndirectObject(ref: PdfRef, obj: PdfObject): Uint8Array {
   const writer = new ByteWriter();
   writer.writeAscii(`${ref.objectNumber} ${ref.generation} obj\n`);
-  
+
   obj.toBytes(writer);
-  
+
   writer.writeAscii("\nendobj\n");
   return writer.toBytes();
 }
@@ -273,7 +273,7 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
 
   // Header
   writer.writeAscii(`%PDF-${options.version ?? "1.7"}\n`);
-  writer.writeBytes(new Uint8Array([0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A])); // Binary comment
+  writer.writeBytes(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a])); // Binary comment
 
   // Objects
   const offsets = new Map<number, { offset: number; generation: number }>();
@@ -301,15 +301,15 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
 
 export function writeIncremental(
   registry: ObjectRegistry,
-  options: IncrementalWriteOptions
+  options: IncrementalWriteOptions,
 ): WriteResult {
   // Initialize with original bytes - they're preserved exactly
   const writer = new ByteWriter(options.originalBytes);
 
   // Ensure newline before appended content
   const lastByte = options.originalBytes[options.originalBytes.length - 1];
-  if (lastByte !== 0x0A && lastByte !== 0x0D) {
-    writer.writeByte(0x0A); // newline
+  if (lastByte !== 0x0a && lastByte !== 0x0d) {
+    writer.writeByte(0x0a); // newline
   }
 
   // Write modified/new objects
@@ -341,9 +341,10 @@ export function writeXRefTable(writer: ByteWriter, options: XRefWriteOptions): v
 
   for (const entry of subsection) {
     // Each entry is exactly 20 bytes: offset(10) + space + gen(5) + space + flag + CRLF
-    const line = `${entry.offset.toString().padStart(10, "0")} ` +
-                 `${entry.generation.toString().padStart(5, "0")} ` +
-                 `${entry.type === "free" ? "f" : "n"}\r\n`;
+    const line =
+      `${entry.offset.toString().padStart(10, "0")} ` +
+      `${entry.generation.toString().padStart(5, "0")} ` +
+      `${entry.type === "free" ? "f" : "n"}\r\n`;
     writer.writeAscii(line);
   }
 
@@ -392,28 +393,29 @@ function prepareForWrite(obj: PdfObject, ref: PdfRef, handler: SecurityHandler):
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/io/byte-writer.ts` | **New** - ByteWriter class |
-| `src/io/byte-writer.test.ts` | **New** - Tests |
-| `src/helpers/format.ts` | **New** - formatPdfNumber helper |
+| File                           | Changes                                           |
+| ------------------------------ | ------------------------------------------------- |
+| `src/io/byte-writer.ts`        | **New** - ByteWriter class                        |
+| `src/io/byte-writer.test.ts`   | **New** - Tests                                   |
+| `src/helpers/format.ts`        | **New** - formatPdfNumber helper                  |
 | `src/objects/pdf-primitive.ts` | **New** - PdfPrimitive interface with `toBytes()` |
-| `src/objects/pdf-null.ts` | Add `toBytes()` |
-| `src/objects/pdf-bool.ts` | Add `toBytes()` |
-| `src/objects/pdf-number.ts` | Add `toBytes()` |
-| `src/objects/pdf-name.ts` | Add `toBytes()` |
-| `src/objects/pdf-string.ts` | Add `toBytes()` |
-| `src/objects/pdf-ref.ts` | Add `toBytes()` |
-| `src/objects/pdf-array.ts` | Add `toBytes()` |
-| `src/objects/pdf-dict.ts` | Add `toBytes()` |
-| `src/objects/pdf-stream.ts` | Add `toBytes()` |
-| `src/writer/serializer.ts` | Simplify to use `toBytes()` |
-| `src/writer/pdf-writer.ts` | Use shared ByteWriter |
-| `src/writer/xref-writer.ts` | Update to use ByteWriter |
+| `src/objects/pdf-null.ts`      | Add `toBytes()`                                   |
+| `src/objects/pdf-bool.ts`      | Add `toBytes()`                                   |
+| `src/objects/pdf-number.ts`    | Add `toBytes()`                                   |
+| `src/objects/pdf-name.ts`      | Add `toBytes()`                                   |
+| `src/objects/pdf-string.ts`    | Add `toBytes()`                                   |
+| `src/objects/pdf-ref.ts`       | Add `toBytes()`                                   |
+| `src/objects/pdf-array.ts`     | Add `toBytes()`                                   |
+| `src/objects/pdf-dict.ts`      | Add `toBytes()`                                   |
+| `src/objects/pdf-stream.ts`    | Add `toBytes()`                                   |
+| `src/writer/serializer.ts`     | Simplify to use `toBytes()`                       |
+| `src/writer/pdf-writer.ts`     | Use shared ByteWriter                             |
+| `src/writer/xref-writer.ts`    | Update to use ByteWriter                          |
 
 ## Test Plan
 
 ### 1. ByteWriter Tests
+
 - `writeByte()` single bytes
 - `writeBytes()` byte arrays
 - `writeAscii()` ASCII strings
@@ -426,6 +428,7 @@ function prepareForWrite(obj: PdfObject, ref: PdfRef, handler: SecurityHandler):
 - **Large writes** - 1MB+, verify no corruption
 
 ### 2. Primitive toBytes() Tests
+
 - Each type serializes correctly
 - Edge cases:
   - Empty arrays `[]`
@@ -438,15 +441,18 @@ function prepareForWrite(obj: PdfObject, ref: PdfRef, handler: SecurityHandler):
 - Null values in dicts (should be skipped)
 
 ### 3. Existing Serializer Tests
+
 - All existing tests in `serializer.test.ts` should still pass
 - They test the output, not the implementation
 
 ### 4. Integration Tests
+
 - Full PDF round-trip: load → modify → save → load
 - Incremental save preserves original bytes exactly
 - XRef offsets are correct after refactor
 
 ### 5. Performance Tests
+
 - Serialize a PDF >10MB
 - Verify memory stays bounded
 - Compare allocation count before/after (if possible)

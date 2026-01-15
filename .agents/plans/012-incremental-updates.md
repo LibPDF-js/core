@@ -3,6 +3,7 @@
 ## Overview
 
 Enable modifying PDF documents and saving changes efficiently. This plan covers:
+
 1. **Modification tracking** — Know which objects changed
 2. **Object creation** — Assign object numbers to new objects
 3. **Incremental save** — Append changes without rewriting
@@ -14,12 +15,14 @@ This is **Tier 1 Foundation** work, required for digital signatures (which canno
 ## Reference Implementations
 
 ### pdf.js Approach
+
 - **No dirty flags** — Changes collected explicitly before writing
 - Uses `RefSetCache` (a Map of `ref.toString() → { data, objStreamRef?, index? }`)
 - `data: null` means delete, `data: object` means add/modify
 - Simple but requires manual collection
 
 ### PDFBox Approach
+
 - **Automatic tracking** via `COSUpdateState` per object
 - `COSDocumentState` gates when updates are accepted (only after parse completes)
 - `setItem()` calls mark both parent and child as updated
@@ -27,6 +30,7 @@ This is **Tier 1 Foundation** work, required for digital signatures (which canno
 - More complex but automatic
 
 ### Our Approach: Walk-on-Save with Dirty Flags
+
 - Each mutable object has a simple `dirty` boolean flag
 - Mutations just set `dirty = true` — no callbacks, no parent tracking
 - On `saveIncremental()`, walk loaded objects to find dirty descendants
@@ -88,9 +92,10 @@ interface ObjectRegistry {
 ### Object Identity
 
 A key insight: **object identity matters**. When you do:
+
 ```typescript
 const page = await doc.getObject(pageRef);
-page.set("MediaBox", newBox);  // Modifies the page
+page.set("MediaBox", newBox); // Modifies the page
 ```
 
 The `page` object instance is what we track. We need to map it back to its ref.
@@ -275,9 +280,10 @@ Understanding how objects move through states:
 ### New Object Handling
 
 **Registered (indirect) new objects:**
+
 ```typescript
 const newAnnot = new PdfDict();
-const ref = doc.register(newAnnot);  // → newObjects set, gets ref 99 0 R
+const ref = doc.register(newAnnot); // → newObjects set, gets ref 99 0 R
 page.getArray("Annots")?.push(ref);
 
 // On first save: written because it's in newObjects set
@@ -286,6 +292,7 @@ page.getArray("Annots")?.push(ref);
 ```
 
 **Direct (embedded) new objects:**
+
 ```typescript
 const newBox = PdfArray.of(...);
 page.set("MediaBox", newBox);  // page.dirty = true
@@ -300,12 +307,14 @@ page.set("MediaBox", newBox);  // page.dirty = true
 ## Phase 3: Stream Data Modification
 
 Streams need special handling because:
+
 1. The dict part uses dirty flags (already works via PdfDict inheritance)
 2. The binary data needs explicit modification API
 
 ### Options
 
 **Option A: Immutable data, replace whole stream**
+
 ```typescript
 // Create new stream with modified data
 const newData = modifyImageData(stream.data);
@@ -314,9 +323,10 @@ page.set("XObject", newStream);
 ```
 
 **Option B: Mutable data with explicit setter**
+
 ```typescript
 // PdfStream gets a setData method
-stream.setData(newData);  // This triggers mutation notification
+stream.setData(newData); // This triggers mutation notification
 ```
 
 **Recommendation**: Option B is more ergonomic. Add to PdfStream:
@@ -327,7 +337,7 @@ class PdfStream extends PdfDict {
 
   setData(data: Uint8Array): void {
     this._data = data;
-    this.notifyMutation();  // Inherited from PdfDict
+    this.notifyMutation(); // Inherited from PdfDict
   }
 }
 ```
@@ -369,7 +379,7 @@ class ObjectRegistry {
 
     this.refToObject.set(ref.toString(), obj);
     this.objectToRef.set(obj, ref);
-    this.changeTracker.markDirty(ref);  // Mark as new/modified
+    this.changeTracker.markDirty(ref); // Mark as new/modified
 
     // Wire up mutation tracking
     this.wireUpTracking(obj, ref);
@@ -402,15 +412,24 @@ interface PdfWriter {
 ```typescript
 function serializeObject(obj: PdfObject): Uint8Array {
   switch (obj.type) {
-    case "null": return encode("null");
-    case "bool": return encode(obj.value ? "true" : "false");
-    case "number": return encode(formatNumber(obj.value));
-    case "name": return encode("/" + escapeName(obj.value));
-    case "string": return serializeString(obj);
-    case "ref": return encode(`${obj.objectNumber} ${obj.generation} R`);
-    case "array": return serializeArray(obj);
-    case "dict": return serializeDict(obj);
-    case "stream": return serializeStream(obj);
+    case "null":
+      return encode("null");
+    case "bool":
+      return encode(obj.value ? "true" : "false");
+    case "number":
+      return encode(formatNumber(obj.value));
+    case "name":
+      return encode("/" + escapeName(obj.value));
+    case "string":
+      return serializeString(obj);
+    case "ref":
+      return encode(`${obj.objectNumber} ${obj.generation} R`);
+    case "array":
+      return serializeArray(obj);
+    case "dict":
+      return serializeDict(obj);
+    case "stream":
+      return serializeStream(obj);
   }
 }
 ```
@@ -435,6 +454,7 @@ startxref
 Two formats supported:
 
 **Traditional XRef Table:**
+
 ```
 xref
 0 1
@@ -450,6 +470,7 @@ startxref
 ```
 
 **XRef Stream (PDF 1.5+):**
+
 ```
 N 0 obj
 << /Type /XRef /Size 7 /Index [0 1 5 2] /W [1 4 2] /Prev 9876 /Root 1 0 R >>
@@ -470,15 +491,17 @@ For encrypted documents, objects must be re-encrypted:
 function writeObject(
   ref: PdfRef,
   obj: PdfObject,
-  encryptionHandler?: StandardSecurityHandler
+  encryptionHandler?: StandardSecurityHandler,
 ): Uint8Array {
   if (encryptionHandler) {
     obj = encryptObject(obj, ref, encryptionHandler);
   }
 
-  return encode(`${ref.objectNumber} ${ref.generation} obj\n`) +
-         serializeObject(obj) +
-         encode("\nendobj\n");
+  return (
+    encode(`${ref.objectNumber} ${ref.generation} obj\n`) +
+    serializeObject(obj) +
+    encode("\nendobj\n")
+  );
 }
 ```
 
@@ -499,10 +522,7 @@ class PdfDocument {
   // Loading
   // ─────────────────────────────────────────────────────────────
 
-  static async load(
-    bytes: Uint8Array,
-    options?: LoadOptions
-  ): Promise<PdfDocument>;
+  static async load(bytes: Uint8Array, options?: LoadOptions): Promise<PdfDocument>;
 
   // ─────────────────────────────────────────────────────────────
   // Object Access (with automatic tracking)
@@ -570,6 +590,7 @@ interface SaveOptions {
 ## Implementation Order
 
 ### Step 1: Add Dirty Flags to Objects
+
 - [ ] Add `dirty` flag to `PdfDict`
 - [ ] Add `dirty` flag to `PdfArray`
 - [ ] Add `dirty` flag to `PdfStream` (for data changes)
@@ -579,6 +600,7 @@ interface SaveOptions {
 - [ ] Add tests
 
 ### Step 2: ObjectRegistry
+
 - [ ] Create `src/document/object-registry.ts`
 - [ ] Implement ref ↔ object mapping
 - [ ] Implement object number allocation
@@ -586,6 +608,7 @@ interface SaveOptions {
 - [ ] Add tests
 
 ### Step 3: Change Collection
+
 - [ ] Create `src/document/change-collector.ts`
 - [ ] Implement `hasDirtyDescendant()` walk
 - [ ] Implement `collectChanges()` for incremental save
@@ -593,18 +616,21 @@ interface SaveOptions {
 - [ ] Add tests
 
 ### Step 4: Object Serialization
+
 - [ ] Create `src/writer/serializer.ts`
 - [ ] Implement all object type serializers
 - [ ] Handle string escaping, name escaping
 - [ ] Add tests with round-trip verification
 
 ### Step 5: XRef Writing
+
 - [ ] Create `src/writer/xref-writer.ts`
 - [ ] Implement traditional xref table format
 - [ ] Implement xref stream format
 - [ ] Add tests
 
 ### Step 6: PDF Writer
+
 - [ ] Create `src/writer/pdf-writer.ts`
 - [ ] Implement full save (rewrite everything)
 - [ ] Implement incremental save (append only)
@@ -612,12 +638,14 @@ interface SaveOptions {
 - [ ] Add tests
 
 ### Step 7: Linearization Detection
+
 - [ ] Add `isLinearized` flag to ParsedDocument
 - [ ] Detect linearization dict in first object
 - [ ] Add `recoveredViaBruteForce` flag (already tracked in parser)
 - [ ] Add tests
 
 ### Step 8: PdfDocument High-Level API
+
 - [ ] Create `src/document/pdf-document.ts`
 - [ ] Wrap ParsedDocument with modification support
 - [ ] Add `register()` for new objects
@@ -635,13 +663,13 @@ interface SaveOptions {
 
 Some conditions make incremental save impossible. In these cases, `save({ incremental: true })` silently falls back to full save:
 
-| Condition | Why Full Save Required |
-|-----------|----------------------|
-| **Brute-force recovery** | Original xref is corrupted/missing — nothing to append to |
-| **Encryption added** | All content must be encrypted from scratch |
-| **Encryption removed** | All content must be decrypted and rewritten |
+| Condition                     | Why Full Save Required                                           |
+| ----------------------------- | ---------------------------------------------------------------- |
+| **Brute-force recovery**      | Original xref is corrupted/missing — nothing to append to        |
+| **Encryption added**          | All content must be encrypted from scratch                       |
+| **Encryption removed**        | All content must be decrypted and rewritten                      |
 | **Encryption params changed** | Password/permissions change requires re-encryption of everything |
-| **Linearized PDF** | Linearization structure is incompatible with appending |
+| **Linearized PDF**            | Linearization structure is incompatible with appending           |
 
 ```typescript
 interface ParsedDocument {
@@ -680,6 +708,7 @@ async save(options: SaveOptions = {}): Promise<Uint8Array> {
 ### Linearization Handling
 
 When we detect a linearized PDF:
+
 1. Strip the linearization dictionary (`/Linearized` entry in first-page xref)
 2. Remove the hint streams
 3. Force full save (structure is incompatible with incremental)
@@ -687,12 +716,15 @@ When we detect a linearized PDF:
 Linearization is a read-optimization — stripping it just makes initial page load slightly slower.
 
 ### Circular References
+
 Objects can reference each other. During serialization, track which objects have been written to avoid infinite loops.
 
 ### Object Streams
+
 For full save, we can optionally compress objects into object streams. For incremental save, modified objects are written uncompressed (simpler).
 
 ### Signature Preservation
+
 Digital signatures cover specific byte ranges. Incremental save preserves these ranges. Our `saveIncremental()` is specifically designed for this.
 
 ---

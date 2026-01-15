@@ -5,8 +5,9 @@
  * real PDF fixtures from PDFBox test suite.
  */
 
-import { describe, expect, it } from "vitest";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { PDF } from "./pdf";
 
 describe("PDF attachments", () => {

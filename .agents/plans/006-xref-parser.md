@@ -36,6 +36,7 @@ startxref
 ```
 
 Structure:
+
 - `xref` keyword
 - Subsections: `<first-obj-num> <count>`
 - Entries: `<10-digit-offset> <5-digit-gen> <n|f>`
@@ -59,6 +60,7 @@ startxref
 ```
 
 The xref is encoded as a stream object:
+
 - `/Type /XRef` identifies it
 - `/W [w1 w2 w3]` - field widths in bytes
 - `/Size` - total object count
@@ -66,6 +68,7 @@ The xref is encoded as a stream object:
 - Stream contains packed binary entries
 
 Entry fields (based on `/W`):
+
 - Field 1: Type (0=free, 1=uncompressed, 2=compressed)
 - Field 2: Offset (type 1) or object stream number (type 2)
 - Field 3: Generation (type 1) or index in object stream (type 2)
@@ -85,34 +88,34 @@ type XRefEntry =
  * Parsed cross-reference data.
  */
 interface XRefData {
-  entries: Map<number, XRefEntry>;  // objNum → entry
+  entries: Map<number, XRefEntry>; // objNum → entry
   trailer: PdfDict;
-  prev?: number;  // Offset to previous xref (incremental updates)
+  prev?: number; // Offset to previous xref (incremental updates)
 }
 
 /**
  * Parser for cross-reference tables and streams.
  */
 class XRefParser {
-  constructor(scanner: Scanner)
+  constructor(scanner: Scanner);
 
   /**
    * Parse xref at given offset.
    * Auto-detects table vs stream format.
    */
-  parseAt(offset: number): XRefData
+  parseAt(offset: number): XRefData;
 
   /**
    * Parse traditional xref table.
    * Scanner must be positioned at "xref" keyword.
    */
-  parseTable(): XRefData
+  parseTable(): XRefData;
 
   /**
    * Parse xref stream.
    * Scanner must be positioned at stream object start.
    */
-  parseStream(): XRefData
+  parseStream(): XRefData;
 }
 ```
 
@@ -148,6 +151,7 @@ trailer
 5. Check for `/Prev` entry (previous xref for incremental updates)
 
 **Entry format**: `OOOOOOOOOO GGGGG T\n`
+
 - O: 10-digit offset (zero-padded)
 - G: 5-digit generation (zero-padded)
 - T: 'n' (in-use) or 'f' (free)
@@ -163,11 +167,13 @@ trailer
 4. Read packed entries according to `/W` widths
 
 **Field widths**: If `/W [1 2 1]`:
+
 - 1 byte for type
 - 2 bytes for offset/stream-num
 - 1 byte for generation/index
 
 **Default values**: If a width is 0, use default:
+
 - Field 1: default 1 (uncompressed)
 - Field 3: default 0 (generation 0 / index 0)
 
@@ -196,6 +202,7 @@ startxref
 ```
 
 The `/Prev` entry points to the previous xref. To build complete xref:
+
 1. Parse most recent xref (at `startxref` offset)
 2. If `/Prev` exists, parse that xref
 3. Repeat until no `/Prev`
@@ -205,17 +212,18 @@ The `/Prev` entry points to the previous xref. To build complete xref:
 
 Real-world PDFs have issues:
 
-| Issue | Lenient Handling |
-|-------|------------------|
-| Whitespace variations in entries | Accept flexible spacing |
-| Missing EOL after entry | Scan for next digit |
-| Offset points to whitespace before obj | Scan forward to find `obj` |
-| `/W` with unusual widths | Handle arbitrary byte counts |
-| Invalid generation numbers | Accept and warn |
+| Issue                                  | Lenient Handling             |
+| -------------------------------------- | ---------------------------- |
+| Whitespace variations in entries       | Accept flexible spacing      |
+| Missing EOL after entry                | Scan for next digit          |
+| Offset points to whitespace before obj | Scan forward to find `obj`   |
+| `/W` with unusual widths               | Handle arbitrary byte counts |
+| Invalid generation numbers             | Accept and warn              |
 
 ## Test Cases
 
 ### Table Format
+
 - Empty xref (only object 0 free entry)
 - Single subsection
 - Multiple subsections with gaps
@@ -223,6 +231,7 @@ Real-world PDFs have issues:
 - Free entries forming linked list
 
 ### Stream Format
+
 - Basic `/W [1 2 1]` encoding
 - Different field widths `/W [1 3 2]`
 - Compressed objects (type 2 entries)
@@ -230,11 +239,13 @@ Real-world PDFs have issues:
 - FlateDecode compressed stream
 
 ### Incremental Updates
+
 - Single update with `/Prev`
 - Multiple chained updates
 - Object overwritten in update
 
 ### Edge Cases
+
 - Hybrid xref (some table, some stream)
 - Cross-reference stream as first object
 - Linearized PDF (xref at start)
@@ -252,12 +263,14 @@ Real-world PDFs have issues:
 ### Byte-Level Precision
 
 XRef offsets must be exact. Even one byte off and the object won't parse. This is why:
+
 - Table format uses fixed 10-digit offsets
 - Stream format uses precise binary encoding
 
 ### Object 0
 
 Object 0 is always free and heads the free list:
+
 - Generation 65535 (max)
 - Points to next free object (or 0 if none)
 

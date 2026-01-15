@@ -13,6 +13,7 @@ import type {
   StringToken,
 } from "#src/content/parsing/types";
 import type { PdfFont } from "#src/fonts/pdf-font";
+
 import { TextState } from "./text-state";
 import type { ExtractedChar } from "./types";
 

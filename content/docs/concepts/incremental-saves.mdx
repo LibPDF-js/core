@@ -21,18 +21,20 @@ The entire PDF is rebuilt from scratch:
 ```
 
 **Advantages:**
+
 - Smaller file size (removes unused objects)
 - Clean structure
 - Removes document history
 
 **Disadvantages:**
+
 - Invalidates all existing signatures
 - Breaks certified documents
 - Loses incremental history
 
 ### Incremental Update
 
-Changes are *appended* to the end of the file:
+Changes are _appended_ to the end of the file:
 
 ```
 [Original PDF content untouched]
@@ -43,11 +45,13 @@ Changes are *appended* to the end of the file:
 ```
 
 **Advantages:**
+
 - Preserves existing signatures
 - Maintains document history
 - Faster for small changes
 
 **Disadvantages:**
+
 - File size grows with each update
 - Old content remains (larger file)
 
@@ -174,10 +178,10 @@ An incremental update appends:
 
 ```
 trailer
-<< 
-  /Root 1 0 R 
+<<
+  /Root 1 0 R
   /Prev 12345    ← Points to previous xref
-  /Size 50 
+  /Size 50
 >>
 startxref
 54321
@@ -225,7 +229,7 @@ A signature covers specific byte ranges:
 ```typescript
 // Signature dictionary contains
 {
-  ByteRange: [0, 1000, 2000, 5000]
+  ByteRange: [0, 1000, 2000, 5000];
 }
 // Covers bytes 0-999 and 2000-6999
 // Gap at 1000-1999 is the signature value itself
@@ -234,6 +238,7 @@ A signature covers specific byte ranges:
 ### Why Full Rewrites Break Signatures
 
 A full rewrite:
+
 1. Reorganizes all objects
 2. Changes byte positions
 3. Updates xref offsets
@@ -243,6 +248,7 @@ The bytes the signature covers no longer match, so verification fails.
 ### Incremental Saves Preserve Signatures
 
 An incremental save:
+
 1. Keeps original bytes untouched
 2. Appends new content after `%%EOF`
 3. Signature byte ranges still valid
@@ -305,13 +311,13 @@ if (hasSigs) {
 
 ## Summary
 
-| Scenario | Save Mode | Reason |
-|----------|-----------|--------|
-| Signed document, adding form data | Incremental | Preserve signatures |
-| Adding second signature | Incremental | Preserve first signature |
-| New document | Full rewrite | No history to preserve |
-| Removing encryption | Full rewrite | Clean file structure |
-| Reducing file size | Full rewrite | Remove old data |
-| Certified document modifications | Incremental | Maintain certification |
+| Scenario                          | Save Mode    | Reason                   |
+| --------------------------------- | ------------ | ------------------------ |
+| Signed document, adding form data | Incremental  | Preserve signatures      |
+| Adding second signature           | Incremental  | Preserve first signature |
+| New document                      | Full rewrite | No history to preserve   |
+| Removing encryption               | Full rewrite | Clean file structure     |
+| Reducing file size                | Full rewrite | Remove old data          |
+| Certified document modifications  | Incremental  | Maintain certification   |
 
 **Rule of thumb**: If the document has signatures you want to keep, use `{ incremental: true }`.

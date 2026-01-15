@@ -5,9 +5,10 @@
  * in the test-output directory.
  */
 
-import { describe, expect, it } from "vitest";
 import { black, blue, cmyk, grayscale, green, red, rgb, white } from "#src/helpers/colors";
 import { isPdfHeader, loadFixture, saveTestOutput } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { PDF } from "../pdf";
 
 describe("Drawing API Integration", () => {

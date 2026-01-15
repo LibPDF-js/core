@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { BuiltInEncoding, StandardEncoding, Type1Font } from "./font.ts";
 import { parseType1 } from "./parser.ts";
 import { PfbParser } from "./pfb-parser.ts";

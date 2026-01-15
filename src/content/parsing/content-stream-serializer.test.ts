@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { Op, Operator } from "#src/content/operators";
 import { PdfString } from "#src/objects/pdf-string";
+import { describe, expect, it } from "vitest";
+
 import { ContentStreamParser } from "./content-stream-parser";
 import { ContentStreamSerializer } from "./content-stream-serializer";
 import type { ContentToken, InlineImageOperation, ParsedOperation } from "./types";

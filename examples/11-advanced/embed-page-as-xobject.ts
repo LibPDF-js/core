@@ -8,6 +8,7 @@
  */
 
 import { loadFixture } from "#src/test-utils.ts";
+
 import { black, PDF, rgb } from "../../src/index";
 import { formatBytes, saveOutput } from "../utils";
 

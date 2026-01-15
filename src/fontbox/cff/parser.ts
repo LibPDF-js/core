@@ -8,6 +8,7 @@
  */
 
 import { BinaryScanner } from "#src/io/binary-scanner.ts";
+
 import {
   type CFFCharset,
   CFFCharsetCID,

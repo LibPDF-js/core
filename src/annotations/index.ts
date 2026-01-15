@@ -26,11 +26,7 @@ export { PDFPolygonAnnotation, PDFPolylineAnnotation } from "./polygon";
 export { PDFPopupAnnotation } from "./popup";
 export { PDFCircleAnnotation, PDFSquareAnnotation } from "./square-circle";
 export { PDFStampAnnotation, STANDARD_STAMPS } from "./stamp";
-export {
-  PDFTextAnnotation,
-  type TextAnnotationState,
-  type TextAnnotationStateModel,
-} from "./text";
+export { PDFTextAnnotation, type TextAnnotationState, type TextAnnotationStateModel } from "./text";
 export {
   PDFHighlightAnnotation,
   PDFSquigglyAnnotation,

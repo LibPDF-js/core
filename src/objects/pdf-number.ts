@@ -1,5 +1,6 @@
 import { formatPdfNumber } from "#src/helpers/format";
 import type { ByteWriter } from "#src/io/byte-writer";
+
 import type { PdfPrimitive } from "./pdf-primitive";
 
 /**

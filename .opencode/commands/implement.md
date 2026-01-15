@@ -18,12 +18,14 @@ You are implementing a specification from the `.agents/plans/` directory. Work a
 ## Implementation Guidelines
 
 ### Before Coding
+
 - Understand the spec's goals and scope
 - Identify the desired API from usage examples in the spec
 - Review related existing code to understand patterns
 - Break the work into discrete tasks using TodoWrite
 
 ### During Implementation
+
 - Follow CODE_STYLE.md strictly (2-space indent, double quotes, braces always, etc.)
 - Use `#src/*` import alias for internal imports
 - Co-locate tests as `*.test.ts` files
@@ -32,12 +34,14 @@ You are implementing a specification from the `.agents/plans/` directory. Work a
 - Commit logical chunks of work
 
 ### Code Quality
+
 - No stubbed implementations or skipped tests
 - Handle edge cases and error conditions
 - Include descriptive error messages with context
 - Use async/await for all I/O operations
 
 ### Testing
+
 - Write tests first when practical (TDD)
 - Test happy paths and edge cases
 - Test error conditions
@@ -50,19 +54,21 @@ Work continuously through these steps:
 1. **Implement** - Write the code for the current task
 2. **Test** - Run `bun run test` to verify
 3. **Fix** - If tests fail, fix and re-run
-4. **Typecheck** - Run `bun run typecheck` 
+4. **Typecheck** - Run `bun run typecheck`
 5. **Lint** - Run `bun run lint:fix`
 6. **Repeat** - Move to next task
 
 ## Stopping Conditions
 
 **Stop and report success when:**
+
 - All spec requirements are implemented
 - All tests pass
 - Typecheck passes
 - Lint passes
 
 **Stop and ask for help when:**
+
 - The spec is ambiguous and you need clarification
 - You encounter a blocking issue you cannot resolve
 - You need to make a decision that significantly deviates from the spec

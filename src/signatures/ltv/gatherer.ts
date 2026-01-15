@@ -9,8 +9,6 @@
  * RFC 5652: Cryptographic Message Syntax (CMS)
  */
 
-import { fromBER } from "asn1js";
-import * as pkijs from "pkijs";
 import { toArrayBuffer } from "#src/helpers/buffer.ts";
 import { buildCertificateChain } from "#src/signatures/aia.ts";
 import { OID_SIGNED_DATA, OID_TIMESTAMP_TOKEN } from "#src/signatures/oids.ts";
@@ -19,6 +17,9 @@ import {
   extractOcspResponderCerts,
 } from "#src/signatures/revocation.ts";
 import { CertificateChainError, type RevocationProvider } from "#src/signatures/types.ts";
+import { fromBER } from "asn1js";
+import * as pkijs from "pkijs";
+
 import { computeSha1Hex } from "./vri";
 
 /**

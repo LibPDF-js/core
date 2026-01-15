@@ -13,9 +13,10 @@
  * - PasswordSample-*.pdf: owner="owner", user="user"
  */
 
-import { describe, expect, it } from "vitest";
 import { PermissionDeniedError } from "#src/security/errors";
 import { loadFixture } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { PDF } from "./pdf";
 
 describe("PDF security API", () => {

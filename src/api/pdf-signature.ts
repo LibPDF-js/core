@@ -47,6 +47,7 @@ import {
   type TimestampAuthority,
 } from "#src/signatures/types";
 import { escapePdfString, hashData } from "#src/signatures/utils";
+
 import type { PDF } from "./pdf";
 
 // ─────────────────────────────────────────────────────────────────────────────

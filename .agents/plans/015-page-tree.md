@@ -7,12 +7,14 @@ Create a `PageTree` class in `src/document/` that encapsulates all page tree tra
 ## Motivation
 
 Currently:
+
 - `getPages()` delegates directly to `ParsedDocument.getPages()` which walks the entire page tree on every call
 - No caching of page references at the API level
 - Page tree traversal logic lives in `document-parser.ts` (lines 665-742)
 - No support for page modification (add/remove/reorder)
 
 This causes:
+
 1. Repeated tree walks on multiple `getPages()` calls
 2. Logic scattered between parser and API layers
 3. No foundation for future page manipulation features
@@ -22,6 +24,7 @@ This causes:
 Once `PDF.load()` completes, the user has a fully-loaded document. Navigating pages, getting metadata, etc. should all be **synchronous** - no more `await` unless doing actual I/O (like extracting an embedded file).
 
 This means:
+
 - `PageTree` loads eagerly during `PDF.load()`
 - All page access methods are sync
 - The async work happens once, upfront
@@ -34,9 +37,9 @@ This means:
 export class PageTree {
   /** Page refs in document order */
   private readonly pages: PdfRef[];
-  
+
   private constructor(pages: PdfRef[]);
-  
+
   /**
    * Load and build the page tree by walking from the root.
    * This is the only async operation.
@@ -45,18 +48,18 @@ export class PageTree {
     pagesRef: PdfRef,
     getObject: (ref: PdfRef) => Promise<PdfObject | null>,
   ): Promise<PageTree>;
-  
+
   /**
    * Get all page references in document order.
    * Returns a copy to prevent external mutation.
    */
   getPages(): PdfRef[];
-  
+
   /**
    * Get page count.
    */
   getPageCount(): number;
-  
+
   /**
    * Get a single page by index (0-based).
    * Returns null if index out of bounds.
@@ -72,10 +75,10 @@ export class PageTree {
 
 export class PDF {
   // ...existing fields...
-  
+
   /** Page tree, loaded during PDF.load() */
   private readonly _pages: PageTree;
-  
+
   private constructor(
     // ...existing params...
     pages: PageTree,
@@ -83,34 +86,34 @@ export class PDF {
     // ...
     this._pages = pages;
   }
-  
+
   static async load(bytes: Uint8Array, options?: LoadOptions): Promise<PDF> {
     // ...existing parsing...
-    
+
     // Load page tree eagerly
     const catalog = await parsed.getCatalog();
     const pagesRef = catalog?.getRef("Pages");
-    const pages = pagesRef 
+    const pages = pagesRef
       ? await PageTree.load(pagesRef, parsed.getObject.bind(parsed))
       : PageTree.empty();
-    
+
     return new PDF(parsed, registry, /* ... */, pages);
   }
-  
+
   /**
    * Get all page references.
    */
   getPages(): PdfRef[] {
     return this._pages.getPages();
   }
-  
+
   /**
    * Get page count.
    */
   getPageCount(): number {
     return this._pages.getPageCount();
   }
-  
+
   /**
    * Get a single page by index (0-based).
    */
@@ -133,17 +136,17 @@ static async load(
 ): Promise<PageTree> {
   const pages: PdfRef[] = [];
   const visited = new Set<string>();
-  
+
   const walk = async (ref: PdfRef): Promise<void> => {
     const key = `${ref.objectNumber} ${ref.generation}`;
     if (visited.has(key)) return; // Circular reference protection
     visited.add(key);
-    
+
     const node = await getObject(ref);
     if (!(node instanceof PdfDict)) return;
-    
+
     const type = node.getName("Type")?.value;
-    
+
     if (type === "Page") {
       pages.push(ref);
     } else if (type === "Pages") {
@@ -158,7 +161,7 @@ static async load(
       }
     }
   };
-  
+
   await walk(pagesRef);
   return new PageTree(pages);
 }
@@ -220,7 +223,7 @@ src/document/
 These are enabled by this architecture but not implemented now:
 
 - `insertPage(index, pageRef)` - Insert page at position
-- `removePage(index)` - Remove page at position  
+- `removePage(index)` - Remove page at position
 - `movePage(from, to)` - Reorder pages
 - `Page` wrapper class - High-level page object with MediaBox, rotation, etc.
 

@@ -10,6 +10,7 @@
 
 import { bytesToHex } from "#src/helpers/buffer.ts";
 import { PdfRaw } from "#src/objects/pdf-raw";
+
 import { PlaceholderError } from "./types";
 
 /** Default placeholder size in bytes (12KB) */

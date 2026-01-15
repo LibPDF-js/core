@@ -2,13 +2,14 @@
  * Tests for PDF annotations.
  */
 
-import { describe, expect, it } from "vitest";
 import { PDF } from "#src/api/pdf";
 import { rgb } from "#src/helpers/colors";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { describe, expect, it } from "vitest";
+
 import type { PDFLinkAnnotation } from "./link";
 import type { PDFTextAnnotation } from "./text";
 import type { PDFHighlightAnnotation } from "./text-markup";

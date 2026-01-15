@@ -10,25 +10,25 @@
 
 /** A rectangle in PDF coordinates (origin at bottom-left) */
 interface BoundingBox {
-  x: number;      // Left edge
-  y: number;      // Bottom edge
+  x: number; // Left edge
+  y: number; // Bottom edge
   width: number;
   height: number;
 }
 
 /** A single character with its position */
 interface ExtractedChar {
-  char: string;           // The Unicode character
-  bbox: BoundingBox;      // Position on page
-  fontSize: number;       // Font size in points
-  fontName: string;       // Font name (e.g., "Helvetica", "ArialMT")
-  baseline: number;       // Y coordinate of text baseline
+  char: string; // The Unicode character
+  bbox: BoundingBox; // Position on page
+  fontSize: number; // Font size in points
+  fontName: string; // Font name (e.g., "Helvetica", "ArialMT")
+  baseline: number; // Y coordinate of text baseline
 }
 
 /** A span of text (characters with same font/size on same line) */
 interface TextSpan {
-  text: string;           // The text content
-  bbox: BoundingBox;      // Bounding box around entire span
+  text: string; // The text content
+  bbox: BoundingBox; // Bounding box around entire span
   chars: ExtractedChar[]; // Individual characters (for precise positioning)
   fontSize: number;
   fontName: string;
@@ -36,10 +36,10 @@ interface TextSpan {
 
 /** A line of text (multiple spans on same baseline) */
 interface TextLine {
-  text: string;           // Combined text from all spans
-  bbox: BoundingBox;      // Bounding box around entire line
-  spans: TextSpan[];      // Individual spans
-  baseline: number;       // Y coordinate of baseline
+  text: string; // Combined text from all spans
+  bbox: BoundingBox; // Bounding box around entire line
+  spans: TextSpan[]; // Individual spans
+  baseline: number; // Y coordinate of baseline
 }
 
 /** Full page text extraction result */
@@ -47,14 +47,14 @@ interface PageText {
   pageIndex: number;
   width: number;
   height: number;
-  lines: TextLine[];      // All text lines
-  text: string;           // Plain text (all lines joined)
+  lines: TextLine[]; // All text lines
+  text: string; // Plain text (all lines joined)
 }
 
 /** A search match result */
 interface TextMatch {
-  text: string;           // The matched text
-  bbox: BoundingBox;      // Bounding box around the match
+  text: string; // The matched text
+  bbox: BoundingBox; // Bounding box around the match
   pageIndex: number;
   /** Individual character boxes (useful for multi-line matches or highlighting) */
   charBoxes: BoundingBox[];
@@ -106,9 +106,9 @@ async function example2() {
 
   // With options
   const matches2 = await pdf.findText("{{ asd }}", {
-    pages: [0, 1, 2],        // Only search specific pages
-    caseSensitive: false,    // Case-insensitive search
-    wholeWord: true,         // Match whole words only
+    pages: [0, 1, 2], // Only search specific pages
+    caseSensitive: false, // Case-insensitive search
+    wholeWord: true, // Match whole words only
   });
 }
 
@@ -156,7 +156,7 @@ async function detailedExtraction() {
   const page = pdf.getPage(0);
 
   const pageText = await page.extractText({
-    includeChars: true,      // Include individual character positions
+    includeChars: true, // Include individual character positions
     preserveWhitespace: true, // Keep exact spacing
   });
 
@@ -191,12 +191,12 @@ class TextState {
 
   font: PdfFont | null = null;
   fontSize: number = 0;
-  characterSpacing: number = 0;  // Tc
-  wordSpacing: number = 0;       // Tw
+  characterSpacing: number = 0; // Tc
+  wordSpacing: number = 0; // Tw
   horizontalScale: number = 100; // Tz (percentage)
-  leading: number = 0;           // TL
-  renderMode: number = 0;        // Tr
-  rise: number = 0;              // Ts
+  leading: number = 0; // TL
+  renderMode: number = 0; // Tr
+  rise: number = 0; // Ts
 
   /** Current position in text space */
   get position(): { x: number; y: number } {
@@ -217,8 +217,9 @@ class TextState {
 
   /** Advance after showing a character */
   advanceChar(width: number, isSpace: boolean) {
-    const tx = (width * this.fontSize + this.characterSpacing +
-      (isSpace ? this.wordSpacing : 0)) * (this.horizontalScale / 100);
+    const tx =
+      (width * this.fontSize + this.characterSpacing + (isSpace ? this.wordSpacing : 0)) *
+      (this.horizontalScale / 100);
     this.tm = this.tm.translate(tx, 0);
   }
 }
@@ -228,9 +229,12 @@ class TextState {
  */
 class Matrix {
   constructor(
-    public a: number, public b: number,
-    public c: number, public d: number,
-    public e: number, public f: number
+    public a: number,
+    public b: number,
+    public c: number,
+    public d: number,
+    public e: number,
+    public f: number,
   ) {}
 
   static identity() {
@@ -239,10 +243,12 @@ class Matrix {
 
   translate(tx: number, ty: number): Matrix {
     return new Matrix(
-      this.a, this.b,
-      this.c, this.d,
+      this.a,
+      this.b,
+      this.c,
+      this.d,
       this.a * tx + this.c * ty + this.e,
-      this.b * tx + this.d * ty + this.f
+      this.b * tx + this.d * ty + this.f,
     );
   }
 
@@ -272,25 +278,57 @@ async function extractTextFromPage(page: PDFPage): Promise<PageText> {
   for (const op of operations) {
     switch (op.operator) {
       // Graphics state
-      case "q": graphicsStateStack.push(state.clone()); break;
-      case "Q": Object.assign(state, graphicsStateStack.pop()); break;
+      case "q":
+        graphicsStateStack.push(state.clone());
+        break;
+      case "Q":
+        Object.assign(state, graphicsStateStack.pop());
+        break;
 
       // Text state operators
-      case "BT": state.tm = Matrix.identity(); state.tlm = Matrix.identity(); break;
-      case "ET": break;
-      case "Tf": state.font = resolveFont(op.args[0]); state.fontSize = op.args[1]; break;
-      case "Tc": state.characterSpacing = op.args[0]; break;
-      case "Tw": state.wordSpacing = op.args[0]; break;
-      case "Tz": state.horizontalScale = op.args[0]; break;
-      case "TL": state.leading = op.args[0]; break;
-      case "Tr": state.renderMode = op.args[0]; break;
-      case "Ts": state.rise = op.args[0]; break;
+      case "BT":
+        state.tm = Matrix.identity();
+        state.tlm = Matrix.identity();
+        break;
+      case "ET":
+        break;
+      case "Tf":
+        state.font = resolveFont(op.args[0]);
+        state.fontSize = op.args[1];
+        break;
+      case "Tc":
+        state.characterSpacing = op.args[0];
+        break;
+      case "Tw":
+        state.wordSpacing = op.args[0];
+        break;
+      case "Tz":
+        state.horizontalScale = op.args[0];
+        break;
+      case "TL":
+        state.leading = op.args[0];
+        break;
+      case "Tr":
+        state.renderMode = op.args[0];
+        break;
+      case "Ts":
+        state.rise = op.args[0];
+        break;
 
       // Text positioning
-      case "Td": state.moveBy(op.args[0], op.args[1]); break;
-      case "TD": state.leading = -op.args[1]; state.moveBy(op.args[0], op.args[1]); break;
-      case "Tm": state.tm = state.tlm = new Matrix(...op.args); break;
-      case "T*": state.nextLine(); break;
+      case "Td":
+        state.moveBy(op.args[0], op.args[1]);
+        break;
+      case "TD":
+        state.leading = -op.args[1];
+        state.moveBy(op.args[0], op.args[1]);
+        break;
+      case "Tm":
+        state.tm = state.tlm = new Matrix(...op.args);
+        break;
+      case "T*":
+        state.nextLine();
+        break;
 
       // Text showing - THE MAIN EVENT
       case "Tj": {
@@ -319,7 +357,7 @@ async function extractTextFromPage(page: PDFPage): Promise<PageText> {
         for (const item of array) {
           if (typeof item === "number") {
             // Negative = move right, positive = move left (in thousandths of em)
-            const tx = -item / 1000 * state.fontSize * (state.horizontalScale / 100);
+            const tx = (-item / 1000) * state.fontSize * (state.horizontalScale / 100);
             state.tm = state.tm.translate(tx, 0);
           } else {
             // Same as Tj
@@ -343,8 +381,14 @@ async function extractTextFromPage(page: PDFPage): Promise<PageText> {
         break;
       }
 
-      case "'": state.nextLine(); /* then Tj */ break;
-      case '"': state.wordSpacing = op.args[0]; state.characterSpacing = op.args[1]; state.nextLine(); /* then Tj */ break;
+      case "'":
+        state.nextLine();
+        /* then Tj */ break;
+      case '"':
+        state.wordSpacing = op.args[0];
+        state.characterSpacing = op.args[1];
+        state.nextLine();
+        /* then Tj */ break;
     }
   }
 
@@ -402,7 +446,11 @@ function findTextInPage(pageText: PageText, query: string | RegExp): TextMatch[]
 }
 
 // Helper stubs
-function calculateCharBbox(pos: { x: number; y: number }, width: number, state: TextState): BoundingBox {
+function calculateCharBbox(
+  pos: { x: number; y: number },
+  width: number,
+  state: TextState,
+): BoundingBox {
   const ascender = state.font?.ascender ?? 0.8;
   const descender = state.font?.descender ?? -0.2;
   return {

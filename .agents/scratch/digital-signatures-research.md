@@ -5,6 +5,7 @@ This document captures research and design considerations for implementing digit
 ## Overview
 
 Digital signatures in PDF are complex because they require:
+
 1. **Full document knowledge** before signing - you need to know the exact byte positions
 2. **Cryptographic operations** that may happen externally (HSM, cloud, smart cards)
 3. **Incremental updates** to preserve existing signatures
@@ -28,8 +29,9 @@ PDF Document:
 ```
 
 The signature dictionary looks like:
+
 ```
-<< 
+<<
   /Type /Sig
   /Filter /Adobe.PPKLite
   /SubFilter /adbe.pkcs7.detached
@@ -42,6 +44,7 @@ The signature dictionary looks like:
 ```
 
 The `/ByteRange` array `[0 10000 12000 5000]` means:
+
 - Sign bytes 0-9999 (before /Contents)
 - Sign bytes 12000-16999 (after /Contents)
 - Skip bytes 10000-11999 (the /Contents value itself)
@@ -51,6 +54,7 @@ The `/ByteRange` array `[0 10000 12000 5000]` means:
 Every library uses the same approach:
 
 1. **Reserve space** with placeholder values:
+
    ```
    /ByteRange [0 /********** /********** /**********]
    /Contents <0000...0000>  % e.g., 10KB of zeros
@@ -79,12 +83,14 @@ Every library uses the same approach:
 ### The Problem
 
 Modern signing often happens externally:
+
 - **HSM (Hardware Security Module)**: Keys never leave secure hardware
 - **Cloud signing services**: Azure Key Vault, AWS KMS, Google Cloud HSM
 - **Smart cards**: User's key is on a smart card/USB token
 - **Remote signing services**: Third-party signing APIs
 
 These services typically:
+
 1. Receive a **hash/digest** of the data to sign
 2. Return the **raw signature bytes** (not a complete CMS envelope)
 
@@ -167,6 +173,7 @@ const signedPdf = await signPdf.sign(pdfWithPlaceholder, signer);
 ```
 
 The signing step:
+
 1. Finds the placeholder in the PDF bytes
 2. Calculates and updates ByteRange
 3. Hashes the signed ranges
@@ -191,11 +198,13 @@ SignedData ::= SEQUENCE {
 ```
 
 For PDF:
+
 - `encapContentInfo` is empty (detached signature)
 - `certificates` contains the signing certificate and chain
 - `signerInfos` contains the actual signature
 
 Typical size: 3-8KB depending on:
+
 - Certificate chain length
 - Signature algorithm (RSA 2048 vs 4096)
 - Whether timestamp is embedded
@@ -206,13 +215,13 @@ Typical size: 3-8KB depending on:
 
 The `/SubFilter` entry specifies the signature format:
 
-| SubFilter | Description | PAdES Level |
-|-----------|-------------|-------------|
-| `adbe.x509.rsa_sha1` | Legacy, SHA-1 (deprecated) | - |
-| `adbe.pkcs7.detached` | Standard PKCS#7, any hash | B-B |
-| `adbe.pkcs7.sha1` | PKCS#7 with SHA-1 only (deprecated) | - |
-| `ETSI.CAdES.detached` | CAdES format for PAdES | B-B to B-LTA |
-| `ETSI.RFC3161` | Document timestamp (not a signature) | B-LTA |
+| SubFilter             | Description                          | PAdES Level  |
+| --------------------- | ------------------------------------ | ------------ |
+| `adbe.x509.rsa_sha1`  | Legacy, SHA-1 (deprecated)           | -            |
+| `adbe.pkcs7.detached` | Standard PKCS#7, any hash            | B-B          |
+| `adbe.pkcs7.sha1`     | PKCS#7 with SHA-1 only (deprecated)  | -            |
+| `ETSI.CAdES.detached` | CAdES format for PAdES               | B-B to B-LTA |
+| `ETSI.RFC3161`        | Document timestamp (not a signature) | B-LTA        |
 
 **Recommendation**: Use `ETSI.CAdES.detached` for PAdES compliance.
 
@@ -223,21 +232,25 @@ The `/SubFilter` entry specifies the signature format:
 PAdES (PDF Advanced Electronic Signature) defines progressive levels:
 
 ### B-B (Basic)
+
 - Base signature with signing certificate
 - Valid only while certificate is valid
 - Minimal implementation
 
 ### B-T (Timestamp)
+
 - B-B + cryptographic timestamp from TSA
 - Proves document existed at specific time
 - Timestamp is embedded in CMS SignerInfo
 
 ### B-LT (Long-Term)
+
 - B-T + validation data embedded in PDF
 - DSS dictionary with certificates, OCSP, CRLs
 - Can be validated offline, years later
 
 ### B-LTA (Long-Term Archival)
+
 - B-LT + document timestamp
 - Timestamp covers entire document including DSS
 - Periodic re-timestamping for algorithm migration
@@ -284,6 +297,7 @@ Catalog
 ```
 
 Key points:
+
 - VRI keys are uppercase hex SHA-1 of the signature's /Contents value
 - All streams are typically Flate-encoded
 - Added as **incremental update** after the signature
@@ -328,10 +342,10 @@ We need an interface for signing that supports both sync and async use cases:
 interface PDFSigner {
   // Return complete CMS signature bytes
   sign(digest: Uint8Array, algorithm: string): Promise<Uint8Array>;
-  
+
   // Return the signing certificate (for embedding in CMS)
   getCertificate(): Promise<Uint8Array>;
-  
+
   // Return certificate chain (optional)
   getCertificateChain?(): Promise<Uint8Array[]>;
 }
@@ -364,10 +378,10 @@ Single unified approach - `sign()` returns bytes and seals the document:
 
 ```typescript
 const signedBytes = await pdf.sign({
-  signer: mySigner,       // Any Signer implementation (local, HSM, cloud)
+  signer: mySigner, // Any Signer implementation (local, HSM, cloud)
   reason: "I approve",
-  level: "B-LTA",         // Optional PAdES level shorthand
-  timestampAuthority,     // Required for B-T and above
+  level: "B-LTA", // Optional PAdES level shorthand
+  timestampAuthority, // Required for B-T and above
 });
 
 // pdf is now sealed - cannot be modified
@@ -389,6 +403,7 @@ We need CMS/PKCS#7 generation. Options:
 ### 6. Timestamp Integration
 
 For B-T and above:
+
 - Need to call a TSA (Time Stamping Authority)
 - TSP protocol is HTTP-based (RFC 3161)
 - Timestamp token is embedded in CMS SignerInfo
@@ -402,6 +417,7 @@ interface TimestampProvider {
 ### 7. LTV/DSS Support
 
 For B-LT and B-LTA:
+
 - OCSP client for fetching certificate status
 - CRL fetching and parsing
 - DSS dictionary construction
@@ -412,6 +428,7 @@ This is significant additional work but critical for enterprise use cases.
 ### 8. Signature Verification
 
 Separate but related to creation:
+
 1. Parse signature dictionary
 2. Extract ByteRange and Contents
 3. Hash the signed byte ranges
@@ -426,6 +443,7 @@ Separate but related to creation:
 ## Implementation Phases
 
 ### Phase 1: Basic Signing (B-B)
+
 - Placeholder mechanism (ByteRange, Contents)
 - `SignatureProvider` interface
 - CMS generation (using pkijs)
@@ -433,11 +451,13 @@ Separate but related to creation:
 - Basic signature field/widget creation
 
 ### Phase 2: Timestamps (B-T)
+
 - TSA client implementation
 - Timestamp embedding in CMS
 - `TimestampProvider` interface
 
 ### Phase 3: Long-Term Validation (B-LT)
+
 - DSS dictionary construction
 - VRI entries for per-signature data
 - OCSP client
@@ -445,10 +465,12 @@ Separate but related to creation:
 - Certificate chain embedding
 
 ### Phase 4: Archival (B-LTA)
+
 - Document timestamp signatures
 - Re-timestamping workflow
 
 ### Phase 5: Verification
+
 - Signature verification
 - Certificate chain validation
 - Revocation checking
@@ -481,14 +503,15 @@ Separate but related to creation:
 
 ## Dependencies to Consider
 
-| Library | Purpose | Size | Notes |
-|---------|---------|------|-------|
-| pkijs | CMS/PKCS#7 | ~200KB | Full PKI support |
-| asn1js | ASN.1 parsing | ~100KB | Required by pkijs |
-| @peculiar/x509 | X.509 parsing | ~150KB | Certificate handling |
-| node-forge | Crypto primitives | ~500KB | Alternative to Web Crypto |
+| Library        | Purpose           | Size   | Notes                     |
+| -------------- | ----------------- | ------ | ------------------------- |
+| pkijs          | CMS/PKCS#7        | ~200KB | Full PKI support          |
+| asn1js         | ASN.1 parsing     | ~100KB | Required by pkijs         |
+| @peculiar/x509 | X.509 parsing     | ~150KB | Certificate handling      |
+| node-forge     | Crypto primitives | ~500KB | Alternative to Web Crypto |
 
 For minimal bundle size, consider:
+
 - Web Crypto API for hashing and basic crypto
 - pkijs/asn1js for CMS structure
 - Custom minimal OCSP/TSP clients
@@ -500,6 +523,7 @@ For minimal bundle size, consider:
 ### Core Principle: Sign Returns Bytes
 
 Signing **must** produce the final PDF bytes because:
+
 1. Any modification after signing invalidates the signature
 2. The signature covers specific byte ranges
 3. Users shouldn't be able to accidentally break signatures
@@ -527,13 +551,13 @@ interface Signer {
    * The signing certificate (DER-encoded X.509)
    */
   certificate: Uint8Array;
-  
+
   /**
    * Certificate chain (optional, for embedding in CMS)
    * Should be ordered: [intermediate1, intermediate2, ..., root]
    */
   certificateChain?: Uint8Array[];
-  
+
   /**
    * Sign a digest and return raw signature bytes.
    * For RSA: PKCS#1 v1.5 or PSS signature
@@ -561,10 +585,13 @@ interface TimestampAuthority {
 
 // Built-in HTTP TSA client
 class HttpTimestampAuthority implements TimestampAuthority {
-  constructor(url: string, options?: {
-    timeout?: number;
-    headers?: Record<string, string>;
-  });
+  constructor(
+    url: string,
+    options?: {
+      timeout?: number;
+      headers?: Record<string, string>;
+    },
+  );
 }
 ```
 
@@ -580,7 +607,7 @@ interface RevocationProvider {
    * Returns DER-encoded OCSPResponse or null if unavailable.
    */
   getOCSP?(cert: Uint8Array, issuer: Uint8Array): Promise<Uint8Array | null>;
-  
+
   /**
    * Get CRL for a certificate.
    * Returns DER-encoded CRL or null if unavailable.
@@ -591,7 +618,7 @@ interface RevocationProvider {
 // Built-in provider that fetches from URLs in certificates
 class DefaultRevocationProvider implements RevocationProvider {
   constructor(options?: {
-    preferOCSP?: boolean;  // Try OCSP before CRL (default: true)
+    preferOCSP?: boolean; // Try OCSP before CRL (default: true)
     timeout?: number;
   });
 }
@@ -615,15 +642,15 @@ form.fill({ name: "John Doe" });
 // Sign and get final bytes
 const signedBytes = await pdf.sign({
   signer: new P12Signer(p12Bytes, "password"),
-  
+
   // Signature metadata
   reason: "I approve this document",
   location: "New York, NY",
   contactInfo: "john@example.com",
-  
+
   // Optional: use existing signature field
   fieldName: "SignatureField1",
-  
+
   // Optional: create visible signature
   appearance: {
     page: 0,
@@ -645,11 +672,9 @@ pdf.addPage(); // Error: Cannot modify signed document
 const signedBytes = await pdf.sign({
   signer: new P12Signer(p12Bytes, "password"),
   reason: "I approve this document",
-  
+
   // Add timestamp
-  timestampAuthority: new HttpTimestampAuthority(
-    "http://timestamp.digicert.com"
-  ),
+  timestampAuthority: new HttpTimestampAuthority("http://timestamp.digicert.com"),
 });
 ```
 
@@ -659,11 +684,9 @@ const signedBytes = await pdf.sign({
 const signedBytes = await pdf.sign({
   signer: new P12Signer(p12Bytes, "password"),
   reason: "I approve this document",
-  
-  timestampAuthority: new HttpTimestampAuthority(
-    "http://timestamp.digicert.com"
-  ),
-  
+
+  timestampAuthority: new HttpTimestampAuthority("http://timestamp.digicert.com"),
+
   // Embed validation data (OCSP/CRL)
   longTermValidation: true,
   // Or provide custom revocation provider
@@ -677,13 +700,11 @@ const signedBytes = await pdf.sign({
 const signedBytes = await pdf.sign({
   signer: new P12Signer(p12Bytes, "password"),
   reason: "I approve this document",
-  
-  timestampAuthority: new HttpTimestampAuthority(
-    "http://timestamp.digicert.com"
-  ),
-  
+
+  timestampAuthority: new HttpTimestampAuthority("http://timestamp.digicert.com"),
+
   longTermValidation: true,
-  
+
   // Add document timestamp for archival
   archivalTimestamp: true,
 });
@@ -695,7 +716,7 @@ const signedBytes = await pdf.sign({
 // Shorthand for common configurations
 const signedBytes = await pdf.sign({
   signer: mySigner,
-  level: "B-LTA",  // Implies timestamp + LTV + doc timestamp
+  level: "B-LTA", // Implies timestamp + LTV + doc timestamp
   timestampAuthority: myTSA,
 });
 
@@ -718,7 +739,7 @@ The `Signer` interface is async, so external services are just another implement
 class AzureKeyVaultSigner implements Signer {
   readonly certificate: Uint8Array;
   readonly certificateChain: Uint8Array[];
-  
+
   private client: KeyVaultClient;
   private keyName: string;
 
@@ -726,7 +747,7 @@ class AzureKeyVaultSigner implements Signer {
     client: KeyVaultClient,
     keyName: string,
     certificate: Uint8Array,
-    certificateChain: Uint8Array[]
+    certificateChain: Uint8Array[],
   ) {
     this.client = client;
     this.keyName = keyName;
@@ -751,7 +772,7 @@ class AzureKeyVaultSigner implements Signer {
 // Usage is identical to local signing
 const signer = await AzureKeyVaultSigner.create(
   "https://my-vault.vault.azure.net",
-  "my-signing-key"
+  "my-signing-key",
 );
 
 const signedBytes = await pdf.sign({
@@ -782,7 +803,7 @@ let pdfBytes = await pdf.sign({
 const pdf2 = await PDF.load(pdfBytes);
 pdfBytes = await pdf2.sign({
   signer: signer2,
-  reason: "Manager approval", 
+  reason: "Manager approval",
   fieldName: "ManagerSignature",
 });
 
@@ -823,40 +844,40 @@ const archivedBytes = await pdf.addDocumentTimestamp({
 interface SignOptions {
   /** The signer providing certificate and signing capability */
   signer: Signer;
-  
+
   /** Reason for signing */
   reason?: string;
-  
+
   /** Location where signing occurred */
   location?: string;
-  
+
   /** Contact information */
   contactInfo?: string;
-  
+
   /** Name of existing signature field, or name for new field */
   fieldName?: string;
-  
+
   /** Visible signature appearance */
   appearance?: SignatureAppearance;
-  
+
   /** PAdES conformance level (convenience) */
   level?: "B-B" | "B-T" | "B-LT" | "B-LTA";
-  
+
   /** Timestamp authority for B-T and above */
   timestampAuthority?: TimestampAuthority;
-  
+
   /** Enable long-term validation data embedding */
   longTermValidation?: boolean;
-  
+
   /** Provider for OCSP/CRL data */
   revocationProvider?: RevocationProvider;
-  
+
   /** Add document timestamp for archival (B-LTA) */
   archivalTimestamp?: boolean;
-  
+
   /** Digest algorithm (default: SHA-256) */
   digestAlgorithm?: DigestAlgorithm;
-  
+
   /** Size to reserve for signature (default: 12KB) */
   estimatedSize?: number;
 }
@@ -864,18 +885,16 @@ interface SignOptions {
 interface SignatureAppearance {
   /** Page index (0-based) */
   page: number;
-  
+
   /** Rectangle for signature widget */
   rect: { x: number; y: number; width: number; height: number };
-  
+
   /** Optional background image */
   image?: Uint8Array;
-  
+
   /** Text to display (can include placeholders like {name}, {date}) */
   text?: string;
 }
-
-
 ```
 
 ---
@@ -886,23 +905,17 @@ interface SignatureAppearance {
 /** Signs using a PKCS#12 (.p12/.pfx) file */
 class P12Signer implements Signer {
   constructor(p12Bytes: Uint8Array, password: string);
-  
+
   readonly certificate: Uint8Array;
   readonly certificateChain: Uint8Array[];
-  
+
   sign(digest: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array>;
 }
 
 /** Signs using Web Crypto API with provided key/cert */
 class CryptoKeySigner implements Signer {
-  constructor(
-    privateKey: CryptoKey,
-    certificate: Uint8Array,
-    certificateChain?: Uint8Array[]
-  );
+  constructor(privateKey: CryptoKey, certificate: Uint8Array, certificateChain?: Uint8Array[]);
 }
-
-
 ```
 
 ---
@@ -942,7 +955,7 @@ For B-LTA, the final PDF looks like:
 
 [Incremental Update 1: Signature]
   - Signature field
-  - Widget annotation  
+  - Widget annotation
   - Signature dictionary (with CMS containing timestamp)
 %%EOF
 

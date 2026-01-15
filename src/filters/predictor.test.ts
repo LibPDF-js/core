@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { describe, expect, it } from "vitest";
+
 import { applyPredictor } from "./predictor";
 
 /**

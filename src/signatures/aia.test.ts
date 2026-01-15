@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { loadFixture } from "../test-utils";
 import { buildCertificateChain } from "./aia";
 

@@ -8,6 +8,7 @@
 import type { ObjectRegistry } from "#src/document/object-registry";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfRef } from "#src/objects/pdf-ref";
+
 import { PDFAnnotation } from "./base";
 import { PDFCaretAnnotation } from "./caret";
 import { PDFFileAttachmentAnnotation } from "./file-attachment";

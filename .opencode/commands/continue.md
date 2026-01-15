@@ -29,6 +29,7 @@ bun run typecheck           # Check for type errors
 ```
 
 Review the code that's already been written to understand:
+
 - What's already implemented
 - What's partially done
 - What's not started yet
@@ -36,6 +37,7 @@ Review the code that's already been written to understand:
 ## Implementation Guidelines
 
 ### During Implementation
+
 - Follow CODE_STYLE.md strictly (2-space indent, double quotes, braces always, etc.)
 - Use `#src/*` import alias for internal imports
 - Co-locate tests as `*.test.ts` files
@@ -44,12 +46,14 @@ Review the code that's already been written to understand:
 - Commit logical chunks of work
 
 ### Code Quality
+
 - No stubbed implementations or skipped tests
 - Handle edge cases and error conditions
 - Include descriptive error messages with context
 - Use async/await for all I/O operations
 
 ### Testing
+
 - Write tests first when practical (TDD)
 - Test happy paths and edge cases
 - Test error conditions
@@ -69,12 +73,14 @@ Work continuously through these steps:
 ## Stopping Conditions
 
 **Stop and report success when:**
+
 - All spec requirements are implemented
 - All tests pass
 - Typecheck passes
 - Lint passes
 
 **Stop and ask for help when:**
+
 - The spec is ambiguous and you need clarification
 - You encounter a blocking issue you cannot resolve
 - You need to make a decision that significantly deviates from the spec

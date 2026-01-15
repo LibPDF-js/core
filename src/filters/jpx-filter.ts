@@ -1,4 +1,5 @@
 import type { PdfDict } from "#src/objects/pdf-dict";
+
 import type { Filter } from "./filter";
 
 /**

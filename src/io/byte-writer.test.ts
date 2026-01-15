@@ -2,8 +2,9 @@
  * Tests for ByteWriter - efficient byte buffer writer.
  */
 
-import { describe, expect, it } from "vitest";
 import { stringToBytes } from "#src/test-utils";
+import { describe, expect, it } from "vitest";
+
 import { ByteWriter } from "./byte-writer";
 
 describe("ByteWriter", () => {

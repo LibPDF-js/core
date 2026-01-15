@@ -9,6 +9,7 @@
  */
 
 import type { BinaryScanner } from "#src/io/binary-scanner.ts";
+
 import type { TableParseContext, TTFTable } from "../types.ts";
 
 // Platform IDs

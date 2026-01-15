@@ -1,4 +1,13 @@
 {
   "title": "API Reference",
-  "pages": ["index", "---Classes---", "pdf", "pdf-page", "pdf-form", "annotations", "---Other---", "errors"]
+  "pages": [
+    "index",
+    "---Classes---",
+    "pdf",
+    "pdf-page",
+    "pdf-form",
+    "annotations",
+    "---Other---",
+    "errors"
+  ]
 }

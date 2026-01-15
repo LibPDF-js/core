@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { loadFixture } from "../../test-utils.ts";
 import { isTTF, parseTTF } from "./parser.ts";
 import { ENCODING_WIN_UNICODE_BMP, PLATFORM_WINDOWS } from "./tables/cmap.ts";

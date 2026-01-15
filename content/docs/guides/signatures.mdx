@@ -5,11 +5,12 @@ description: Sign PDFs with PKCS#12 certificates or Web Crypto API keys.
 
 # Digital Signatures
 
-
 This guide covers digitally signing PDF documents using PAdES (PDF Advanced Electronic Signatures) standards.
 
 <Callout type="warn" title="Need a complete signing solution?">
-  This library provides low-level PDF signing primitives. If you need a full document signing platform with workflows, templates, email notifications, and a signing portal, check out [Documenso](https://documenso.com) - the open-source DocuSign alternative.
+  This library provides low-level PDF signing primitives. If you need a full document signing
+  platform with workflows, templates, email notifications, and a signing portal, check out
+  [Documenso](https://documenso.com) - the open-source DocuSign alternative.
 </Callout>
 
 ## Overview
@@ -22,12 +23,12 @@ Digital signatures provide:
 
 ## PAdES Conformance Levels
 
-| Level | Description | Use Case |
-|-------|-------------|----------|
-| B-B | Basic signature | Simple signing |
-| B-T | With timestamp | Proves when signed |
-| B-LT | Long-term validation | Validates after cert expires |
-| B-LTA | Long-term archival | Highest durability |
+| Level | Description          | Use Case                     |
+| ----- | -------------------- | ---------------------------- |
+| B-B   | Basic signature      | Simple signing               |
+| B-T   | With timestamp       | Proves when signed           |
+| B-LT  | Long-term validation | Validates after cert expires |
+| B-LTA | Long-term archival   | Highest durability           |
 
 ## Sign with PKCS#12 (.p12/.pfx)
 
@@ -44,7 +45,7 @@ const p12Bytes = await readFile("certificate.p12");
 const signer = await P12Signer.create(p12Bytes, "certificate-password");
 
 // Sign the document
-const signed =await pdf.sign({ signer });
+const signed = await pdf.sign({ signer });
 
 // Save with incremental update (preserves signature)
 await writeFile("signed.pdf", signed.bytes);
@@ -114,10 +115,10 @@ import { PDF, CryptoKeySigner } from "@libpdf/core";
 
 // Assuming you have a CryptoKey and DER-encoded certificate
 const signer = new CryptoKeySigner(
-  privateKey,           // CryptoKey
-  certificateDer,       // Uint8Array (DER-encoded X.509 certificate)
-  "RSA",                // KeyType: "RSA" or "EC"
-  "RSASSA-PKCS1-v1_5"   // SignatureAlgorithm
+  privateKey, // CryptoKey
+  certificateDer, // Uint8Array (DER-encoded X.509 certificate)
+  "RSA", // KeyType: "RSA" or "EC"
+  "RSASSA-PKCS1-v1_5", // SignatureAlgorithm
 );
 
 await pdf.sign({ signer });
@@ -135,7 +136,7 @@ const keyPair = await crypto.subtle.generateKey(
     hash: "SHA-256",
   },
   true,
-  ["sign", "verify"]
+  ["sign", "verify"],
 );
 
 // Note: You still need a certificate from a CA
@@ -223,11 +224,11 @@ await pdf.sign({
 
 Popular free timestamp servers:
 
-| Provider | URL |
-|----------|-----|
+| Provider | URL                             |
+| -------- | ------------------------------- |
 | DigiCert | `http://timestamp.digicert.com` |
-| Sectigo | `http://timestamp.sectigo.com` |
-| FreeTSA | `https://freetsa.org/tsr` |
+| Sectigo  | `http://timestamp.sectigo.com`  |
+| FreeTSA  | `https://freetsa.org/tsr`       |
 
 For production, use a timestamp server from your certificate provider.
 
@@ -241,14 +242,14 @@ async function signDocument() {
   // Load document
   const pdfBytes = await readFile("contract.pdf");
   const pdf = await PDF.load(pdfBytes);
-  
+
   // Create signer
   const p12Bytes = await readFile("my-certificate.p12");
   const signer = await P12Signer.create(p12Bytes, "p12-password");
-  
+
   // Create timestamp authority
   const tsa = new HttpTimestampAuthority("http://timestamp.digicert.com");
-  
+
   // Sign with timestamp
   const signed = await pdf.sign({
     signer,
@@ -258,10 +259,10 @@ async function signDocument() {
     location: "San Francisco, CA",
     fieldName: "ApprovalSignature",
   });
-  
+
   // Save with incremental update
   await writeFile("contract-signed.pdf", signed.bytes);
-  
+
   console.log("Document signed successfully");
 }
 
@@ -270,12 +271,12 @@ signDocument().catch(console.error);
 
 ## Troubleshooting
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
+| Issue                        | Cause                   | Solution                    |
+| ---------------------------- | ----------------------- | --------------------------- |
 | "Unknown signature" in Adobe | Certificate not trusted | Use a CA-issued certificate |
-| Signature invalid after edit | Document modified | Use incremental save |
-| Timestamp failed | Server unreachable | Check network/firewall |
-| Certificate expired | Old certificate | Renew certificate |
+| Signature invalid after edit | Document modified       | Use incremental save        |
+| Timestamp failed             | Server unreachable      | Check network/firewall      |
+| Certificate expired          | Old certificate         | Renew certificate           |
 
 ## Security Best Practices
 

@@ -16,6 +16,7 @@ Currently, @libpdf/core only supports Widget annotations (form field widgets) th
 - **File attachment annotations**
 
 These are needed for:
+
 - Review workflows (comments, highlights, stamps)
 - Interactive PDFs (links, navigation)
 - Print-ready PDFs (flattening annotations)
@@ -44,25 +45,25 @@ These are needed for:
 
 Based on PDF spec Table 169 and reference library analysis:
 
-| Priority | Type | Subtype | Description |
-|----------|------|---------|-------------|
-| P1 | Link | `Link` | Hyperlinks, go-to actions |
-| P1 | Text | `Text` | Sticky notes/comments |
-| P1 | Highlight | `Highlight` | Yellow highlight |
-| P1 | Underline | `Underline` | Text underline |
-| P1 | StrikeOut | `StrikeOut` | Strikethrough |
-| P1 | Squiggly | `Squiggly` | Wavy underline |
-| P2 | FreeText | `FreeText` | Text box on page |
-| P2 | Line | `Line` | Line with optional arrows |
-| P2 | Square | `Square` | Rectangle |
-| P2 | Circle | `Circle` | Ellipse |
-| P2 | Stamp | `Stamp` | Rubber stamps |
-| P2 | Ink | `Ink` | Freehand drawings |
-| P3 | Polygon | `Polygon` | Filled polygon |
-| P3 | PolyLine | `PolyLine` | Polyline |
-| P3 | Caret | `Caret` | Insertion caret |
-| P3 | FileAttachment | `FileAttachment` | Embedded file icon |
-| P3 | Popup | `Popup` | Associated popup window |
+| Priority | Type           | Subtype          | Description               |
+| -------- | -------------- | ---------------- | ------------------------- |
+| P1       | Link           | `Link`           | Hyperlinks, go-to actions |
+| P1       | Text           | `Text`           | Sticky notes/comments     |
+| P1       | Highlight      | `Highlight`      | Yellow highlight          |
+| P1       | Underline      | `Underline`      | Text underline            |
+| P1       | StrikeOut      | `StrikeOut`      | Strikethrough             |
+| P1       | Squiggly       | `Squiggly`       | Wavy underline            |
+| P2       | FreeText       | `FreeText`       | Text box on page          |
+| P2       | Line           | `Line`           | Line with optional arrows |
+| P2       | Square         | `Square`         | Rectangle                 |
+| P2       | Circle         | `Circle`         | Ellipse                   |
+| P2       | Stamp          | `Stamp`          | Rubber stamps             |
+| P2       | Ink            | `Ink`            | Freehand drawings         |
+| P3       | Polygon        | `Polygon`        | Filled polygon            |
+| P3       | PolyLine       | `PolyLine`       | Polyline                  |
+| P3       | Caret          | `Caret`          | Insertion caret           |
+| P3       | FileAttachment | `FileAttachment` | Embedded file icon        |
+| P3       | Popup          | `Popup`          | Associated popup window   |
 
 **Handled Separately:** Widget annotations (via forms subsystem - completely separate, not exposed via annotation API)
 
@@ -71,22 +72,29 @@ Based on PDF spec Table 169 and reference library analysis:
 ## Key Design Decisions
 
 ### Widget Annotation Separation
+
 Widget annotations are **completely separate** from this annotation system. They are accessed only via `PDFForm`. The `getAnnotations()` method excludes widgets entirely. This maintains backwards compatibility and keeps the forms subsystem self-contained.
 
 ### Link Action Security
+
 For Link annotations, we support a **safe subset of actions only**:
+
 - **Supported:** URI actions, GoTo actions (internal navigation)
 - **Ignored/Warned:** JavaScript, Launch, ImportData, and other potentially dangerous actions
 
 This protects users from security risks. Dangerous action types are not parsed or exposed.
 
 ### Flatten Behavior for Missing Appearances
+
 When flattening annotations that have no appearance stream and we cannot generate one (e.g., custom stamp names, unrecognized icons):
+
 - **Remove the annotation** - The annotation is deleted from the page
 - This ensures a clean result without orphaned interactive elements
 
 ### Popup Annotation Handling
+
 Popup annotations are accessed via a **dedicated method**, consistent with other annotation types:
+
 - `page.getAnnotations()` - excludes Popups (they're not standalone)
 - `page.getPopupAnnotations()` - get all Popups on a page
 - `annotation.getPopup()` - access Popup linked from a markup annotation
@@ -94,25 +102,33 @@ Popup annotations are accessed via a **dedicated method**, consistent with other
 Popups are **never auto-created**. Users explicitly create them if needed via `annotation.createPopup()`.
 
 ### Cascade Deletion
+
 When removing an annotation via `page.removeAnnotation(annot)`:
+
 - The annotation is removed from the page's Annots array
 - Any linked Popup annotation is also removed
 - Appearance streams are left in place (may be shared; garbage collected later)
 
 ### Incremental Save Support
+
 Annotation modifications are **fully tracked** for incremental saves:
+
 - New annotations are appended in incremental updates
 - Modified annotations are re-written in incremental updates
 - This preserves digital signatures on documents
 
 ### Change Tracking
+
 Annotation property changes are **auto-tracked**:
+
 - Any property setter (e.g., `highlight.setColor(red)`) automatically marks the annotation as modified
 - The document is marked dirty for save
 - No explicit `markModified()` call required
 
 ### Malformed Annotation Handling
+
 When parsing annotations from PDFs with invalid/missing data:
+
 - **Lenient with defaults** - Use sensible defaults for missing data
 - Missing Rect defaults to `[0, 0, 0, 0]`
 - Invalid QuadPoints are normalized or defaulted
@@ -120,13 +136,17 @@ When parsing annotations from PDFs with invalid/missing data:
 - Matches library's overall "be lenient" philosophy
 
 ### Caching Strategy
+
 Parsed annotation objects are **cached always**:
+
 - `getAnnotations()` returns the same object instances on repeated calls
 - Faster for repeated access
 - Cache is invalidated when annotations are added/removed from the page
 
 ### Page Copy Behavior
+
 When copying pages between documents via `copyPagesFrom()`:
+
 - **Default: exclude annotations** - `copyPagesFrom(src, pages)` copies page content only
 - **Opt-in:** `copyPagesFrom(src, pages, { includeAnnotations: true })` copies annotations
 - This avoids broken internal links and unwanted annotation transfer
@@ -184,7 +204,7 @@ for (const hl of highlights) {
   console.log(hl.quadPoints);     // Raw: number[][] (advanced use)
   console.log(hl.getBounds());    // Convenience: { x, y, width, height }
   console.log(hl.opacity);        // 0-1
-  
+
   // Access linked Popup
   const popup = hl.getPopup();    // PDFPopupAnnotation or null
 }
@@ -356,7 +376,7 @@ await pdf.flattenAnnotations();
 await page.flattenAnnotations();
 
 // Flatten excluding certain types (keep them interactive)
-await pdf.flattenAnnotations({ 
+await pdf.flattenAnnotations({
   exclude: ["Link"]  // Keep links interactive (they have no visual to flatten anyway)
 });
 ```
@@ -365,7 +385,7 @@ await pdf.flattenAnnotations({
 
 ```typescript
 // Access annotation dictionaries directly
-const annotDict = annotation.dict;  // PdfDict
+const annotDict = annotation.dict; // PdfDict
 
 // Get raw appearance streams
 const normalAppearance = await annotation.getNormalAppearance();
@@ -381,7 +401,7 @@ annotation.hasFlag(AnnotationFlags.Print);
 annotation.setFlag(AnnotationFlags.Print, true);
 
 // Page-level annotation management
-const annots = await page.getAnnotsArray();  // PdfArray of refs
+const annots = await page.getAnnotsArray(); // PdfArray of refs
 page.addAnnotRef(annotRef);
 page.removeAnnotRef(annotRef);
 ```
@@ -393,8 +413,8 @@ page.removeAnnotRef(annotRef);
 await targetPdf.copyPagesFrom(sourcePdf, [0, 1, 2]);
 
 // Include annotations (note: internal link destinations may break)
-await targetPdf.copyPagesFrom(sourcePdf, [0, 1, 2], { 
-  includeAnnotations: true 
+await targetPdf.copyPagesFrom(sourcePdf, [0, 1, 2], {
+  includeAnnotations: true,
 });
 ```
 
@@ -454,7 +474,7 @@ src/
     base.ts                     # PDFAnnotation base class
     factory.ts                  # Annotation factory (parse by subtype)
     cache.ts                    # Annotation cache per page
-    
+
     # Annotation types
     link.ts                     # PDFLinkAnnotation
     text.ts                     # PDFTextAnnotation (sticky notes)
@@ -469,7 +489,7 @@ src/
     caret.ts                    # PDFCaretAnnotation
     file-attachment.ts          # PDFFileAttachmentAnnotation
     popup.ts                    # PDFPopupAnnotation
-    
+
     # Appearance generation
     appearance/
       index.ts
@@ -483,13 +503,13 @@ src/
       circle.ts                 # Circle/ellipse appearance
       ink.ts                    # Ink path appearance
       free-text.ts              # FreeText with font rendering
-    
+
     # Built-in assets
     icons/
       index.ts                  # Icon registry
       text-icons.ts             # Comment, Note, Help, Paragraph, etc.
       stamp-appearances.ts      # Approved, Draft, Confidential, etc.
-    
+
     # Flattening
     flattener.ts                # AnnotationFlattener
 ```
@@ -597,7 +617,7 @@ src/
 ### Phase 7: Other Annotations (P2-P3)
 
 1. **FreeText** - text boxes with font/styling
-2. **Ink** - freehand path drawing  
+2. **Ink** - freehand path drawing
 3. **Polygon/Polyline** - multi-point shapes
 4. **Caret** - insertion markers
 5. **FileAttachment** - file icons
@@ -633,16 +653,16 @@ src/
 
 ```typescript
 export enum AnnotationFlags {
-  Invisible = 1 << 0,       // Don't display unknown types
-  Hidden = 1 << 1,          // Don't display or print
-  Print = 1 << 2,           // Print when page is printed
-  NoZoom = 1 << 3,          // Don't scale with page zoom
-  NoRotate = 1 << 4,        // Don't rotate with page
-  NoView = 1 << 5,          // Don't display on screen
-  ReadOnly = 1 << 6,        // Don't allow interaction
-  Locked = 1 << 7,          // Don't allow deletion/modification
-  ToggleNoView = 1 << 8,    // Invert NoView for certain events
-  LockedContents = 1 << 9,  // Don't allow content modification
+  Invisible = 1 << 0, // Don't display unknown types
+  Hidden = 1 << 1, // Don't display or print
+  Print = 1 << 2, // Print when page is printed
+  NoZoom = 1 << 3, // Don't scale with page zoom
+  NoRotate = 1 << 4, // Don't rotate with page
+  NoView = 1 << 5, // Don't display on screen
+  ReadOnly = 1 << 6, // Don't allow interaction
+  Locked = 1 << 7, // Don't allow deletion/modification
+  ToggleNoView = 1 << 8, // Invert NoView for certain events
+  LockedContents = 1 << 9, // Don't allow content modification
 }
 ```
 
@@ -651,6 +671,7 @@ export enum AnnotationFlags {
 Text markup annotations (Highlight, Underline, StrikeOut, Squiggly) use QuadPoints internally to define regions. QuadPoints support rotated/skewed text, but most use cases involve horizontal text where a simple rect is sufficient.
 
 **Why QuadPoints exist:**
+
 - PDF spec requires them for text markup annotations
 - They allow highlighting text at any angle (see PDF spec Figure 64)
 - Each quad defines 4 corners of a region in counterclockwise order
@@ -662,12 +683,12 @@ Text markup annotations (Highlight, Underline, StrikeOut, Squiggly) use QuadPoin
 interface TextMarkupOptions {
   // Option 1: Single rect (most common - horizontal text)
   rect?: { x: number; y: number; width: number; height: number };
-  
+
   // Option 2: Multiple rects (multi-line selection)
   rects?: { x: number; y: number; width: number; height: number }[];
-  
+
   // Option 3: Raw quadPoints (advanced - rotated text)
-  quadPoints?: number[][];  // Array of [x1,y1,x2,y2,x3,y3,x4,y4]
+  quadPoints?: number[][]; // Array of [x1,y1,x2,y2,x3,y3,x4,y4]
 }
 ```
 
@@ -678,10 +699,14 @@ function rectToQuadPoints(rect: Rect): number[] {
   // PDF spec order: counterclockwise from bottom-left of text baseline
   const { x, y, width, height } = rect;
   return [
-    x, y + height,           // top-left
-    x + width, y + height,   // top-right  
-    x + width, y,            // bottom-right
-    x, y,                    // bottom-left
+    x,
+    y + height, // top-left
+    x + width,
+    y + height, // top-right
+    x + width,
+    y, // bottom-right
+    x,
+    y, // bottom-left
   ];
 }
 
@@ -696,7 +721,7 @@ When reading annotations, we expose the raw quadPoints but also provide a conven
 
 ```typescript
 const highlight = annot as PDFHighlightAnnotation;
-highlight.quadPoints;  // Raw: number[][] (for advanced use)
+highlight.quadPoints; // Raw: number[][] (for advanced use)
 highlight.getBounds(); // Convenience: { x, y, width, height } bounding box
 ```
 
@@ -709,36 +734,42 @@ Highlights require proper transparency to not obscure underlying text:
 // Uses transparency group with Multiply blend mode
 function generateHighlightAppearance(quads: number[][], color: Color): PdfStream {
   const stream = new PdfStream();
-  
+
   // Set up transparency group
   stream.set("Type", PdfName.of("XObject"));
   stream.set("Subtype", PdfName.of("Form"));
-  stream.set("Group", new PdfDict({
-    S: PdfName.of("Transparency"),
-    CS: PdfName.of("DeviceRGB"),
-    I: true,   // Isolated
-    K: false,  // Non-knockout
-  }));
-  
+  stream.set(
+    "Group",
+    new PdfDict({
+      S: PdfName.of("Transparency"),
+      CS: PdfName.of("DeviceRGB"),
+      I: true, // Isolated
+      K: false, // Non-knockout
+    }),
+  );
+
   // Content with blend mode
   const content = `
     /GS0 gs                    % Graphics state with BM /Multiply
     ${color.r} ${color.g} ${color.b} rg
-    ${quads.map(q => quadToPath(q)).join('\n')}
+    ${quads.map(q => quadToPath(q)).join("\n")}
   `;
-  
+
   // Resources with ExtGState
-  stream.set("Resources", new PdfDict({
-    ExtGState: new PdfDict({
-      GS0: new PdfDict({
-        Type: PdfName.of("ExtGState"),
-        BM: PdfName.of("Multiply"),
-        CA: 1,  // Stroke opacity
-        ca: 1,  // Fill opacity (annotation CA handles overall)
+  stream.set(
+    "Resources",
+    new PdfDict({
+      ExtGState: new PdfDict({
+        GS0: new PdfDict({
+          Type: PdfName.of("ExtGState"),
+          BM: PdfName.of("Multiply"),
+          CA: 1, // Stroke opacity
+          ca: 1, // Fill opacity (annotation CA handles overall)
+        }),
       }),
     }),
-  }));
-  
+  );
+
   return stream;
 }
 ```
@@ -758,13 +789,13 @@ interface AppearanceHandler {
 class PDFAnnotation {
   async ensureAppearance(): Promise<void> {
     if (this.hasNormalAppearance()) return;
-    
+
     const handler = getAppearanceHandler(this.type);
     if (!handler) {
       // No handler available - annotation will be removed on flatten
       return;
     }
-    
+
     const appearance = handler.generateNormalAppearance();
     this.setNormalAppearance(appearance);
   }
@@ -776,7 +807,7 @@ class PDFAnnotation {
 ```typescript
 // Colors can be grayscale, RGB, or CMYK based on array length
 function parseAnnotationColor(arr: number[]): Color | null {
-  if (arr.length === 0) return null;  // Transparent
+  if (arr.length === 0) return null; // Transparent
   if (arr.length === 1) return grayscale(arr[0]);
   if (arr.length === 3) return rgb(arr[0], arr[1], arr[2]);
   if (arr.length === 4) return cmyk(arr[0], arr[1], arr[2], arr[3]);
@@ -789,18 +820,18 @@ function parseAnnotationColor(arr: number[]): Color | null {
 ```typescript
 function parseLinkAction(actionDict: PdfDict): LinkAction | null {
   const actionType = actionDict.getName("S")?.value;
-  
+
   switch (actionType) {
     case "URI":
       return { type: "uri", uri: actionDict.getString("URI")?.asString() };
-    
+
     case "GoTo":
       return { type: "goto", destination: parseDestination(actionDict.get("D")) };
-    
+
     case "GoToR":
       // Remote GoTo - safe, just references another file
       return { type: "gotoRemote", file: actionDict.getString("F")?.asString(), destination: ... };
-    
+
     // Dangerous actions - ignore
     case "JavaScript":
     case "Launch":
@@ -810,7 +841,7 @@ function parseLinkAction(actionDict: PdfDict): LinkAction | null {
       // Log warning, return null
       console.warn(`Ignoring potentially dangerous action type: ${actionType}`);
       return null;
-    
+
     default:
       return null;
   }
@@ -822,24 +853,24 @@ function parseLinkAction(actionDict: PdfDict): LinkAction | null {
 ```typescript
 class PDFAnnotation {
   private _modified = false;
-  
+
   protected markModified(): void {
     if (!this._modified) {
       this._modified = true;
       this.registry.markDirty(this.ref);
     }
   }
-  
+
   setColor(color: Color): void {
     this.dict.set("C", colorToArray(color));
     this.markModified();
   }
-  
+
   setContents(contents: string): void {
     this.dict.set("Contents", PdfString.fromString(contents));
     this.markModified();
   }
-  
+
   // ... all setters call markModified()
 }
 ```
@@ -847,17 +878,20 @@ class PDFAnnotation {
 ## Reference Implementation Notes
 
 ### From pdf.js
+
 - Factory pattern with switch on `/Subtype`
 - QuadPoints normalization for various PDF generators
 - Comprehensive flag handling
 - Rich appearance stream parsing
 
 ### From pdf-lib
+
 - TypeScript API patterns
 - Appearance provider callbacks
 - Widget-centric (limited annotation support)
 
 ### From PDFBox
+
 - Complete annotation type coverage
 - Appearance handler architecture
 - Flattening via content stream injection
@@ -866,6 +900,7 @@ class PDFAnnotation {
 ## Test Plan
 
 ### Unit Tests
+
 - Parse each annotation type from fixtures
 - Create annotations and verify dictionary structure
 - Appearance generation correctness (especially highlight transparency)
@@ -875,6 +910,7 @@ class PDFAnnotation {
 - Safe action parsing (verify dangerous actions are filtered)
 
 ### Integration Tests
+
 - Add annotations, save, reload, verify
 - Flatten annotations, verify visual appearance
 - Flatten with missing appearances, verify annotations removed
@@ -883,12 +919,14 @@ class PDFAnnotation {
 - Page copy with/without annotations
 
 ### Edge Case Tests
+
 - Malformed annotations (missing Rect, invalid QuadPoints)
 - Annotations with corrupt appearance streams
 - Custom stamp names (verify removal on flatten)
 - Links with dangerous actions (verify filtered)
 
 ### Fixtures Needed
+
 - PDFs with various annotation types
 - PDFs with annotations lacking appearances
 - PDFs with rotated pages and annotations
@@ -898,7 +936,9 @@ class PDFAnnotation {
 ## Built-in Assets
 
 ### Text Annotation Icons
+
 Pre-built appearance streams for standard icon names:
+
 - Comment (speech bubble)
 - Note (lined paper)
 - Help (question mark)
@@ -908,7 +948,9 @@ Pre-built appearance streams for standard icon names:
 - NewParagraph (paragraph symbol with arrow)
 
 ### Stamp Appearances
+
 Pre-built for standard stamp names (English):
+
 - Approved (green)
 - Rejected / NotApproved (red)
 - Draft (blue)
