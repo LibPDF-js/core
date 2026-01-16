@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { derToPem, getPemLabel, isPem, normalizePem, pemToDer } from "./pem";
+import { derToPem, getPemLabel, isPem, normalizePem, parsePem, pemToDer } from "./pem";
 
 describe("PEM utilities", () => {
   // Sample DER data (just random bytes for testing)
@@ -161,6 +161,113 @@ describe("PEM utilities", () => {
       const pem2 = `-----BEGIN CERTIFICATE-----\n${base64.match(/.{1,64}/g)?.join("\n")}\n-----END CERTIFICATE-----`;
 
       expect(normalizePem(pem1)).toBe(normalizePem(pem2));
+    });
+  });
+
+  describe("parsePem", () => {
+    it("parses a single PEM block", () => {
+      const pem = derToPem(sampleDer, "CERTIFICATE");
+      const blocks = parsePem(pem);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].label).toBe("CERTIFICATE");
+      expect(blocks[0].der).toEqual(sampleDer);
+    });
+
+    it("parses multiple PEM blocks", () => {
+      const der1 = new Uint8Array([0x01, 0x02, 0x03]);
+      const der2 = new Uint8Array([0x04, 0x05, 0x06]);
+      const der3 = new Uint8Array([0x07, 0x08, 0x09]);
+
+      const pem = [
+        derToPem(der1, "CERTIFICATE"),
+        derToPem(der2, "CERTIFICATE"),
+        derToPem(der3, "PRIVATE KEY"),
+      ].join("\n");
+
+      const blocks = parsePem(pem);
+
+      expect(blocks).toHaveLength(3);
+      expect(blocks[0]).toEqual({ label: "CERTIFICATE", der: der1 });
+      expect(blocks[1]).toEqual({ label: "CERTIFICATE", der: der2 });
+      expect(blocks[2]).toEqual({ label: "PRIVATE KEY", der: der3 });
+    });
+
+    it("handles different label types", () => {
+      const labels = [
+        "CERTIFICATE",
+        "PUBLIC KEY",
+        "PRIVATE KEY",
+        "RSA PRIVATE KEY",
+        "EC PRIVATE KEY",
+        "ENCRYPTED PRIVATE KEY",
+      ];
+
+      const pem = labels.map(label => derToPem(sampleDer, label)).join("\n");
+
+      const blocks = parsePem(pem);
+
+      expect(blocks).toHaveLength(labels.length);
+      for (let i = 0; i < labels.length; i++) {
+        expect(blocks[i].label).toBe(labels[i]);
+        expect(blocks[i].der).toEqual(sampleDer);
+      }
+    });
+
+    it("returns empty array for non-PEM string", () => {
+      expect(parsePem("not a pem")).toEqual([]);
+      expect(parsePem("")).toEqual([]);
+    });
+
+    it("handles PEM with extra whitespace and text between blocks", () => {
+      const der1 = new Uint8Array([0x01, 0x02]);
+      const der2 = new Uint8Array([0x03, 0x04]);
+
+      const pem = `
+        Some header text
+        ${derToPem(der1, "CERTIFICATE")}
+        Intermediate text here
+        ${derToPem(der2, "PRIVATE KEY")}
+        Footer text
+      `;
+
+      const blocks = parsePem(pem);
+
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toEqual({ label: "CERTIFICATE", der: der1 });
+      expect(blocks[1]).toEqual({ label: "PRIVATE KEY", der: der2 });
+    });
+
+    it("throws on mismatched BEGIN/END labels", () => {
+      const pem = `-----BEGIN CERTIFICATE-----
+AQID
+-----END PRIVATE KEY-----`;
+
+      expect(() => parsePem(pem)).toThrow(/label mismatch.*BEGIN CERTIFICATE.*END PRIVATE KEY/);
+    });
+
+    it("handles empty PEM blocks", () => {
+      const pem = `-----BEGIN CERTIFICATE-----
+-----END CERTIFICATE-----`;
+
+      const blocks = parsePem(pem);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].label).toBe("CERTIFICATE");
+      expect(blocks[0].der).toEqual(new Uint8Array(0));
+    });
+
+    it("handles trailing text after last block", () => {
+      const pem = `${derToPem(sampleDer, "CERTIFICATE")}
+Some trailing text here
+-----BEGIN ORPHAN-----
+AQID`;
+
+      const blocks = parsePem(pem);
+
+      // Should only parse the complete block, ignoring the incomplete one
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].label).toBe("CERTIFICATE");
     });
   });
 

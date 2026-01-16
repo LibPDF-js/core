@@ -8,6 +8,71 @@
 import { base64 } from "@scure/base";
 
 /**
+ * A single PEM block parsed from a PEM file.
+ */
+export interface PemBlock {
+  /** The label from the BEGIN statement (e.g., "CERTIFICATE", "PRIVATE KEY") */
+  label: string;
+  /** The DER-encoded binary data */
+  der: Uint8Array;
+}
+
+/**
+ * Parse a PEM file into a series of DER blocks with their types.
+ *
+ * PEM files can contain multiple blocks (e.g., certificate chains). This function
+ * extracts each block along with its label from the BEGIN statement.
+ *
+ * @param pem - The PEM-encoded string (may contain multiple blocks)
+ * @returns Array of PEM blocks, each containing a label and DER data
+ * @throws {Error} if the PEM format is invalid (mismatched labels or missing markers)
+ *
+ * @example
+ * ```typescript
+ * const blocks = parsePem(pemString);
+ * // [
+ * //   { label: "CERTIFICATE", der: Uint8Array(...) },
+ * //   { label: "CERTIFICATE", der: Uint8Array(...) },
+ * //   { label: "PRIVATE KEY", der: Uint8Array(...) }
+ * // ]
+ * ```
+ */
+export function parsePem(pem: string): PemBlock[] {
+  const blocks: PemBlock[] = [];
+
+  // Match all BEGIN...END blocks with their content
+  // The regex captures: (1) label from BEGIN, (2) base64 content, (3) label from END
+  const blockRegex = /-----BEGIN ([A-Z0-9 ]+)-----([\s\S]*?)-----END ([A-Z0-9 ]+)-----/g;
+
+  let match: RegExpExecArray | null;
+
+  while ((match = blockRegex.exec(pem)) !== null) {
+    const beginLabel = match[1];
+    const content = match[2];
+    const endLabel = match[3];
+
+    // Validate that BEGIN and END labels match
+    if (beginLabel !== endLabel) {
+      throw new Error(`PEM label mismatch: BEGIN ${beginLabel} but END ${endLabel}`);
+    }
+
+    // Remove all whitespace from base64 content
+    const b64 = content.replace(/\s/g, "");
+
+    // Skip empty blocks
+    if (b64.length === 0) {
+      blocks.push({ label: beginLabel, der: new Uint8Array(0) });
+      continue;
+    }
+
+    const der = base64.decode(b64);
+    blocks.push({ label: beginLabel, der });
+  }
+
+  return blocks;
+}
+
+/**
  * Convert DER (binary) bytes to PEM format.
  *
  * @param der - The DER-encoded binary data
