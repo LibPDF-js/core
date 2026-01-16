@@ -1,0 +1,404 @@
+---
+title: Google Cloud KMS
+description: Sign PDFs with keys stored in Google Cloud Key Management Service (KMS), including HSM-backed keys.
+---
+
+# Google Cloud KMS
+
+Sign PDFs using keys stored in Google Cloud Key Management Service (KMS). This is ideal for enterprise environments where private keys must never leave a hardware security module (HSM) for compliance and security reasons.
+
+<Callout type="info">
+  The private key never leaves KMS - only the digest is sent for signing.
+</Callout>
+
+## Installation
+
+The Google Cloud KMS client is an optional peer dependency:
+
+```bash
+npm install @google-cloud/kms
+```
+
+For loading certificates from Secret Manager:
+
+```bash
+npm install @google-cloud/secret-manager
+```
+
+## Quick Start
+
+```typescript
+import { PDF, GoogleKmsSigner } from "@libpdf/core";
+import { readFile, writeFile } from "fs/promises";
+
+// Load your DER-encoded certificate (issued by your CA for the KMS key)
+const certificate = await readFile("certificate.der");
+
+// Create signer with KMS key reference
+const signer = await GoogleKmsSigner.create({
+  keyVersionName:
+    "projects/my-project/locations/us-east1/keyRings/my-ring/cryptoKeys/my-key/cryptoKeyVersions/1",
+  certificate,
+});
+
+// Sign the PDF
+const pdf = await PDF.load(await readFile("document.pdf"));
+const { bytes } = await pdf.sign({ signer });
+
+await writeFile("signed.pdf", bytes);
+```
+
+---
+
+## Authentication
+
+`GoogleKmsSigner` uses [Application Default Credentials (ADC)](https://cloud.google.com/docs/authentication/application-default-credentials) by default. Common authentication methods:
+
+| Method                   | Environment        | Setup                                        |
+| ------------------------ | ------------------ | -------------------------------------------- |
+| Service Account Key      | Any                | Set `GOOGLE_APPLICATION_CREDENTIALS` env var |
+| User Credentials         | Local development  | Run `gcloud auth application-default login`  |
+| Workload Identity        | GKE                | Configure workload identity for your pod     |
+| Attached Service Account | GCE/Cloud Run/etc. | Automatic (uses instance metadata)           |
+
+### Required Permissions
+
+The authenticating identity needs these IAM permissions:
+
+- `cloudkms.cryptoKeyVersions.useToSign` - Sign with the key
+- `cloudkms.cryptoKeyVersions.viewPublicKey` - Validate certificate matches
+- `cloudkms.cryptoKeyVersions.get` - Read key metadata
+
+The predefined role `roles/cloudkms.signerVerifier` includes all required permissions.
+
+---
+
+## GoogleKmsSigner.create(options)
+
+Create a new KMS signer instance.
+
+### Full Resource Name
+
+| Param                        | Type                         | Default  | Description                                    |
+| ---------------------------- | ---------------------------- | -------- | ---------------------------------------------- |
+| `options`                    | `object`                     | required |                                                |
+| `options.keyVersionName`     | `string`                     | required | Full KMS key version resource name             |
+| `options.certificate`        | `Uint8Array`                 | required | DER-encoded X.509 certificate for this KMS key |
+| `[options.certificateChain]` | `Uint8Array[]`               |          | Intermediate and root certificates             |
+| `[options.buildChain]`       | `boolean`                    | `false`  | Fetch chain via AIA extensions                 |
+| `[options.chainTimeout]`     | `number`                     | `15000`  | Timeout for AIA fetching (ms)                  |
+| `[options.client]`           | `KeyManagementServiceClient` |          | Pre-configured KMS client                      |
+
+```typescript
+const signer = await GoogleKmsSigner.create({
+  keyVersionName:
+    "projects/my-project/locations/us-east1/keyRings/my-ring/cryptoKeys/my-key/cryptoKeyVersions/1",
+  certificate: certificateDer,
+  buildChain: true, // Automatically fetch intermediate certificates
+});
+```
+
+### Shorthand Options
+
+Instead of a full resource name, you can use shorthand properties:
+
+| Param                  | Type     | Default  | Description        |
+| ---------------------- | -------- | -------- | ------------------ |
+| `options.projectId`    | `string` | required | GCP project ID     |
+| `options.locationId`   | `string` | required | KMS location       |
+| `options.keyRingId`    | `string` | required | Key ring name      |
+| `options.keyId`        | `string` | required | Key name           |
+| `[options.keyVersion]` | `string` | `"1"`    | Key version number |
+
+```typescript
+const signer = await GoogleKmsSigner.create({
+  projectId: "my-project",
+  locationId: "us-east1",
+  keyRingId: "my-ring",
+  keyId: "my-key",
+  keyVersion: "1",
+  certificate: certificateDer,
+});
+```
+
+**Returns**: `Promise<GoogleKmsSigner>`
+
+**Throws**: `KmsSignerError` if:
+
+- Key is not found or not accessible
+- Key is not enabled
+- Key algorithm is unsupported
+- Certificate public key doesn't match the KMS key
+
+---
+
+## Signer Properties
+
+After creation, inspect the signer's detected configuration:
+
+```typescript
+const signer = await GoogleKmsSigner.create({
+  keyVersionName: "projects/.../cryptoKeyVersions/1",
+  certificate: certificateDer,
+});
+
+signer.keyType; // "RSA" or "EC"
+signer.signatureAlgorithm; // "RSASSA-PKCS1-v1_5", "RSA-PSS", or "ECDSA"
+signer.digestAlgorithm; // "SHA-256", "SHA-384", or "SHA-512"
+signer.keyVersionName; // Full resource name
+signer.certificate; // DER-encoded certificate
+signer.certificateChain; // Chain certificates (if provided/built)
+```
+
+---
+
+## Supported Algorithms
+
+Algorithm is auto-detected from the KMS key metadata:
+
+| KMS Algorithm                | Key Type | Signature Algorithm | Digest      |
+| ---------------------------- | -------- | ------------------- | ----------- |
+| `RSA_SIGN_PKCS1_2048_SHA256` | RSA      | RSASSA-PKCS1-v1_5   | SHA-256     |
+| `RSA_SIGN_PKCS1_3072_SHA256` | RSA      | RSASSA-PKCS1-v1_5   | SHA-256     |
+| `RSA_SIGN_PKCS1_4096_SHA256` | RSA      | RSASSA-PKCS1-v1_5   | SHA-256     |
+| `RSA_SIGN_PKCS1_4096_SHA512` | RSA      | RSASSA-PKCS1-v1_5   | SHA-512     |
+| `RSA_SIGN_PSS_*`             | RSA      | RSA-PSS             | SHA-256/512 |
+| `EC_SIGN_P256_SHA256`        | EC       | ECDSA               | SHA-256     |
+| `EC_SIGN_P384_SHA384`        | EC       | ECDSA               | SHA-384     |
+| `EC_SIGN_P521_SHA512`        | EC       | ECDSA               | SHA-512     |
+
+<Callout type="warn">
+  **RSA-PSS compatibility**: RSA-PSS signatures may not verify correctly in older PDF readers (Adobe
+  Acrobat before 2020). Use PKCS#1 v1.5 keys for maximum compatibility.
+</Callout>
+
+**Unsupported**: `EC_SIGN_SECP256K1_SHA256` (secp256k1 is not suitable for PDF signing)
+
+---
+
+## Certificate from Secret Manager
+
+Store your certificate securely in Google Secret Manager and load it at runtime:
+
+```typescript
+// Load certificate from Secret Manager
+const certificate = await GoogleKmsSigner.getCertificateFromSecretManager(
+  "projects/my-project/secrets/signing-cert/versions/latest",
+);
+
+const signer = await GoogleKmsSigner.create({
+  keyVersionName: "projects/my-project/.../cryptoKeyVersions/1",
+  certificate,
+});
+```
+
+### Cross-Project Access
+
+The certificate can be stored in a different project than the KMS key:
+
+```typescript
+// Certificate in shared-certs project, KMS key in app project
+const certificate = await GoogleKmsSigner.getCertificateFromSecretManager(
+  "projects/shared-certs/secrets/signing-cert/versions/1",
+);
+
+const signer = await GoogleKmsSigner.create({
+  keyVersionName:
+    "projects/my-app/locations/us-east1/keyRings/ring/cryptoKeys/key/cryptoKeyVersions/1",
+  certificate,
+});
+```
+
+The certificate must be stored as DER-encoded binary, not PEM. Convert before storing:
+
+```bash
+openssl x509 -in cert.pem -outform DER -out cert.der
+```
+
+---
+
+## Certificate Chain
+
+For trusted signatures, include the full certificate chain (intermediates and root).
+
+### Automatic Chain Building (AIA)
+
+If your certificate has Authority Information Access (AIA) extensions (most CA-issued certificates do), the chain can be built automatically:
+
+```typescript
+const signer = await GoogleKmsSigner.create({
+  keyVersionName: "projects/.../cryptoKeyVersions/1",
+  certificate: certificateDer,
+  buildChain: true, // Fetch intermediates via AIA
+  chainTimeout: 20000, // Optional: extend timeout (default 15s)
+});
+
+console.log(`Chain has ${signer.certificateChain.length} certificates`);
+```
+
+### Manual Chain
+
+Provide the chain explicitly if AIA isn't available or you want to avoid network calls:
+
+```typescript
+const signer = await GoogleKmsSigner.create({
+  keyVersionName: "projects/.../cryptoKeyVersions/1",
+  certificate: certificateDer,
+  certificateChain: [intermediateDer, rootDer],
+});
+```
+
+---
+
+## Custom KMS Client
+
+Provide your own pre-configured client for custom authentication or testing:
+
+```typescript
+import { KeyManagementServiceClient } from "@google-cloud/kms";
+
+const client = new KeyManagementServiceClient({
+  keyFilename: "/path/to/service-account.json",
+});
+
+const signer = await GoogleKmsSigner.create({
+  client,
+  keyVersionName: "projects/.../cryptoKeyVersions/1",
+  certificate: certificateDer,
+});
+```
+
+---
+
+## Complete Example
+
+```typescript
+import { readFile, writeFile } from "fs/promises";
+import { PDF, GoogleKmsSigner, HttpTimestampAuthority } from "@libpdf/core";
+
+async function signWithKms() {
+  // Load certificate from Secret Manager
+  const certificate = await GoogleKmsSigner.getCertificateFromSecretManager(
+    "projects/my-project/secrets/signing-cert/versions/latest",
+  );
+
+  // Create KMS signer with automatic chain building
+  const signer = await GoogleKmsSigner.create({
+    projectId: "my-project",
+    locationId: "us-east1",
+    keyRingId: "document-signing",
+    keyId: "contract-key",
+    certificate,
+    buildChain: true,
+  });
+
+  // Load document
+  const pdf = await PDF.load(await readFile("contract.pdf"));
+
+  // Create timestamp authority for long-term validation
+  const tsa = new HttpTimestampAuthority("http://timestamp.digicert.com");
+
+  // Sign with timestamp
+  const { bytes } = await pdf.sign({
+    signer,
+    level: "B-LT",
+    timestampAuthority: tsa,
+    reason: "Contract approval",
+    location: "Cloud signing service",
+  });
+
+  await writeFile("contract-signed.pdf", bytes);
+  console.log("Document signed with KMS");
+}
+
+signWithKms().catch(console.error);
+```
+
+---
+
+## Performance Considerations
+
+Each `sign()` call makes a network request to Google Cloud KMS, typically adding 50-200ms latency. For bulk signing operations, consider:
+
+- **Batch processing**: Sign documents in parallel where possible
+- **Regional keys**: Use keys in a region close to your application
+- **Connection reuse**: Reuse the same `GoogleKmsSigner` instance for multiple documents
+
+---
+
+## Error Handling
+
+`GoogleKmsSigner` throws `KmsSignerError` for KMS-specific issues:
+
+```typescript
+import { GoogleKmsSigner, KmsSignerError } from "@libpdf/core";
+
+try {
+  const signer = await GoogleKmsSigner.create({
+    keyVersionName: "projects/.../cryptoKeyVersions/1",
+    certificate: certificateDer,
+  });
+} catch (error) {
+  if (error instanceof KmsSignerError) {
+    console.error("KMS error:", error.message);
+    // error.cause contains the original error if available
+  }
+}
+```
+
+Common errors:
+
+| Error                 | Cause                                  | Solution                                   |
+| --------------------- | -------------------------------------- | ------------------------------------------ |
+| Key not found         | Invalid resource name or no access     | Verify the key path and IAM permissions    |
+| Permission denied     | Missing IAM permissions                | Grant `roles/cloudkms.signerVerifier`      |
+| Key is not enabled    | Key version disabled or destroyed      | Enable the key version in GCP Console      |
+| Certificate mismatch  | Certificate wasn't issued for this key | Regenerate certificate from KMS public key |
+| Unsupported algorithm | secp256k1 or other unsupported curve   | Use P-256, P-384, P-521, or RSA            |
+
+---
+
+## KMS Key Setup
+
+### Create a Signing Key
+
+```bash
+# Create key ring (if needed)
+gcloud kms keyrings create document-signing \
+  --location us-east1
+
+# Create RSA signing key (HSM-backed)
+gcloud kms keys create contract-key \
+  --keyring document-signing \
+  --location us-east1 \
+  --purpose asymmetric-signing \
+  --default-algorithm rsa-sign-pkcs1-2048-sha256 \
+  --protection-level hsm
+
+# Or create ECDSA key
+gcloud kms keys create contract-key-ec \
+  --keyring document-signing \
+  --location us-east1 \
+  --purpose asymmetric-signing \
+  --default-algorithm ec-sign-p256-sha256 \
+  --protection-level hsm
+```
+
+### Get Public Key for Certificate Request
+
+```bash
+gcloud kms keys versions get-public-key 1 \
+  --key contract-key \
+  --keyring document-signing \
+  --location us-east1 \
+  --output-file public-key.pem
+```
+
+Use this public key to generate a Certificate Signing Request (CSR) and submit it to your Certificate Authority.
+
+---
+
+## See Also
+
+- [Digital Signatures](/docs/guides/signatures) - Overview of PDF signing
+- [Encryption](/docs/guides/encryption) - Password-protect signed documents

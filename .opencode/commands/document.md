@@ -5,6 +5,8 @@ argument-hint: <module-path-or-feature>
 
 You are creating proper markdown documentation for a module or feature in the library.
 
+**Read [WRITING_STYLE.md](../../WRITING_STYLE.md) first** for tone, formatting conventions, and anti-patterns to avoid.
+
 ## Your Task
 
 1. **Identify the scope** - What does `$ARGUMENTS` refer to? (file, directory, or feature name)
@@ -83,8 +85,6 @@ title: ModuleName
 description: Brief description for SEO and previews.
 ---
 
-import { Callout } from "fumadocs-ui/components/callout";
-
 # ModuleName
 
 Brief description of what this module does and when to use it.
@@ -133,8 +133,6 @@ property: string;
 ### Fumadocs Components
 
 ```mdx
-import { Callout } from "fumadocs-ui/components/callout";
-
 <Callout type="info">Informational note</Callout>
 <Callout type="warn">Warning message</Callout>
 <Callout type="error">Error/danger message</Callout>
@@ -142,38 +140,14 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 ## Guidelines
 
-### Content Quality
+See [WRITING_STYLE.md](../../WRITING_STYLE.md) for complete guidelines. Key points:
 
-- **Be accurate** - Verify behavior by reading the code
-- **Be complete** - Document all public API surface
-- **Be practical** - Include real, working examples
-- **Be concise** - Don't over-explain obvious things
-
-### Code Examples
-
-- All examples must be valid TypeScript
-- Show imports when not obvious
-- Include expected output in comments where helpful
-- Progress from simple to complex
-
-### Formatting
-
-- Use `---` horizontal rules between major sections
-- Use code fences with `typescript` language tag
-- Use tables for parameter/option documentation
-- Use Fumadocs `<Callout>` components sparingly
-
-### Cross-References
-
-- Link to related docs: `[PDFPage](/docs/api/pdf-page)`
-- Add "See Also" sections when helpful
-- Update `meta.json` when adding new pages
-
-### Maintenance
-
-- Include types inline so docs don't get stale
-- Reference source file locations for complex behavior
-- Use `<Callout type="warn">` for beta/unstable features
+- **Tone**: Direct, second-person, no emojis
+- **Examples**: Progressive complexity, all must be valid TypeScript
+- **Tables**: Use Sharp-style nested parameter tables (see WRITING_STYLE.md)
+- **Callouts**: Use sparingly for warnings, beta features, security
+- **Cross-references**: Link related docs, add "See Also" sections
+- **Navigation**: Update `meta.json` when adding new pages
 
 ## Process
 

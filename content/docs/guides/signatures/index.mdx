@@ -1,5 +1,5 @@
 ---
-title: Digital Signatures
+title: Overview
 description: Sign PDFs with PKCS#12 certificates or Web Crypto API keys.
 ---
 
@@ -106,9 +106,28 @@ await pdf.sign({
 
 Adds a document timestamp that covers the embedded validation data, enabling indefinite verification.
 
+## Sign with Cloud KMS
+
+For enterprise environments requiring HSM-backed keys, use `GoogleKmsSigner`:
+
+```ts
+import { PDF, GoogleKmsSigner } from "@libpdf/core";
+
+const signer = await GoogleKmsSigner.create({
+  keyVersionName:
+    "projects/my-project/locations/us-east1/keyRings/my-ring/cryptoKeys/my-key/cryptoKeyVersions/1",
+  certificate: certificateDer, // DER-encoded certificate for this KMS key
+  buildChain: true, // Auto-fetch intermediate certificates
+});
+
+const signed = await pdf.sign({ signer });
+```
+
+See the [Google Cloud KMS guide](/docs/guides/signatures/google-kms) for complete setup instructions.
+
 ## Sign with Web Crypto API
 
-For browser environments or HSM-backed keys:
+For browser environments:
 
 ```ts
 import { PDF, CryptoKeySigner } from "@libpdf/core";
@@ -295,6 +314,9 @@ signDocument().catch(console.error);
 ## Next Steps
 
 <Cards>
+  <Card title="Google Cloud KMS" href="/docs/guides/signatures/google-kms">
+    Sign with HSM-backed keys in Google Cloud KMS
+  </Card>
   <Card title="Encryption" href="/docs/guides/encryption">
     Password-protect signed documents
   </Card>

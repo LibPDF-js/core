@@ -182,6 +182,10 @@ Prefer small, focused commits over large ones.
 
 See [CODE_STYLE.md](./CODE_STYLE.md) for detailed formatting and naming conventions.
 
+### Documentation Style
+
+See [WRITING_STYLE.md](./WRITING_STYLE.md) for documentation writing conventions.
+
 ## Test Fixtures
 
 Load fixtures with the typed helper:
