@@ -678,3 +678,153 @@ describe("drawField", () => {
     expect(checkbox2!.isChecked()).toBe(true);
   });
 });
+
+describe("removeField", () => {
+  it("removes a field by instance", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = pdf.getOrCreateForm();
+    const page = pdf.getPage(0);
+
+    const field = form.createTextField("name");
+    page!.drawField(field, { x: 100, y: 700, width: 200, height: 24 });
+
+    expect(form.hasField("name")).toBe(true);
+    expect(form.fieldCount).toBe(1);
+
+    const removed = form.removeField(field);
+
+    expect(removed).toBe(true);
+    expect(form.hasField("name")).toBe(false);
+    expect(form.fieldCount).toBe(0);
+    expect(form.getField("name")).toBeUndefined();
+  });
+
+  it("removes a field by name", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = pdf.getOrCreateForm();
+    const page = pdf.getPage(0);
+
+    form.createTextField("email");
+    page!.drawField(form.getTextField("email")!, { x: 100, y: 700, width: 200, height: 24 });
+
+    const removed = form.removeField("email");
+
+    expect(removed).toBe(true);
+    expect(form.hasField("email")).toBe(false);
+  });
+
+  it("returns false for non-existent field", async () => {
+    const pdf = PDF.create();
+    const form = pdf.getOrCreateForm();
+
+    const removed = form.removeField("nonexistent");
+
+    expect(removed).toBe(false);
+  });
+
+  it("removes widget annotations from page", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = pdf.getOrCreateForm();
+    const page = pdf.getPage(0);
+
+    const field = form.createTextField("name");
+    page!.drawField(field, { x: 100, y: 700, width: 200, height: 24 });
+
+    // Verify widget was added
+    expect(field.getWidgets()).toHaveLength(1);
+
+    form.removeField(field);
+
+    // After removal, the page should not have form field annotations
+    // We can verify by saving and reloading
+    const bytes = await pdf.save();
+    const pdf2 = await PDF.load(bytes);
+    const form2 = pdf2.getForm();
+
+    // Form should exist but be empty
+    if (form2) {
+      expect(form2.fieldCount).toBe(0);
+    }
+  });
+
+  it("removes field with multiple widgets across pages", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    pdf.addPage({ size: "letter" });
+    const form = pdf.getOrCreateForm();
+    const page1 = pdf.getPage(0);
+    const page2 = pdf.getPage(1);
+
+    const field = form.createTextField("sharedField");
+    page1!.drawField(field, { x: 100, y: 700, width: 200, height: 24 });
+    page2!.drawField(field, { x: 50, y: 500, width: 300, height: 30 });
+
+    expect(field.getWidgets()).toHaveLength(2);
+
+    form.removeField(field);
+
+    expect(form.hasField("sharedField")).toBe(false);
+    expect(form.fieldCount).toBe(0);
+  });
+
+  it("allows creating a new field with the same name after removal", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = pdf.getOrCreateForm();
+    const page = pdf.getPage(0);
+
+    const field1 = form.createTextField("name", { defaultValue: "First" });
+    page!.drawField(field1, { x: 100, y: 700, width: 200, height: 24 });
+
+    form.removeField(field1);
+
+    // Should be able to create a new field with the same name
+    const field2 = form.createTextField("name", { defaultValue: "Second" });
+    page!.drawField(field2, { x: 100, y: 700, width: 200, height: 24 });
+
+    expect(form.hasField("name")).toBe(true);
+    expect(form.getTextField("name")?.getValue()).toBe("Second");
+  });
+
+  it("removes existing field from loaded PDF", async () => {
+    const bytes = await loadFixture("forms", "sample_form.pdf");
+    const pdf = await PDF.load(bytes);
+    const form = pdf.getForm();
+
+    const initialCount = form!.fieldCount;
+    const fieldToRemove = form!.getFields()[0];
+    const fieldName = fieldToRemove.name;
+
+    const removed = form!.removeField(fieldToRemove);
+
+    expect(removed).toBe(true);
+    expect(form!.hasField(fieldName)).toBe(false);
+    expect(form!.fieldCount).toBe(initialCount - 1);
+  });
+
+  it("persists removal through save/load cycle", async () => {
+    const pdf = PDF.create();
+    pdf.addPage({ size: "letter" });
+    const form = pdf.getOrCreateForm();
+    const page = pdf.getPage(0);
+
+    form.createTextField("keep");
+    form.createTextField("remove");
+    page!.drawField(form.getTextField("keep")!, { x: 100, y: 700, width: 200, height: 24 });
+    page!.drawField(form.getTextField("remove")!, { x: 100, y: 650, width: 200, height: 24 });
+
+    form.removeField("remove");
+
+    const bytes = await pdf.save();
+    const pdf2 = await PDF.load(bytes);
+    const form2 = pdf2.getForm();
+
+    expect(form2).not.toBeNull();
+    expect(form2!.fieldCount).toBe(1);
+    expect(form2!.hasField("keep")).toBe(true);
+    expect(form2!.hasField("remove")).toBe(false);
+  });
+});

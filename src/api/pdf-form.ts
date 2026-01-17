@@ -60,6 +60,7 @@ import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfString } from "#src/objects/pdf-string";
 
 import type { PDFContext } from "./pdf-context";
@@ -959,6 +960,130 @@ export class PDFForm {
     this.fieldsByName.set(name, field);
 
     return field;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Field Removal
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Remove a form field from the document.
+   *
+   * This removes the field from the AcroForm and all its widget annotations
+   * from their respective pages.
+   *
+   * @param fieldOrName - The field instance or field name to remove
+   * @returns true if the field was found and removed, false otherwise
+   *
+   * @example
+   * ```typescript
+   * // Remove by field instance
+   * const nameField = form.getTextField("name");
+   * form.removeField(nameField);
+   *
+   * // Remove by name
+   * form.removeField("email");
+   * ```
+   */
+  removeField(fieldOrName: FormField | string): boolean {
+    // Resolve field from name if needed
+    const field =
+      typeof fieldOrName === "string" ? this.fieldsByName.get(fieldOrName) : fieldOrName;
+
+    if (!field) {
+      return false;
+    }
+
+    const fieldRef = field.getRef();
+
+    if (!fieldRef) {
+      return false;
+    }
+
+    // Remove widgets from their pages
+    this.removeWidgetsFromPages(field);
+
+    // Remove field from AcroForm's /Fields array
+    const removed = this._acroForm.removeField(fieldRef);
+
+    if (removed) {
+      // Update internal caches
+      this.allFields = this.allFields.filter(f => f !== field);
+      this.fieldsByName.delete(field.name);
+    }
+
+    return removed;
+  }
+
+  /**
+   * Remove all widgets of a field from their respective pages.
+   */
+  private removeWidgetsFromPages(field: FormField): void {
+    const widgets = field.getWidgets();
+    const pageRefs = this._ctx.pages.getPages();
+
+    // Build a set of widget refs for fast lookup
+    const widgetRefKeys = new Set<string>();
+
+    for (const widget of widgets) {
+      if (widget.ref) {
+        widgetRefKeys.add(`${widget.ref.objectNumber} ${widget.ref.generation}`);
+      }
+    }
+
+    if (widgetRefKeys.size === 0) {
+      return;
+    }
+
+    // Scan pages and remove widget annotations
+    for (const pageRef of pageRefs) {
+      const pageDict = this._ctx.registry.resolve(pageRef);
+
+      if (!(pageDict instanceof PdfDict)) {
+        continue;
+      }
+
+      const annotsEntry = pageDict.get("Annots");
+
+      if (!annotsEntry) {
+        continue;
+      }
+
+      let annots: PdfArray | null = null;
+
+      if (annotsEntry instanceof PdfArray) {
+        annots = annotsEntry;
+      } else if (annotsEntry instanceof PdfRef) {
+        const resolved = this._ctx.registry.resolve(annotsEntry);
+
+        if (resolved instanceof PdfArray) {
+          annots = resolved;
+        }
+      }
+
+      if (!annots) {
+        continue;
+      }
+
+      // Remove matching widget refs from this page's annotations
+      // Iterate backwards to safely remove items
+      for (let i = annots.length - 1; i >= 0; i--) {
+        const item = annots.at(i);
+
+        if (item instanceof PdfRef) {
+          const key = `${item.objectNumber} ${item.generation}`;
+
+          if (widgetRefKeys.has(key)) {
+            annots.remove(i);
+          }
+        }
+      }
+
+      // If annots is now empty, remove the /Annots entry
+      if (annots.length === 0) {
+        pageDict.delete("Annots");
+      }
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

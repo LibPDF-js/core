@@ -765,6 +765,37 @@ export class AcroForm implements AcroFormLike {
     this.clearCache();
   }
 
+  /**
+   * Remove a field reference from the Fields array.
+   *
+   * This only removes the field from the AcroForm's /Fields array.
+   * Widget removal from pages must be handled separately.
+   *
+   * @param fieldRef Reference to the field dictionary to remove
+   * @returns true if the field was found and removed, false otherwise
+   */
+  removeField(fieldRef: PdfRef): boolean {
+    const fieldsArray = this.dict.getArray("Fields");
+
+    if (!fieldsArray) {
+      return false;
+    }
+
+    // Find and remove the field reference
+    for (let i = 0; i < fieldsArray.length; i++) {
+      const item = fieldsArray.at(i);
+
+      if (item instanceof PdfRef && item === fieldRef) {
+        fieldsArray.remove(i);
+        this.clearCache();
+
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Form Flattening
   // ─────────────────────────────────────────────────────────────────────────────
