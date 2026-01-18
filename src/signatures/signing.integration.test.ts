@@ -564,6 +564,30 @@ describe("signing integration", () => {
       const pdfStr = new TextDecoder().decode(bytes);
       expect(pdfStr).toContain("/SubFilter /adbe.pkcs7.detached");
     });
+
+    it("handles buildChain with self-signed ECDSA cert", async () => {
+      const p12Bytes = await loadFixture("certificates", P12_FILES.ecdsaP256);
+
+      // Self-signed cert has no AIA URLs, so buildChain should gracefully handle this
+      const signer = await P12Signer.create(p12Bytes, "test123", { buildChain: true });
+
+      expect(signer.certificate).toBeInstanceOf(Uint8Array);
+      expect(signer.certificateChain).toHaveLength(0); // Self-signed has no chain
+
+      // Should still sign successfully
+      const pdfBytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(pdfBytes);
+
+      const { bytes, warnings } = await pdf.sign({
+        signer,
+        reason: "Self-signed ECDSA with buildChain",
+      });
+
+      expect(warnings).toHaveLength(0);
+      expect(bytes.length).toBeGreaterThan(pdfBytes.length);
+
+      await saveTestOutput("signatures/signed-ecdsa-p256-buildchain.pdf", bytes);
+    });
   });
 
   describe("error handling", () => {
