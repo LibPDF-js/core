@@ -1,6 +1,6 @@
 {
   "name": "@libpdf/core",
-  "version": "0.0.1-beta.10",
+  "version": "0.0.1-beta.11",
   "description": "A modern PDF library for TypeScript - parsing and generation",
   "keywords": [
     "digital-signature",
