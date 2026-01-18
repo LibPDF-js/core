@@ -66,8 +66,7 @@
     "@noble/hashes": "^2.0.1",
     "@scure/base": "^2.0.0",
     "pako": "^2.1.0",
-    "pkijs": "^3.3.3",
-    "zod": "4"
+    "pkijs": "^3.3.3"
   },
   "devDependencies": {
     "@google-cloud/kms": "^5.0.0",
