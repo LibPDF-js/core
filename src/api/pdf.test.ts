@@ -347,6 +347,34 @@ describe("PDF", () => {
       expect(saved.length).toBeGreaterThan(0);
       expect(pdf.warnings.some(w => w.includes("not possible"))).toBe(true);
     });
+
+    it("incremental save preserves document /ID for signatures", async () => {
+      // document.pdf has an /ID array in its trailer
+      const bytes = await loadFixture("basic", "document.pdf");
+      const originalText = new TextDecoder().decode(bytes);
+
+      // Verify the original document has an /ID
+      expect(originalText).toContain("/ID");
+
+      const pdf = await PDF.load(bytes);
+
+      // Modify the catalog to trigger a save
+      const catalog = pdf.getCatalog();
+
+      catalog?.set("ModDate", PdfString.fromString("D:20240101"));
+
+      // Perform incremental save
+      const saved = await pdf.save({ incremental: true });
+      const text = new TextDecoder().decode(saved);
+
+      // The new trailer should include the /ID array
+      // The incremental section is appended after the original bytes
+      const appendedSection = text.slice(bytes.length);
+
+      // Check the appended section has a trailer with /ID
+      expect(appendedSection).toContain("trailer");
+      expect(appendedSection).toContain("/ID");
+    });
   });
 
   describe("copyPagesFrom", () => {

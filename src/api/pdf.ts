@@ -2639,6 +2639,21 @@ export class PDF {
     }
     // Note: action === "remove" means no encrypt dict (decrypted on load, written without encryption)
 
+    // For incremental saves, preserve the document /ID if not already set
+    // This is required for digital signatures to validate properly
+    if (useIncremental && !fileId) {
+      const idArray = this.ctx.info.trailer.getArray("ID");
+
+      if (idArray && idArray.length >= 2) {
+        const id1 = idArray.at(0);
+        const id2 = idArray.at(1);
+
+        if (id1 instanceof PdfString && id2 instanceof PdfString) {
+          fileId = [id1.bytes, id2.bytes];
+        }
+      }
+    }
+
     // For incremental saves, use the same XRef format as the original document
     // unless explicitly overridden by the caller
     const useXRefStream = options.useXRefStream ?? (useIncremental ? this.usesXRefStreams : false);
