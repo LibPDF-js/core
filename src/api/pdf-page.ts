@@ -114,6 +114,7 @@ import type {
   DrawRectangleOptions,
   DrawTextOptions,
   FontInput,
+  Rotation,
 } from "./drawing/types";
 import { resolveRotationOrigin } from "./drawing/types";
 import type { PDFContext } from "./pdf-context";
@@ -168,6 +169,23 @@ export interface DrawPageOptions {
   height?: number;
   /** Opacity 0-1 (default: 1.0, fully opaque) */
   opacity?: number;
+  /**
+   * Rotation specification.
+   * Can be a simple number (degrees) or an object with angle and origin.
+   *
+   * @example
+   * ```typescript
+   * // Simple rotation (around position x, y)
+   * page.drawPage(embedded, { x: 100, y: 100, rotate: 45 });
+   *
+   * // Rotation with custom origin
+   * page.drawPage(embedded, { x: 100, y: 100, rotate: { angle: 45, origin: "center" } });
+   *
+   * // Rotation with explicit origin coordinates
+   * page.drawPage(embedded, { x: 100, y: 100, rotate: { angle: 45, origin: { x: 150, y: 150 } } });
+   * ```
+   */
+  rotate?: number | Rotation;
   /** Draw as background behind existing content (default: false = foreground) */
   background?: boolean;
 }
@@ -403,7 +421,7 @@ export class PDFPage {
    * Use `{ background: true }` to draw behind existing content.
    *
    * @param embedded - The embedded page to draw
-   * @param options - Drawing options (position, scale, opacity, background)
+   * @param options - Drawing options (position, scale, rotate, opacity, background)
    *
    * @example
    * ```typescript
@@ -420,6 +438,15 @@ export class PDFPage {
    *
    * // Draw as a background
    * page.drawPage(letterhead, { background: true });
+   *
+   * // Draw rotated 45 degrees counter-clockwise (around position x, y)
+   * page.drawPage(stamp, { x: 100, y: 100, rotate: 45, scale: 0.5 });
+   *
+   * // Draw rotated around the center of the embedded page
+   * page.drawPage(stamp, { x: 100, y: 100, rotate: { angle: 45, origin: "center" }, scale: 0.5 });
+   *
+   * // Draw rotated around a custom point
+   * page.drawPage(stamp, { x: 100, y: 100, rotate: { angle: 90, origin: { x: 200, y: 200 } } });
    * ```
    */
   drawPage(embedded: PDFEmbeddedPage, options: DrawPageOptions = {}): void {
@@ -458,13 +485,65 @@ export class PDFPage {
       ops.push(`/${gsName} gs`);
     }
 
-    // Apply transformation matrix: [scaleX 0 0 scaleY x y]
-    // Account for the embedded page's BBox origin
-    const translateX = x - embedded.box.x * scaleX;
-    const translateY = y - embedded.box.y * scaleY;
-    ops.push(
-      `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(translateX)} ${this.formatNumber(translateY)} cm`,
-    );
+    // Parse rotation options
+    let rotateDegrees = 0;
+    let rotateOriginX = x;
+    let rotateOriginY = y;
+
+    if (options.rotate !== undefined) {
+      if (typeof options.rotate === "number") {
+        // Simple number: rotate around (x, y)
+        rotateDegrees = options.rotate;
+      } else {
+        // Rotation object with optional origin
+        rotateDegrees = options.rotate.angle;
+
+        // Calculate the actual rendered bounds for origin resolution
+        const renderedWidth = embedded.width * scaleX;
+        const renderedHeight = embedded.height * scaleY;
+        const bounds = { x, y, width: renderedWidth, height: renderedHeight };
+        const defaultOrigin = { x, y }; // Default: bottom-left corner (position)
+
+        const origin = resolveRotationOrigin(options.rotate.origin, bounds, defaultOrigin);
+
+        rotateOriginX = origin.x;
+        rotateOriginY = origin.y;
+      }
+    }
+
+    // Apply transformations
+    if (rotateDegrees !== 0) {
+      // With rotation: translate to rotation origin, rotate, translate back, then position and scale
+      const radians = (rotateDegrees * Math.PI) / 180;
+      const cos = Math.cos(radians);
+      const sin = Math.sin(radians);
+
+      // Translate to rotation origin
+      ops.push(
+        `1 0 0 1 ${this.formatNumber(rotateOriginX)} ${this.formatNumber(rotateOriginY)} cm`,
+      );
+
+      // Rotate
+      ops.push(
+        `${this.formatNumber(cos)} ${this.formatNumber(sin)} ${this.formatNumber(-sin)} ${this.formatNumber(cos)} 0 0 cm`,
+      );
+
+      // Translate back from rotation origin to position, then adjust for BBox and scale
+      const offsetX = x - rotateOriginX - embedded.box.x * scaleX;
+      const offsetY = y - rotateOriginY - embedded.box.y * scaleY;
+
+      ops.push(
+        `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(offsetX)} ${this.formatNumber(offsetY)} cm`,
+      );
+    } else {
+      // No rotation: simple translate and scale
+      const translateX = x - embedded.box.x * scaleX;
+      const translateY = y - embedded.box.y * scaleY;
+
+      ops.push(
+        `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(translateX)} ${this.formatNumber(translateY)} cm`,
+      );
+    }
 
     // Draw the XObject
     ops.push(`/${xobjectName} Do`);

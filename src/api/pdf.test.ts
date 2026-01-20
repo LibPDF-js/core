@@ -1033,6 +1033,231 @@ describe("PDF", () => {
 
       expect(saved.length).toBeGreaterThan(0);
     });
+
+    it("draws with rotation", async () => {
+      const destBytes = await loadFixture("basic", "rot0.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const sourceBytes = await loadFixture("basic", "sample.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const embedded = await dest.embedPage(source, 0);
+      const page = dest.getPage(0);
+
+      // Draw rotated 45 degrees counter-clockwise at center of page
+      page!.drawPage(embedded, {
+        x: page!.width / 2,
+        y: page!.height / 2,
+        scale: 0.5,
+        rotate: 45,
+      });
+
+      // Verify XObject was added
+      const resources = page!.getResources();
+      const xobjects = resources.get("XObject");
+
+      expect(xobjects).toBeInstanceOf(PdfDict);
+
+      // Save and reload to verify it works
+      const saved = await dest.save();
+      const reloaded = await PDF.load(saved);
+
+      expect(reloaded.getPageCount()).toBe(dest.getPageCount());
+    });
+
+    it("draws with 90 degree rotation", async () => {
+      const destBytes = await loadFixture("basic", "rot0.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const sourceBytes = await loadFixture("basic", "sample.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const embedded = await dest.embedPage(source, 0);
+      const page = dest.getPage(0);
+
+      // Draw rotated 90 degrees at position
+      page!.drawPage(embedded, {
+        x: 100,
+        y: 100,
+        rotate: 90,
+      });
+
+      const saved = await dest.save();
+      const reloaded = await PDF.load(saved);
+
+      expect(reloaded.getPageCount()).toBe(dest.getPageCount());
+    });
+
+    it("outputs rotated overlay", async () => {
+      const destBytes = await loadFixture("basic", "rot0.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const sourceBytes = await loadFixture("basic", "sample.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const embedded = await dest.embedPage(source, 0);
+      const page = dest.getPage(0);
+
+      // Draw with various rotations
+      page!.drawPage(embedded, {
+        x: page!.width / 4,
+        y: page!.height * 0.75,
+        scale: 0.25,
+        rotate: 0,
+        opacity: 0.7,
+      });
+
+      page!.drawPage(embedded, {
+        x: page!.width * 0.75,
+        y: page!.height * 0.75,
+        scale: 0.25,
+        rotate: 45,
+        opacity: 0.7,
+      });
+
+      page!.drawPage(embedded, {
+        x: page!.width / 4,
+        y: page!.height * 0.25,
+        scale: 0.25,
+        rotate: 90,
+        opacity: 0.7,
+      });
+
+      page!.drawPage(embedded, {
+        x: page!.width * 0.75,
+        y: page!.height * 0.25,
+        scale: 0.25,
+        rotate: 180,
+        opacity: 0.7,
+      });
+
+      const saved = await dest.save();
+
+      const outputPath = await saveTestOutput("merge-split/rotated-overlays.pdf", saved);
+      console.log(`  -> Rotated overlays: ${outputPath}`);
+
+      expect(saved.length).toBeGreaterThan(0);
+    });
+
+    it("draws with rotation around center origin", async () => {
+      const destBytes = await loadFixture("basic", "rot0.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const sourceBytes = await loadFixture("basic", "sample.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const embedded = await dest.embedPage(source, 0);
+      const page = dest.getPage(0);
+
+      // Draw rotated around center
+      page!.drawPage(embedded, {
+        x: 100,
+        y: 100,
+        scale: 0.5,
+        rotate: { angle: 45, origin: "center" },
+      });
+
+      const saved = await dest.save();
+      const reloaded = await PDF.load(saved);
+
+      expect(reloaded.getPageCount()).toBe(dest.getPageCount());
+    });
+
+    it("draws with rotation around explicit origin", async () => {
+      const destBytes = await loadFixture("basic", "rot0.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const sourceBytes = await loadFixture("basic", "sample.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const embedded = await dest.embedPage(source, 0);
+      const page = dest.getPage(0);
+
+      // Draw rotated around explicit point
+      page!.drawPage(embedded, {
+        x: 100,
+        y: 100,
+        scale: 0.5,
+        rotate: { angle: 90, origin: { x: 200, y: 200 } },
+      });
+
+      const saved = await dest.save();
+      const reloaded = await PDF.load(saved);
+
+      expect(reloaded.getPageCount()).toBe(dest.getPageCount());
+    });
+
+    it("outputs rotation origins comparison", async () => {
+      const destBytes = await loadFixture("basic", "rot0.pdf");
+      const dest = await PDF.load(destBytes);
+
+      const sourceBytes = await loadFixture("basic", "sample.pdf");
+      const source = await PDF.load(sourceBytes);
+
+      const embedded = await dest.embedPage(source, 0);
+      const page = dest.getPage(0);
+
+      const scale = 0.2;
+      const baseX = 150;
+      const baseY = 400;
+
+      // Row 1: Different origins with same rotation angle (45 degrees)
+      // Default origin (bottom-left / position)
+      page!.drawPage(embedded, {
+        x: baseX,
+        y: baseY,
+        scale,
+        rotate: 45,
+        opacity: 0.6,
+      });
+
+      // Center origin
+      page!.drawPage(embedded, {
+        x: baseX + 200,
+        y: baseY,
+        scale,
+        rotate: { angle: 45, origin: "center" },
+        opacity: 0.6,
+      });
+
+      // Top-right origin
+      page!.drawPage(embedded, {
+        x: baseX + 400,
+        y: baseY,
+        scale,
+        rotate: { angle: 45, origin: "top-right" },
+        opacity: 0.6,
+      });
+
+      // Row 2: Same positions but no rotation (for comparison)
+      page!.drawPage(embedded, {
+        x: baseX,
+        y: baseY - 200,
+        scale,
+        opacity: 0.3,
+      });
+
+      page!.drawPage(embedded, {
+        x: baseX + 200,
+        y: baseY - 200,
+        scale,
+        opacity: 0.3,
+      });
+
+      page!.drawPage(embedded, {
+        x: baseX + 400,
+        y: baseY - 200,
+        scale,
+        opacity: 0.3,
+      });
+
+      const saved = await dest.save();
+
+      const outputPath = await saveTestOutput("merge-split/rotation-origins.pdf", saved);
+      console.log(`  -> Rotation origins: ${outputPath}`);
+
+      expect(saved.length).toBeGreaterThan(0);
+    });
   });
 
   describe("round-trip", () => {
