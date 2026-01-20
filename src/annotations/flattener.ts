@@ -162,7 +162,17 @@ export class AnnotationFlattener {
         continue;
       }
 
-      // Skip non-flattenable types
+      // Handle Link annotations specially
+      if (subtype === "Link") {
+        if (options.removeLinks) {
+          // Remove Link annotations for signing security (they contain "hidden behavior")
+          if (annotRef) {
+            refsToRemove.add(`${annotRef.objectNumber} ${annotRef.generation}`);
+          }
+        }
+      }
+
+      // Skip other non-flattenable types
       if (NON_FLATTENABLE_TYPES.includes(subtype)) {
         continue;
       }
@@ -212,12 +222,17 @@ export class AnnotationFlattener {
         continue;
       }
 
-      // Normalize appearance stream
+      // Normalize appearance stream (only if needed)
       this.normalizeAppearanceStream(appearance);
 
-      // Add appearance as XObject
+      // Add appearance as XObject - reuse existing ref if already registered
       const xObjectName = `FlatAnnot${xObjectIndex++}`;
-      const appearanceRef = this.registry.register(appearance);
+      let appearanceRef = this.registry.getRef(appearance);
+
+      if (!appearanceRef) {
+        appearanceRef = this.registry.register(appearance);
+      }
+
       xObjects.set(xObjectName, appearanceRef);
 
       // Calculate transformation matrix
@@ -267,7 +282,6 @@ export class AnnotationFlattener {
    * Generate appearance for annotation types we support.
    */
   private generateAppearance(annotation: PDFAnnotation): PdfStream | null {
-    const type = annotation.type;
     const rect = annotation.rect;
 
     // Use instanceof checks for annotation types instead of a switch on `type`
@@ -569,23 +583,41 @@ export class AnnotationFlattener {
 
   /**
    * Remove specific annotations from page.
+   *
+   * IMPORTANT: If Annots is an indirect reference, we modify the array in-place
+   * to preserve the indirection. This is critical for signing: if we convert
+   * an indirect Annots to a direct array, then later signing will convert it
+   * back to indirect, modifying the page object and potentially breaking
+   * signature validation.
    */
   private removeAnnotations(page: PdfDict, toRemove: Set<string>): void {
     if (toRemove.size === 0) {
       return;
     }
 
-    let annots = page.get("Annots");
+    const annotsEntry = page.get("Annots");
 
-    if (annots instanceof PdfRef) {
-      annots = this.registry.resolve(annots) ?? undefined;
-    }
-
-    if (!(annots instanceof PdfArray)) {
+    if (!annotsEntry) {
       return;
     }
 
-    const remaining: PdfRef[] = [];
+    // Track if Annots was indirect - we need to preserve this
+    const wasIndirect = annotsEntry instanceof PdfRef;
+    let annots: PdfArray | undefined;
+
+    if (annotsEntry instanceof PdfRef) {
+      const resolved = this.registry.resolve(annotsEntry);
+      annots = resolved instanceof PdfArray ? resolved : undefined;
+    } else if (annotsEntry instanceof PdfArray) {
+      annots = annotsEntry;
+    }
+
+    if (!annots) {
+      return;
+    }
+
+    // Find indices to remove (in reverse order for safe removal)
+    const indicesToRemove: number[] = [];
 
     for (let i = 0; i < annots.length; i++) {
       const item = annots.at(i);
@@ -593,15 +625,36 @@ export class AnnotationFlattener {
       if (item instanceof PdfRef) {
         const key = `${item.objectNumber} ${item.generation}`;
 
-        if (!toRemove.has(key)) {
-          remaining.push(item);
+        if (toRemove.has(key)) {
+          indicesToRemove.push(i);
         }
       }
     }
 
-    if (remaining.length === 0) {
-      page.delete("Annots");
-    } else if (remaining.length < annots.length) {
+    if (indicesToRemove.length === 0) {
+      return;
+    }
+
+    // If Annots was indirect, modify in-place to preserve indirection
+    if (wasIndirect) {
+      // Remove in reverse order to maintain valid indices
+      for (let i = indicesToRemove.length - 1; i >= 0; i--) {
+        annots.remove(indicesToRemove[i]);
+      }
+    } else {
+      // Annots was direct - build a new array with remaining items
+      const remaining: PdfRef[] = [];
+
+      for (let i = 0; i < annots.length; i++) {
+        if (!indicesToRemove.includes(i)) {
+          const item = annots.at(i);
+
+          if (item instanceof PdfRef) {
+            remaining.push(item);
+          }
+        }
+      }
+
       page.set("Annots", PdfArray.of(...remaining));
     }
   }

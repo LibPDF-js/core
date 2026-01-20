@@ -2585,7 +2585,14 @@ export class PDF {
     }
 
     // Flatten annotations last (may reference form widgets which are now gone)
-    const annotations = this.flattenAnnotations(options?.annotations);
+    // By default, remove Link annotations since they contain actions that
+    // Adobe considers "hidden behavior" which can cause signature validation warnings.
+    const annotationOptions = {
+      removeLinks: true,
+      ...options?.annotations,
+    };
+
+    const annotations = this.flattenAnnotations(annotationOptions);
 
     return {
       layers: layerResult.layerCount,

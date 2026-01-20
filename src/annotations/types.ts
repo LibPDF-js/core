@@ -486,4 +486,15 @@ export interface RemoveAnnotationsOptions {
 export interface FlattenAnnotationsOptions {
   /** Annotation types to exclude from flattening */
   exclude?: AnnotationSubtype[];
+
+  /**
+   * Remove Link annotations instead of keeping them.
+   *
+   * Link annotations contain URI or other actions that Adobe considers
+   * "hidden behavior" which can cause signature validation warnings.
+   * Enable this option when preparing documents for signing.
+   *
+   * @default false
+   */
+  removeLinks?: boolean;
 }
