@@ -1,6 +1,7 @@
 import { Scanner } from "#src/io/scanner";
 import { PdfDict } from "#src/objects/pdf-dict.ts";
 import { PdfRef } from "#src/objects/pdf-ref";
+import { PdfStream } from "#src/objects/pdf-stream";
 import { loadFixture } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
@@ -1032,6 +1033,38 @@ describe("DocumentParser", () => {
 
       // PDFBox: assertEquals(1, doc.getNumberOfPages())
       expect(doc.getPageCount()).toBe(1);
+    });
+
+    // Stream /Length as indirect reference to object in object stream.
+    // The stream dict has /Length 6 0 R, but object 6 is stored compressed
+    // in object stream 10, not as a standalone object. This tests that the
+    // lengthResolver can handle compressed objects.
+    // Note: This is valid PDF per spec - only object stream's own /Length
+    // cannot be in an object stream (section 7.5.7).
+    it("resolves stream /Length from object inside object stream", async () => {
+      const bytes = await loadFixture("xref", "length-in-object-stream.pdf");
+      const scanner = new Scanner(bytes);
+      const parser = new DocumentParser(scanner);
+
+      const doc = parser.parse();
+
+      expect(doc.version).toBe("1.7");
+      expect(doc.warnings).toHaveLength(0); // Should parse cleanly, no brute-force
+
+      const catalog = doc.getCatalog();
+      expect(catalog).not.toBeNull();
+
+      expect(doc.getPageCount()).toBe(1);
+
+      // Load the content stream (object 5) which has /Length 6 0 R,
+      // where object 6 is compressed in object stream 10
+      const contentsStream = doc.getObject(PdfRef.of(5, 0));
+      expect(contentsStream).not.toBeNull();
+      expect(contentsStream).toBeInstanceOf(PdfStream);
+
+      // Verify stream data was correctly read using the resolved length
+      const stream = contentsStream as PdfStream;
+      expect(stream.data.length).toBe(43); // "BT /F1 12 Tf 100 700 Td (Hello World) Tj ET"
     });
   });
 });

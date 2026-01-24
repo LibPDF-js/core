@@ -466,40 +466,65 @@ export class DocumentParser {
 
     // Create length resolver for stream objects with indirect /Length
     const lengthResolver: LengthResolver = (ref: PdfRef) => {
-      // Synchronous lookup in cache only - can't do async here
-      const key = `${ref.objectNumber} ${ref.generation}`;
+      // Check object cache first
+      const cacheKey = `${ref.objectNumber} ${ref.generation}`;
+      const cached = cache.get(cacheKey);
 
-      const cached = cache.get(key);
-
-      if (cached && cached.type === "number") {
+      if (cached instanceof PdfNumber) {
         return cached.value;
       }
 
-      // Try to parse synchronously if it's a simple uncompressed object
       const entry = xref.get(ref.objectNumber);
 
-      if (entry?.type === "uncompressed") {
-        // Save scanner position - we must restore it after parsing the length
-        // because we're in the middle of parsing a stream
-        const savedPosition = this.scanner.position;
+      if (!entry || entry.type === "free") {
+        return null;
+      }
 
-        try {
+      // Save scanner position - we must restore it after parsing
+      // because we're in the middle of parsing a stream
+      const savedPosition = this.scanner.position;
+
+      try {
+        let lengthObj: PdfObject | null = null;
+
+        if (entry.type === "uncompressed") {
           const parser = new IndirectObjectParser(this.scanner);
+          lengthObj = parser.parseObjectAt(entry.offset).value;
+        } else {
+          // Compressed: load from object stream
+          // Object streams themselves must be uncompressed (per PDF spec 7.5.7)
+          const streamEntry = xref.get(entry.streamObjNum);
 
-          const result = parser.parseObjectAt(entry.offset);
+          if (streamEntry?.type === "uncompressed") {
+            // Use cached object stream parser if available
+            let objStreamParser = objectStreamCache.get(entry.streamObjNum);
 
-          if (result.value.type === "number") {
-            cache.set(key, result.value);
+            if (!objStreamParser) {
+              const parser = new IndirectObjectParser(this.scanner);
+              const streamResult = parser.parseObjectAt(streamEntry.offset);
 
-            // Restore scanner position before returning
-            this.scanner.moveTo(savedPosition);
+              if (streamResult.value instanceof PdfStream) {
+                objStreamParser = new ObjectStreamParser(streamResult.value);
 
-            return result.value.value;
+                objectStreamCache.set(entry.streamObjNum, objStreamParser);
+              }
+            }
+
+            if (objStreamParser) {
+              lengthObj = objStreamParser.getObject(entry.indexInStream);
+            }
           }
-        } catch {
-          // Restore scanner position and fall through to return null
-          this.scanner.moveTo(savedPosition);
         }
+
+        this.scanner.moveTo(savedPosition);
+
+        if (lengthObj instanceof PdfNumber) {
+          cache.set(cacheKey, lengthObj);
+
+          return lengthObj.value;
+        }
+      } catch {
+        this.scanner.moveTo(savedPosition);
       }
 
       return null;
