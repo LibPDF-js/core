@@ -302,6 +302,223 @@ describe("Drawing API Integration", () => {
       await saveTestOutput("drawing/text-basic.pdf", bytes);
     });
 
+    it("draws text with correct opacity using non-stroking alpha (ca)", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+
+      // Draw text with 50% opacity
+      page.drawText("Semi-transparent text", {
+        x: 50,
+        y: 700,
+        size: 16,
+        color: black,
+        opacity: 0.5,
+      });
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+
+      // Parse the saved PDF and verify the ExtGState has correct ca value
+      const parsed = await PDF.load(bytes);
+      const parsedPage = parsed.getPage(0)!;
+
+      // Get page resources and check ExtGState
+      const resources = parsedPage.getResources();
+      const extGState = resources.getDict("ExtGState");
+
+      expect(extGState).toBeDefined();
+
+      // Find the graphics state with ca = 0.5 (non-stroking alpha for text)
+      let foundCa = false;
+
+      for (const [, gsDict] of extGState!) {
+        if (gsDict.type === "dict") {
+          const caValue = gsDict.getNumber("ca");
+
+          if (caValue && caValue.value === 0.5) {
+            foundCa = true;
+            // Ensure CA (stroking) is not set for text opacity
+            const caStroking = gsDict.getNumber("CA");
+            expect(caStroking).toBeUndefined();
+          }
+        }
+      }
+
+      expect(foundCa).toBe(true);
+      await saveTestOutput("drawing/text-opacity.pdf", bytes);
+    });
+
+    it("draws text with various opacities for visual verification", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+      const { width, height } = page;
+
+      // Title
+      page.drawText("Text Opacity Test", {
+        x: 50,
+        y: height - 50,
+        size: 24,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      page.drawText("Each row shows text at different opacity levels over a colored background", {
+        x: 50,
+        y: height - 80,
+        size: 12,
+        color: black,
+      });
+
+      // Draw background rectangles to make opacity visible
+      const bgColors = [
+        { color: rgb(0.2, 0.6, 1), label: "Blue background" },
+        { color: rgb(1, 0.8, 0), label: "Yellow background" },
+        { color: rgb(0.9, 0.3, 0.3), label: "Red background" },
+      ];
+
+      const opacities = [1.0, 0.75, 0.5, 0.25, 0.1];
+      let yPos = height - 130;
+
+      for (const bg of bgColors) {
+        // Draw background strip
+        page.drawRectangle({
+          x: 40,
+          y: yPos - 10,
+          width: width - 80,
+          height: 70,
+          color: bg.color,
+        });
+
+        // Label the background
+        page.drawText(bg.label, {
+          x: 50,
+          y: yPos + 45,
+          size: 10,
+          color: black,
+        });
+
+        // Draw text at various opacities
+        let xPos = 50;
+
+        for (const opacity of opacities) {
+          const label = `${Math.round(opacity * 100)}%`;
+
+          page.drawText(label, {
+            x: xPos,
+            y: yPos + 25,
+            size: 18,
+            font: "Helvetica-Bold",
+            color: black,
+            opacity,
+          });
+
+          page.drawText("Sample", {
+            x: xPos,
+            y: yPos + 5,
+            size: 14,
+            color: black,
+            opacity,
+          });
+
+          xPos += 100;
+        }
+
+        yPos -= 100;
+      }
+
+      // White text on dark background
+      yPos -= 20;
+      page.drawText("White text on dark background:", {
+        x: 50,
+        y: yPos + 60,
+        size: 12,
+        color: black,
+      });
+
+      page.drawRectangle({
+        x: 40,
+        y: yPos - 10,
+        width: width - 80,
+        height: 70,
+        color: rgb(0.1, 0.1, 0.2),
+      });
+
+      let xPos = 50;
+
+      for (const opacity of opacities) {
+        const label = `${Math.round(opacity * 100)}%`;
+
+        page.drawText(label, {
+          x: xPos,
+          y: yPos + 25,
+          size: 18,
+          font: "Helvetica-Bold",
+          color: white,
+          opacity,
+        });
+
+        page.drawText("Sample", {
+          x: xPos,
+          y: yPos + 5,
+          size: 14,
+          color: white,
+          opacity,
+        });
+
+        xPos += 100;
+      }
+
+      // Overlapping text demonstration
+      yPos -= 120;
+      page.drawText("Overlapping text demonstration:", {
+        x: 50,
+        y: yPos + 60,
+        size: 12,
+        color: black,
+      });
+
+      // Background text (fully opaque)
+      page.drawText("BACKGROUND", {
+        x: 100,
+        y: yPos + 20,
+        size: 48,
+        font: "Helvetica-Bold",
+        color: rgb(0.8, 0.2, 0.2),
+      });
+
+      // Foreground text with various opacities
+      page.drawText("OVERLAY 100%", {
+        x: 120,
+        y: yPos + 35,
+        size: 24,
+        font: "Helvetica-Bold",
+        color: rgb(0.2, 0.2, 0.8),
+        opacity: 1.0,
+      });
+
+      page.drawText("OVERLAY 50%", {
+        x: 120,
+        y: yPos + 5,
+        size: 24,
+        font: "Helvetica-Bold",
+        color: rgb(0.2, 0.2, 0.8),
+        opacity: 0.5,
+      });
+
+      page.drawText("OVERLAY 25%", {
+        x: 120,
+        y: yPos - 25,
+        size: 24,
+        font: "Helvetica-Bold",
+        color: rgb(0.2, 0.2, 0.8),
+        opacity: 0.25,
+      });
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+      await saveTestOutput("drawing/text-opacity-visual.pdf", bytes);
+    });
+
     it("draws multiline text with word wrap", async () => {
       const pdf = PDF.create();
       const page = pdf.addPage({ size: "letter" });
@@ -2706,6 +2923,397 @@ describe("Drawing API Integration", () => {
 
       const savedBytes = await pdf.save();
       expect(isPdfHeader(savedBytes)).toBe(true);
+    });
+  });
+
+  describe("opacity", () => {
+    it("draws all shapes with various opacities (kitchen sink)", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+      const { width, height } = page;
+
+      // Title
+      page.drawText("Opacity Kitchen Sink Test", {
+        x: 50,
+        y: height - 40,
+        size: 24,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      page.drawText("All drawing methods at 100%, 50%, and 25% opacity", {
+        x: 50,
+        y: height - 60,
+        size: 10,
+        color: grayscale(0.4),
+      });
+
+      const opacities = [1.0, 0.5, 0.25];
+      const labels = ["100%", "50%", "25%"];
+      let yPos = height - 100;
+
+      // === RECTANGLES ===
+      page.drawText("Rectangles (filled)", {
+        x: 50,
+        y: yPos,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+      yPos -= 15;
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawRectangle({
+          x: 50 + i * 100,
+          y: yPos - 40,
+          width: 80,
+          height: 40,
+          color: rgb(0.2, 0.5, 0.9),
+          opacity: opacities[i],
+        });
+        page.drawText(labels[i], { x: 75 + i * 100, y: yPos - 55, size: 9, color: black });
+      }
+
+      // Rectangles with border
+      page.drawText("Rectangles (border)", {
+        x: 350,
+        y: yPos + 15,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawRectangle({
+          x: 350 + i * 90,
+          y: yPos - 40,
+          width: 70,
+          height: 40,
+          borderColor: rgb(0.8, 0.2, 0.2),
+          borderWidth: 3,
+          borderOpacity: opacities[i],
+        });
+        page.drawText(labels[i], { x: 370 + i * 90, y: yPos - 55, size: 9, color: black });
+      }
+
+      yPos -= 85;
+
+      // === CIRCLES ===
+      page.drawText("Circles", { x: 50, y: yPos, size: 12, font: "Helvetica-Bold", color: black });
+      yPos -= 15;
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawCircle({
+          x: 90 + i * 100,
+          y: yPos - 25,
+          radius: 25,
+          color: rgb(0.9, 0.6, 0.1),
+          opacity: opacities[i],
+        });
+        page.drawText(labels[i], { x: 75 + i * 100, y: yPos - 60, size: 9, color: black });
+      }
+
+      // Circles with border
+      page.drawText("Circles (border)", {
+        x: 350,
+        y: yPos + 15,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawCircle({
+          x: 385 + i * 90,
+          y: yPos - 25,
+          radius: 25,
+          borderColor: rgb(0.2, 0.7, 0.3),
+          borderWidth: 3,
+          borderOpacity: opacities[i],
+        });
+        page.drawText(labels[i], { x: 370 + i * 90, y: yPos - 60, size: 9, color: black });
+      }
+
+      yPos -= 85;
+
+      // === ELLIPSES ===
+      page.drawText("Ellipses", { x: 50, y: yPos, size: 12, font: "Helvetica-Bold", color: black });
+      yPos -= 15;
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawEllipse({
+          x: 90 + i * 100,
+          y: yPos - 20,
+          xRadius: 40,
+          yRadius: 20,
+          color: rgb(0.7, 0.2, 0.7),
+          opacity: opacities[i],
+        });
+        page.drawText(labels[i], { x: 75 + i * 100, y: yPos - 50, size: 9, color: black });
+      }
+
+      yPos -= 75;
+
+      // === LINES ===
+      page.drawText("Lines", { x: 50, y: yPos, size: 12, font: "Helvetica-Bold", color: black });
+      yPos -= 15;
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawLine({
+          start: { x: 50 + i * 100, y: yPos - 5 },
+          end: { x: 130 + i * 100, y: yPos - 25 },
+          color: rgb(0.1, 0.1, 0.1),
+          thickness: 4,
+          opacity: opacities[i],
+        });
+        page.drawText(labels[i], { x: 75 + i * 100, y: yPos - 40, size: 9, color: black });
+      }
+
+      yPos -= 65;
+
+      // === TEXT ===
+      page.drawText("Text", { x: 50, y: yPos, size: 12, font: "Helvetica-Bold", color: black });
+      yPos -= 20;
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawText("Hello PDF", {
+          x: 50 + i * 120,
+          y: yPos,
+          size: 18,
+          font: "Helvetica-Bold",
+          color: rgb(0.1, 0.4, 0.7),
+          opacity: opacities[i],
+        });
+        page.drawText(labels[i], { x: 75 + i * 120, y: yPos - 18, size: 9, color: black });
+      }
+
+      yPos -= 50;
+
+      // === OVERLAPPING SHAPES ===
+      page.drawText("Overlapping shapes (opacity blending)", {
+        x: 50,
+        y: yPos,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+      yPos -= 20;
+
+      // Background rectangle
+      page.drawRectangle({
+        x: 50,
+        y: yPos - 80,
+        width: 200,
+        height: 80,
+        color: rgb(0.2, 0.6, 0.9),
+      });
+
+      // Overlapping circles at different opacities
+      page.drawCircle({
+        x: 100,
+        y: yPos - 40,
+        radius: 35,
+        color: rgb(0.9, 0.2, 0.2),
+        opacity: 0.7,
+      });
+
+      page.drawCircle({
+        x: 150,
+        y: yPos - 40,
+        radius: 35,
+        color: rgb(0.2, 0.9, 0.2),
+        opacity: 0.7,
+      });
+
+      page.drawCircle({
+        x: 200,
+        y: yPos - 40,
+        radius: 35,
+        color: rgb(0.9, 0.9, 0.2),
+        opacity: 0.7,
+      });
+
+      // Text over shapes
+      page.drawText("Layered", {
+        x: 115,
+        y: yPos - 45,
+        size: 16,
+        font: "Helvetica-Bold",
+        color: white,
+        opacity: 0.9,
+      });
+
+      // Second demo: gradient-like effect with rectangles
+      const gradientX = 300;
+
+      for (let i = 0; i < 10; i++) {
+        page.drawRectangle({
+          x: gradientX + i * 15,
+          y: yPos - 80,
+          width: 30,
+          height: 80,
+          color: rgb(0.1, 0.1, 0.8),
+          opacity: (i + 1) / 10,
+        });
+      }
+
+      page.drawText("Opacity gradient effect", {
+        x: gradientX,
+        y: yPos - 95,
+        size: 9,
+        color: black,
+      });
+
+      yPos -= 130;
+
+      // === PATH BUILDER ===
+      page.drawText("Custom paths (PathBuilder)", {
+        x: 50,
+        y: yPos,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+      yPos -= 20;
+
+      for (let i = 0; i < opacities.length; i++) {
+        const startX = 60 + i * 120;
+        page
+          .drawPath()
+          .moveTo(startX, yPos - 10)
+          .lineTo(startX + 40, yPos - 10)
+          .lineTo(startX + 50, yPos - 40)
+          .lineTo(startX + 20, yPos - 55)
+          .lineTo(startX - 10, yPos - 40)
+          .close()
+          .fillAndStroke({
+            color: rgb(0.6, 0.3, 0.1),
+            opacity: opacities[i],
+            borderColor: rgb(0.2, 0.1, 0.05),
+            borderWidth: 2,
+            borderOpacity: opacities[i],
+          });
+        page.drawText(labels[i], { x: startX + 10, y: yPos - 70, size: 9, color: black });
+      }
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+      await saveTestOutput("drawing/opacity-kitchen-sink.pdf", bytes);
+    });
+
+    it("draws images with various opacities", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage({ size: "letter" });
+      const { height } = page;
+
+      // Load test images
+      const jpegData = await loadFixture("images", "sample.jpg");
+      const pngData = await loadFixture("images", "gradient-circle.png");
+
+      const jpegImg = pdf.embedImage(jpegData);
+      const pngImg = pdf.embedImage(pngData);
+
+      // Title
+      page.drawText("Image Opacity Test", {
+        x: 50,
+        y: height - 40,
+        size: 24,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      const opacities = [1.0, 0.75, 0.5, 0.25, 0.1];
+      const labels = ["100%", "75%", "50%", "25%", "10%"];
+
+      // JPEG images
+      page.drawText("JPEG at various opacities:", {
+        x: 50,
+        y: height - 80,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawImage(jpegImg, {
+          x: 50 + i * 110,
+          y: height - 200,
+          width: 100,
+          opacity: opacities[i],
+        });
+        page.drawText(labels[i], {
+          x: 85 + i * 110,
+          y: height - 215,
+          size: 9,
+          color: black,
+        });
+      }
+
+      // PNG images (with alpha)
+      page.drawText("PNG (with alpha) at various opacities:", {
+        x: 50,
+        y: height - 250,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      // Draw colored background to show transparency
+      page.drawRectangle({
+        x: 45,
+        y: height - 380,
+        width: 520,
+        height: 110,
+        color: rgb(0.9, 0.85, 0.7),
+      });
+
+      for (let i = 0; i < opacities.length; i++) {
+        page.drawImage(pngImg, {
+          x: 50 + i * 110,
+          y: height - 370,
+          width: 100,
+          opacity: opacities[i],
+        });
+        page.drawText(labels[i], {
+          x: 85 + i * 110,
+          y: height - 385,
+          size: 9,
+          color: black,
+        });
+      }
+
+      // Overlapping images
+      page.drawText("Overlapping images with opacity:", {
+        x: 50,
+        y: height - 420,
+        size: 12,
+        font: "Helvetica-Bold",
+        color: black,
+      });
+
+      page.drawImage(jpegImg, {
+        x: 50,
+        y: height - 550,
+        width: 150,
+      });
+
+      page.drawImage(pngImg, {
+        x: 120,
+        y: height - 520,
+        width: 120,
+        opacity: 0.7,
+      });
+
+      page.drawImage(jpegImg, {
+        x: 190,
+        y: height - 540,
+        width: 100,
+        opacity: 0.5,
+      });
+
+      const bytes = await pdf.save();
+      expect(isPdfHeader(bytes)).toBe(true);
+      await saveTestOutput("drawing/opacity-images.pdf", bytes);
     });
   });
 });

@@ -885,7 +885,7 @@ export class PDFPage {
       dashArray: options.borderDashArray,
       dashPhase: options.borderDashPhase,
       cornerRadius: options.cornerRadius,
-      graphicsStateName: gsName ?? undefined,
+      graphicsStateName: gsName ? `/${gsName}` : undefined,
       rotate,
     });
 
@@ -931,7 +931,7 @@ export class PDFPage {
       dashArray: options.dashArray,
       dashPhase: options.dashPhase,
       lineCap: options.lineCap,
-      graphicsStateName: gsName ?? undefined,
+      graphicsStateName: gsName ? `/${gsName}` : undefined,
     });
 
     this.appendOperators(ops);
@@ -966,7 +966,7 @@ export class PDFPage {
       fillColor: options.color,
       strokeColor: options.borderColor,
       strokeWidth: options.borderWidth,
-      graphicsStateName: gsName ?? undefined,
+      graphicsStateName: gsName ? `/${gsName}` : undefined,
     });
 
     this.appendOperators(ops);
@@ -1017,7 +1017,7 @@ export class PDFPage {
       fillColor: options.color,
       strokeColor: options.borderColor,
       strokeWidth: options.borderWidth,
-      graphicsStateName: gsName ?? undefined,
+      graphicsStateName: gsName ? `/${gsName}` : undefined,
       rotate,
     });
 
@@ -1099,7 +1099,7 @@ export class PDFPage {
     const ops: Operator[] = [pushGraphicsState()];
 
     if (gsName) {
-      ops.push(setGraphicsState(gsName));
+      ops.push(setGraphicsState(`/${gsName}`));
     }
 
     // Apply rotation if specified
@@ -2035,11 +2035,11 @@ export class PDFPage {
     const gsDict = new PdfDict();
 
     if (params.ca !== undefined) {
-      gsDict.set("ca", PdfNumber.of(params.ca)); // Stroke opacity
+      gsDict.set("ca", PdfNumber.of(params.ca)); // Non-stroking (fill) opacity
     }
 
     if (params.CA !== undefined) {
-      gsDict.set("CA", PdfNumber.of(params.CA)); // Fill opacity
+      gsDict.set("CA", PdfNumber.of(params.CA)); // Stroking opacity
     }
 
     // Generate unique name
@@ -2261,11 +2261,11 @@ export class PDFPage {
     const params: { ca?: number; CA?: number } = {};
 
     if (fillOpacity !== undefined) {
-      params.CA = Math.max(0, Math.min(1, fillOpacity)); // Fill opacity
+      params.ca = Math.max(0, Math.min(1, fillOpacity)); // Non-stroking (fill) opacity
     }
 
     if (strokeOpacity !== undefined) {
-      params.ca = Math.max(0, Math.min(1, strokeOpacity)); // Stroke opacity
+      params.CA = Math.max(0, Math.min(1, strokeOpacity)); // Stroking opacity
     }
 
     return this.addGraphicsState(params);

@@ -276,7 +276,7 @@ export class PathBuilder {
       dashArray: options.dashArray,
       dashPhase: options.dashPhase,
       windingRule: options.windingRule,
-      graphicsStateName: gsName ?? undefined,
+      graphicsStateName: gsName ? `/${gsName}` : undefined,
     });
 
     this.emitOps(ops);
