@@ -358,6 +358,58 @@ page.drawEllipse({
 
 ---
 
+### drawSvgPath(pathData, options?)
+
+Draw an SVG path on the page. Useful for icons, logos, and vector graphics.
+
+| Param                     | Type                       | Default     | Description                          |
+| ------------------------- | -------------------------- | ----------- | ------------------------------------ |
+| `pathData`                | `string`                   | required    | SVG path `d` attribute string        |
+| `[options]`               | `DrawSvgPathOptions`       |             |                                      |
+| `[options.x]`             | `number`                   | `0`         | X position                           |
+| `[options.y]`             | `number`                   | `0`         | Y position                           |
+| `[options.scale]`         | `number`                   | `1`         | Scale factor                         |
+| `[options.flipY]`         | `boolean`                  | `true`      | Flip Y-axis (SVG to PDF coordinates) |
+| `[options.color]`         | `Color`                    | black       | Fill color                           |
+| `[options.borderColor]`   | `Color`                    |             | Stroke color                         |
+| `[options.borderWidth]`   | `number`                   | `1`         | Stroke width                         |
+| `[options.opacity]`       | `number`                   | `1`         | Fill opacity                         |
+| `[options.borderOpacity]` | `number`                   | `1`         | Stroke opacity                       |
+| `[options.windingRule]`   | `"nonzero" \| "evenodd"`   | `"nonzero"` | Fill rule for overlapping paths      |
+| `[options.lineCap]`       | `LineCap`                  |             | Line cap style                       |
+| `[options.lineJoin]`      | `LineJoin`                 |             | Line join style                      |
+| `[options.dashArray]`     | `number[]`                 |             | Dash pattern                         |
+
+All SVG path commands are supported: M, L, H, V, C, S, Q, T, A, Z (and lowercase relative variants).
+
+```typescript
+// Simple filled triangle
+page.drawSvgPath("M 0 0 L 50 0 L 25 40 Z", {
+  x: 100,
+  y: 700,
+  color: rgb(1, 0, 0),
+});
+
+// Stroked icon (Lucide-style)
+page.drawSvgPath("M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3...", {
+  x: 50,
+  y: 600,
+  scale: 2,
+  borderColor: rgb(0.9, 0.2, 0.2),
+  borderWidth: 2,
+});
+
+// Path with hole (even-odd fill)
+page.drawSvgPath(
+  "M 0 0 L 80 0 L 80 80 L 0 80 Z M 20 20 L 60 20 L 60 60 L 20 60 Z",
+  { x: 200, y: 500, color: rgb(0, 0, 1), windingRule: "evenodd" }
+);
+```
+
+**Coordinate System**: By default, `flipY: true` transforms SVG coordinates (Y increases downward) to PDF coordinates (Y increases upward). Set `flipY: false` when paths are already in PDF coordinate space.
+
+---
+
 ## Image Drawing
 
 ### drawImage(image, options?)
@@ -468,16 +520,43 @@ page
 
 **PathBuilder Methods**:
 
-| Method                                  | Description        |
-| --------------------------------------- | ------------------ |
-| `moveTo(x, y)`                          | Move to point      |
-| `lineTo(x, y)`                          | Draw line to point |
-| `curveTo(cp1x, cp1y, cp2x, cp2y, x, y)` | Bezier curve       |
-| `quadraticCurveTo(cpx, cpy, x, y)`      | Quadratic curve    |
-| `close()`                               | Close the path     |
-| `fill(options)`                         | Fill the path      |
-| `stroke(options)`                       | Stroke the path    |
-| `fillAndStroke(options)`                | Fill and stroke    |
+| Method                                  | Description              |
+| --------------------------------------- | ------------------------ |
+| `moveTo(x, y)`                          | Move to point            |
+| `lineTo(x, y)`                          | Draw line to point       |
+| `curveTo(cp1x, cp1y, cp2x, cp2y, x, y)` | Cubic bezier curve       |
+| `quadraticCurveTo(cpx, cpy, x, y)`      | Quadratic bezier curve   |
+| `appendSvgPath(pathData, options?)`     | Append SVG path commands |
+| `close()`                               | Close the path           |
+| `fill(options)`                         | Fill the path            |
+| `stroke(options)`                       | Stroke the path          |
+| `fillAndStroke(options)`                | Fill and stroke          |
+
+**Using appendSvgPath**:
+
+The `appendSvgPath` method lets you mix SVG path commands with PathBuilder methods:
+
+```typescript
+// Mix PathBuilder methods with SVG path data
+page
+  .drawPath()
+  .moveTo(50, 500)
+  .lineTo(100, 500)
+  .appendSvgPath("l 30 -30 l 30 30", { flipY: false }) // relative SVG
+  .lineTo(200, 500)
+  .stroke({ borderColor: rgb(0, 0, 0) });
+```
+
+Options for `appendSvgPath`:
+
+| Option       | Type      | Default | Description                    |
+| ------------ | --------- | ------- | ------------------------------ |
+| `flipY`      | `boolean` | `false` | Flip Y-axis for SVG paths      |
+| `scale`      | `number`  | `1`     | Scale factor                   |
+| `translateX` | `number`  | `0`     | X translation after transform  |
+| `translateY` | `number`  | `0`     | Y translation after transform  |
+
+Note: Unlike `drawSvgPath()`, the `appendSvgPath()` method defaults to `flipY: false` since PathBuilder operates in PDF coordinates.
 
 ---
 
