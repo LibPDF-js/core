@@ -91,19 +91,65 @@ if (condition) return early;
 if (condition) {
   return early;
 }
+```
 
-// Bad: single-line else
-if (condition) {
-  doSomething();
-} else doOther();
+### Prefer Early Returns Over Else
 
-// Good: braces on else too
-if (condition) {
-  doSomething();
-} else {
-  doOther();
+Avoid `else` and `else if` when possible. Early returns reduce nesting and make code easier to follow — once you hit an `else`, you have to mentally track "what was the condition again?" which is annoying.
+
+```typescript
+// Bad: else creates unnecessary mental context-switching
+function getStatus(user: User): string {
+  if (user.isAdmin) {
+    return "admin";
+  } else if (user.isModerator) {
+    return "moderator";
+  } else {
+    return "user";
+  }
+}
+
+// Good: early returns, flat structure
+function getStatus(user: User): string {
+  if (user.isAdmin) {
+    return "admin";
+  }
+
+  if (user.isModerator) {
+    return "moderator";
+  }
+
+  return "user";
+}
+
+// Bad: nested else blocks
+function processData(data: Data | null): Result {
+  if (data) {
+    if (data.isValid) {
+      return compute(data);
+    } else {
+      throw new Error("Invalid data");
+    }
+  } else {
+    throw new Error("No data provided");
+  }
+}
+
+// Good: guard clauses with early returns
+function processData(data: Data | null): Result {
+  if (!data) {
+    throw new Error("No data provided");
+  }
+
+  if (!data.isValid) {
+    throw new Error("Invalid data");
+  }
+
+  return compute(data);
 }
 ```
+
+Sometimes `else` is unavoidable (e.g., ternaries, complex branching where both paths continue), but don't reach for it by default.
 
 ## Naming Conventions
 

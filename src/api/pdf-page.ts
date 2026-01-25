@@ -112,6 +112,7 @@ import type {
   DrawImageOptions,
   DrawLineOptions,
   DrawRectangleOptions,
+  DrawSvgPathOptions,
   DrawTextOptions,
   FontInput,
   Rotation,
@@ -1329,6 +1330,84 @@ export class PDFPage {
       (fillOpacity, strokeOpacity) =>
         this.registerGraphicsStateForOpacity(fillOpacity, strokeOpacity),
     );
+  }
+
+  /**
+   * Draw an SVG path on the page.
+   *
+   * This is a convenience method that parses an SVG path `d` attribute string
+   * and draws it with the specified options. For more control, use `drawPath()`
+   * with `appendSvgPath()`.
+   *
+   * By default, the path is filled with black. Specify `borderColor` without
+   * `color` to stroke without filling.
+   *
+   * SVG paths are automatically transformed from SVG coordinate space (Y-down)
+   * to PDF coordinate space (Y-up). Use `x`, `y` to position the path, and
+   * `scale` to resize it.
+   *
+   * @param pathData - SVG path `d` attribute string
+   * @param options - Drawing options (x, y, scale, color, etc.)
+   *
+   * @example
+   * ```typescript
+   * // Draw a Font Awesome heart icon at position (100, 500)
+   * // Icon is 512x512 in SVG, scale to ~50pt
+   * page.drawSvgPath(faHeartPath, {
+   *   x: 100,
+   *   y: 500,
+   *   scale: 0.1,
+   *   color: rgb(1, 0, 0),
+   * });
+   *
+   * // Draw a simple triangle at default position (0, 0)
+   * page.drawSvgPath("M 0 0 L 50 0 L 25 40 Z", {
+   *   color: rgb(0, 0, 1),
+   * });
+   *
+   * // Stroke a curve
+   * page.drawSvgPath("M 0 0 C 10 10, 30 10, 40 0", {
+   *   x: 200,
+   *   y: 300,
+   *   borderColor: rgb(0, 0, 0),
+   *   borderWidth: 2,
+   * });
+   * ```
+   */
+  drawSvgPath(pathData: string, options: DrawSvgPathOptions = {}): void {
+    const x = options.x ?? 0;
+    const y = options.y ?? 0;
+    const scale = options.scale ?? 1;
+    const flipY = options.flipY ?? true;
+
+    // Execute the SVG path with transform: scale, optionally flip Y, translate to position
+    const builder = this.drawPath();
+    builder.appendSvgPath(pathData, {
+      flipY,
+      scale,
+      translateX: x,
+      translateY: y,
+    });
+
+    // Determine if we should fill, stroke, or both
+    const hasFill = options.color !== undefined;
+    const hasStroke = options.borderColor !== undefined;
+
+    if (hasFill && hasStroke) {
+      builder.fillAndStroke(options);
+
+      return;
+    }
+
+    if (hasStroke) {
+      builder.stroke(options);
+
+      return;
+    }
+
+    // Default: fill with black if no color specified
+    const fillOptions = hasFill ? options : { ...options, color: black };
+    builder.fill(fillOptions);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

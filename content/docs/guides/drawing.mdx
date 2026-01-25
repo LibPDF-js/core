@@ -305,6 +305,147 @@ page
   .stroke({ borderColor: rgb(0, 0, 0), borderWidth: 2 });
 ```
 
+## SVG Paths
+
+Draw vector graphics using SVG path syntax. This is useful for icons, logos, and importing graphics from SVG files.
+
+### Basic Usage
+
+Use `drawSvgPath()` to render SVG path data:
+
+```ts
+// Simple triangle (filled by default)
+page.drawSvgPath("M 0 0 L 60 0 L 30 50 Z", {
+  x: 50,
+  y: 700,
+  color: rgb(1, 0, 0),
+});
+
+// Stroked path
+page.drawSvgPath("M 0 0 C 20 40 60 40 80 0", {
+  x: 150,
+  y: 700,
+  borderColor: rgb(0, 0, 1),
+  borderWidth: 2,
+});
+```
+
+### Coordinate System
+
+SVG uses a Y-down coordinate system (origin at top-left), while PDF uses Y-up (origin at bottom-left). `drawSvgPath()` automatically transforms coordinates so SVG paths render correctly.
+
+The `x` and `y` options position the path's origin point on the page.
+
+### Scaling
+
+Scale paths up or down with the `scale` option:
+
+```ts
+// Original size (24x24 icon)
+const heartIcon = "M 12 4 C 12 4 8 0 4 4 C 0 8 0 12 12 22 ...";
+
+page.drawSvgPath(heartIcon, { x: 50, y: 700, color: rgb(1, 0, 0) });
+
+// Double size
+page.drawSvgPath(heartIcon, { x: 100, y: 700, scale: 2, color: rgb(1, 0, 0) });
+
+// Triple size
+page.drawSvgPath(heartIcon, { x: 180, y: 700, scale: 3, color: rgb(1, 0, 0) });
+```
+
+### Supported Commands
+
+All SVG path commands are supported:
+
+| Command | Description         | Example               |
+| ------- | ------------------- | --------------------- |
+| M/m     | Move to             | `M 10 20`             |
+| L/l     | Line to             | `L 100 200`           |
+| H/h     | Horizontal line     | `H 150`               |
+| V/v     | Vertical line       | `V 100`               |
+| C/c     | Cubic bezier        | `C 10 20 30 40 50 60` |
+| S/s     | Smooth cubic        | `S 30 40 50 60`       |
+| Q/q     | Quadratic bezier    | `Q 50 100 100 0`      |
+| T/t     | Smooth quadratic    | `T 150 0`             |
+| A/a     | Elliptical arc      | `A 50 50 0 0 1 100 0` |
+| Z/z     | Close path          | `Z`                   |
+
+Uppercase commands use absolute coordinates; lowercase use relative coordinates.
+
+### Even-Odd Fill
+
+For paths with holes (like donuts or frames), use the even-odd winding rule:
+
+```ts
+// Outer square with inner square hole
+page.drawSvgPath(
+  "M 0 0 L 80 0 L 80 80 L 0 80 Z M 20 20 L 60 20 L 60 60 L 20 60 Z",
+  {
+    x: 50,
+    y: 600,
+    color: rgb(0, 0, 1),
+    windingRule: "evenodd",
+  }
+);
+```
+
+### Using with PathBuilder
+
+For more control, use `appendSvgPath()` on a PathBuilder:
+
+```ts
+page
+  .drawPath()
+  .moveTo(50, 500)
+  .lineTo(100, 500)
+  .appendSvgPath("l 30 30 l 30 -30", { flipY: false }) // Continue with SVG
+  .lineTo(200, 500)
+  .stroke({ borderColor: rgb(0, 0, 0), borderWidth: 2 });
+```
+
+The `flipY: false` option keeps SVG in PDF coordinates when mixing with PathBuilder.
+
+### Drawing Icons
+
+Extract the `d` attribute from any SVG icon and use it directly:
+
+```ts
+// From an SVG file: <path d="M12 2l3.09 6.26L22 9.27..." />
+const starPath = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77...";
+
+// Stroked icon (like Lucide/Feather)
+page.drawSvgPath(starPath, {
+  x: 50,
+  y: 600,
+  scale: 2,
+  borderColor: rgb(0.9, 0.7, 0.1),
+  borderWidth: 2,
+});
+
+// Filled icon (like Simple Icons)
+const githubPath = "M12 .297c-6.63 0-12 5.373-12 12...";
+
+page.drawSvgPath(githubPath, {
+  x: 150,
+  y: 600,
+  scale: 2,
+  color: rgb(0.1, 0.1, 0.1),
+});
+```
+
+### Options Reference
+
+| Option        | Type           | Description                              |
+| ------------- | -------------- | ---------------------------------------- |
+| `x`           | `number`       | X position on page                       |
+| `y`           | `number`       | Y position on page                       |
+| `scale`       | `number`       | Scale factor (default: 1)                |
+| `color`       | `Color`        | Fill color                               |
+| `borderColor` | `Color`        | Stroke color                             |
+| `borderWidth` | `number`       | Stroke width in points                   |
+| `windingRule` | `"nonzero" \| "evenodd"` | Fill rule for overlapping paths |
+| `opacity`     | `number`       | Opacity (0-1)                            |
+
 ## Drawing Order
 
 Content is drawn in order - later drawings appear on top:

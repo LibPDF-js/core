@@ -7,6 +7,7 @@
 
 import type { Operator } from "#src/content/operators";
 import { clip, clipEvenOdd, closePath, curveTo, lineTo, moveTo } from "#src/helpers/operators";
+import { executeSvgPathString, type SvgPathExecutorOptions } from "#src/svg/path-executor";
 
 import { wrapPathOps } from "./operations";
 import type { PathOptions } from "./types";
@@ -192,6 +193,79 @@ export class PathBuilder {
       .curveTo(cx + rx, cy - ky, cx + kx, cy - ry, cx, cy - ry)
       .curveTo(cx - kx, cy - ry, cx - rx, cy - ky, cx - rx, cy)
       .close();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SVG Path Support
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Append an SVG path string to the current path.
+   *
+   * Parses the SVG path `d` attribute string and adds all commands to this path.
+   * Relative commands (lowercase) are converted to absolute coordinates based on
+   * the current point. Smooth curves (S, T) and arcs (A) are converted to
+   * cubic bezier curves.
+   *
+   * By default, this method does NOT transform coordinates (flipY: false).
+   * Use the options to apply scale, translation, and Y-flip for SVG paths.
+   *
+   * @param pathData - SVG path `d` attribute string
+   * @param options - Execution options (flipY, scale, translate)
+   * @returns This PathBuilder for chaining
+   *
+   * @example
+   * ```typescript
+   * // Simple path (no transform)
+   * page.drawPath()
+   *   .appendSvgPath("M 10 10 L 100 10 L 55 90 Z")
+   *   .fill({ color: rgb(1, 0, 0) });
+   *
+   * // SVG icon with full transform
+   * page.drawPath()
+   *   .appendSvgPath(iconPath, {
+   *     flipY: true,
+   *     scale: 0.1,
+   *     translateX: 100,
+   *     translateY: 500,
+   *   })
+   *   .fill({ color: rgb(0, 0, 0) });
+   * ```
+   */
+  appendSvgPath(pathData: string, options: SvgPathExecutorOptions = {}): this {
+    // Default flipY to false for PathBuilder (caller must opt-in to transform)
+    const executorOptions: SvgPathExecutorOptions = {
+      flipY: options.flipY ?? false,
+      scale: options.scale,
+      translateX: options.translateX,
+      translateY: options.translateY,
+    };
+
+    executeSvgPathString(
+      pathData,
+      {
+        moveTo: (x: number, y: number) => {
+          this.moveTo(x, y);
+        },
+        lineTo: (x: number, y: number) => {
+          this.lineTo(x, y);
+        },
+        curveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) => {
+          this.curveTo(cp1x, cp1y, cp2x, cp2y, x, y);
+        },
+        quadraticCurveTo: (cpx: number, cpy: number, x: number, y: number) => {
+          this.quadraticCurveTo(cpx, cpy, x, y);
+        },
+        close: () => {
+          this.close();
+        },
+      },
+      this.currentX,
+      this.currentY,
+      executorOptions,
+    );
+
+    return this;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

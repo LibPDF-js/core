@@ -21,6 +21,7 @@ export type {
   DrawImageOptions,
   DrawLineOptions,
   DrawRectangleOptions,
+  DrawSvgPathOptions,
   DrawTextOptions,
   FontInput,
   LineCap,

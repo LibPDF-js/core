@@ -170,6 +170,7 @@ export {
   type DrawImageOptions,
   type DrawLineOptions,
   type DrawRectangleOptions,
+  type DrawSvgPathOptions,
   type DrawTextOptions,
   type FontInput,
   type LayoutResult,

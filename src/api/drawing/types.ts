@@ -290,6 +290,74 @@ export interface DrawEllipseOptions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SVG Path Options
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Options for drawing an SVG path.
+ *
+ * SVG paths are automatically transformed from SVG coordinate space
+ * (Y-down, origin at top-left) to PDF coordinate space (Y-up, origin
+ * at bottom-left). Use `x`, `y`, and `scale` to position and size
+ * the path on the page.
+ */
+export interface DrawSvgPathOptions {
+  /**
+   * X position on the page (left edge of the path's bounding box).
+   * @default 0
+   */
+  x?: number;
+
+  /**
+   * Y position on the page (bottom edge of the path's bounding box after transform).
+   * @default 0
+   */
+  y?: number;
+
+  /**
+   * Scale factor to apply to the path.
+   * Useful for SVG icons with large viewBox (e.g., 512x512).
+   * A scale of 0.1 would make a 512-unit icon ~51 points.
+   * @default 1
+   */
+  scale?: number;
+
+  /**
+   * Whether to flip the Y-axis to convert from SVG coordinates (Y-down)
+   * to PDF coordinates (Y-up).
+   *
+   * Set to `true` (default) when using SVG paths from icon libraries.
+   * Set to `false` when using paths already in PDF coordinate space.
+   *
+   * @default true
+   */
+  flipY?: boolean;
+
+  /** Fill color (default: black; omit to stroke only if borderColor set) */
+  color?: Color;
+  /** Stroke color (omit for no stroke) */
+  borderColor?: Color;
+  /** Stroke width in points (default: 1 if borderColor set) */
+  borderWidth?: number;
+  /** Line cap style */
+  lineCap?: LineCap;
+  /** Line join style */
+  lineJoin?: LineJoin;
+  /** Miter limit for miter joins */
+  miterLimit?: number;
+  /** Dash pattern array */
+  dashArray?: number[];
+  /** Dash pattern phase */
+  dashPhase?: number;
+  /** Fill opacity 0-1 (default: 1) */
+  opacity?: number;
+  /** Stroke opacity 0-1 (default: 1) */
+  borderOpacity?: number;
+  /** Winding rule for fill (default: "nonzero") */
+  windingRule?: "nonzero" | "evenodd";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Path Options
 // ─────────────────────────────────────────────────────────────────────────────
 
