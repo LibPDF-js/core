@@ -357,18 +357,18 @@ page.drawSvgPath(heartIcon, { x: 180, y: 700, scale: 3, color: rgb(1, 0, 0) });
 
 All SVG path commands are supported:
 
-| Command | Description         | Example               |
-| ------- | ------------------- | --------------------- |
-| M/m     | Move to             | `M 10 20`             |
-| L/l     | Line to             | `L 100 200`           |
-| H/h     | Horizontal line     | `H 150`               |
-| V/v     | Vertical line       | `V 100`               |
-| C/c     | Cubic bezier        | `C 10 20 30 40 50 60` |
-| S/s     | Smooth cubic        | `S 30 40 50 60`       |
-| Q/q     | Quadratic bezier    | `Q 50 100 100 0`      |
-| T/t     | Smooth quadratic    | `T 150 0`             |
-| A/a     | Elliptical arc      | `A 50 50 0 0 1 100 0` |
-| Z/z     | Close path          | `Z`                   |
+| Command | Description      | Example               |
+| ------- | ---------------- | --------------------- |
+| M/m     | Move to          | `M 10 20`             |
+| L/l     | Line to          | `L 100 200`           |
+| H/h     | Horizontal line  | `H 150`               |
+| V/v     | Vertical line    | `V 100`               |
+| C/c     | Cubic bezier     | `C 10 20 30 40 50 60` |
+| S/s     | Smooth cubic     | `S 30 40 50 60`       |
+| Q/q     | Quadratic bezier | `Q 50 100 100 0`      |
+| T/t     | Smooth quadratic | `T 150 0`             |
+| A/a     | Elliptical arc   | `A 50 50 0 0 1 100 0` |
+| Z/z     | Close path       | `Z`                   |
 
 Uppercase commands use absolute coordinates; lowercase use relative coordinates.
 
@@ -378,15 +378,12 @@ For paths with holes (like donuts or frames), use the even-odd winding rule:
 
 ```ts
 // Outer square with inner square hole
-page.drawSvgPath(
-  "M 0 0 L 80 0 L 80 80 L 0 80 Z M 20 20 L 60 20 L 60 60 L 20 60 Z",
-  {
-    x: 50,
-    y: 600,
-    color: rgb(0, 0, 1),
-    windingRule: "evenodd",
-  }
-);
+page.drawSvgPath("M 0 0 L 80 0 L 80 80 L 0 80 Z M 20 20 L 60 20 L 60 60 L 20 60 Z", {
+  x: 50,
+  y: 600,
+  color: rgb(0, 0, 1),
+  windingRule: "evenodd",
+});
 ```
 
 ### Using with PathBuilder
@@ -435,16 +432,16 @@ page.drawSvgPath(githubPath, {
 
 ### Options Reference
 
-| Option        | Type           | Description                              |
-| ------------- | -------------- | ---------------------------------------- |
-| `x`           | `number`       | X position on page                       |
-| `y`           | `number`       | Y position on page                       |
-| `scale`       | `number`       | Scale factor (default: 1)                |
-| `color`       | `Color`        | Fill color                               |
-| `borderColor` | `Color`        | Stroke color                             |
-| `borderWidth` | `number`       | Stroke width in points                   |
+| Option        | Type                     | Description                     |
+| ------------- | ------------------------ | ------------------------------- |
+| `x`           | `number`                 | X position on page              |
+| `y`           | `number`                 | Y position on page              |
+| `scale`       | `number`                 | Scale factor (default: 1)       |
+| `color`       | `Color`                  | Fill color                      |
+| `borderColor` | `Color`                  | Stroke color                    |
+| `borderWidth` | `number`                 | Stroke width in points          |
 | `windingRule` | `"nonzero" \| "evenodd"` | Fill rule for overlapping paths |
-| `opacity`     | `number`       | Opacity (0-1)                            |
+| `opacity`     | `number`                 | Opacity (0-1)                   |
 
 ## Drawing Order
 
