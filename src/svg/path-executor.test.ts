@@ -22,7 +22,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 10 20");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.moveTo).toHaveBeenCalledWith(10, 20);
     });
@@ -31,7 +31,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 L 100 200");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(100, 200);
     });
@@ -40,7 +40,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 10 20 H 100");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(100, 20);
     });
@@ -49,7 +49,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 10 20 V 100");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(10, 100);
     });
@@ -58,7 +58,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 C 10 20 30 40 50 60");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.curveTo).toHaveBeenCalledWith(10, 20, 30, 40, 50, 60);
     });
@@ -67,7 +67,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 Q 50 100 100 0");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.quadraticCurveTo).toHaveBeenCalledWith(50, 100, 100, 0);
     });
@@ -76,7 +76,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 L 100 0 L 50 100 Z");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.close).toHaveBeenCalled();
     });
@@ -88,7 +88,7 @@ describe("executeSvgPath", () => {
       const commands = parseSvgPath("m 10 20");
 
       // When starting from (0, 0), relative is same as absolute
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.moveTo).toHaveBeenCalledWith(10, 20);
     });
@@ -97,7 +97,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("m 10 10 l 5 0");
 
-      executeSvgPath(commands, sink, 0, 0, { flipY: false, translateX: 100, translateY: 200 });
+      executeSvgPath({ commands, sink, flipY: false, translateX: 100, translateY: 200 });
 
       expect(sink.moveTo).toHaveBeenCalledWith(110, 210);
       expect(sink.lineTo).toHaveBeenCalledWith(115, 210);
@@ -107,7 +107,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 100 l 50 50");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(150, 150);
     });
@@ -116,7 +116,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 50 h 25");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(125, 50);
     });
@@ -125,7 +125,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 50 100 v 25");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(50, 125);
     });
@@ -134,7 +134,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 100 c 10 20 30 40 50 60");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.curveTo).toHaveBeenCalledWith(110, 120, 130, 140, 150, 160);
     });
@@ -143,7 +143,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 100 q 25 50 50 0");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.quadraticCurveTo).toHaveBeenCalledWith(125, 150, 150, 100);
     });
@@ -152,7 +152,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 l 10 10 l 10 10 l 10 10");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenNthCalledWith(1, 10, 10);
       expect(sink.lineTo).toHaveBeenNthCalledWith(2, 20, 20);
@@ -167,7 +167,7 @@ describe("executeSvgPath", () => {
       // Smooth curve should reflect CP2 around endpoint: 2*100-80=120, 2*100-80=120
       const commands = parseSvgPath("M 0 0 C 20 20 80 80 100 100 S 180 180 200 200");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // First curve
       expect(sink.curveTo).toHaveBeenNthCalledWith(1, 20, 20, 80, 80, 100, 100);
@@ -180,7 +180,7 @@ describe("executeSvgPath", () => {
       // When S is not after C/c/S/s, first control point equals current point
       const commands = parseSvgPath("M 100 100 S 150 150 200 200");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // CP1 should equal current point (100, 100)
       expect(sink.curveTo).toHaveBeenCalledWith(100, 100, 150, 150, 200, 200);
@@ -192,7 +192,7 @@ describe("executeSvgPath", () => {
       // Smooth should reflect: 2*100-50=150, 2*0-100=-100
       const commands = parseSvgPath("M 0 0 Q 50 100 100 0 T 200 0");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.quadraticCurveTo).toHaveBeenNthCalledWith(1, 50, 100, 100, 0);
       expect(sink.quadraticCurveTo).toHaveBeenNthCalledWith(2, 150, -100, 200, 0);
@@ -202,7 +202,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 100 T 200 200");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // CP should equal current point (100, 100), making it effectively a line
       expect(sink.quadraticCurveTo).toHaveBeenCalledWith(100, 100, 200, 200);
@@ -212,7 +212,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 C 0 50 50 100 100 100 S 200 100 200 50 S 150 0 100 0");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.curveTo).toHaveBeenCalledTimes(3);
     });
@@ -221,7 +221,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 C 20 20 80 80 100 100 s 80 80 100 100");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // Reflected CP1: 2*100-80=120, 2*100-80=120
       // Relative CP2: 100+80=180, 100+80=180
@@ -235,7 +235,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 50 A 50 50 0 0 1 50 100");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // Arc should be converted to at least one bezier curve
       expect(sink.curveTo).toHaveBeenCalled();
@@ -245,7 +245,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 50 a 50 50 0 0 1 -50 50");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // Should convert arc ending at (50, 100) relative to start
       expect(sink.curveTo).toHaveBeenCalled();
@@ -260,7 +260,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 A 0 0 0 0 1 50 50");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // Zero radius arc becomes a line
       expect(sink.curveTo).toHaveBeenCalled();
@@ -275,7 +275,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 100 100 L 200 100 L 200 200 Z L 300 300");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       // After Z, position returns to (100, 100)
       // Then L 300 300 draws from (100, 100) to (300, 300)
@@ -286,7 +286,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 L 100 0 Z M 200 200 L 300 200 Z");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.moveTo).toHaveBeenCalledTimes(2);
       expect(sink.close).toHaveBeenCalledTimes(2);
@@ -298,7 +298,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("l 50 50");
 
-      executeSvgPath(commands, sink, 0, 0, noFlip);
+      executeSvgPath({ commands, sink, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(50, 50);
     });
@@ -307,7 +307,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("l 50 50");
 
-      executeSvgPath(commands, sink, 100, 100, noFlip);
+      executeSvgPath({ commands, sink, initialX: 100, initialY: 100, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(150, 150);
     });
@@ -316,7 +316,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("m 10 20");
 
-      executeSvgPath(commands, sink, 100, 100, noFlip);
+      executeSvgPath({ commands, sink, initialX: 100, initialY: 100, ...noFlip });
 
       expect(sink.moveTo).toHaveBeenCalledWith(110, 120);
     });
@@ -327,7 +327,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 10 20 L 100 200");
 
-      const result = executeSvgPath(commands, sink, 0, 0, noFlip);
+      const result = executeSvgPath({ commands, sink, ...noFlip });
 
       expect(result).toEqual({ x: 100, y: 200 });
     });
@@ -336,14 +336,14 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 50 50 L 100 100 Z");
 
-      const result = executeSvgPath(commands, sink, 0, 0, noFlip);
+      const result = executeSvgPath({ commands, sink, ...noFlip });
 
       expect(result).toEqual({ x: 50, y: 50 });
     });
 
     it("returns initial position for empty path", () => {
       const sink = createMockSink();
-      const result = executeSvgPath([], sink, 25, 75, noFlip);
+      const result = executeSvgPath({ commands: [], sink, initialX: 25, initialY: 75, ...noFlip });
 
       expect(result).toEqual({ x: 25, y: 75 });
     });
@@ -353,7 +353,7 @@ describe("executeSvgPath", () => {
     it("parses and executes path string", () => {
       const sink = createMockSink();
 
-      executeSvgPathString("M 10 20 L 100 200", sink, 0, 0, noFlip);
+      executeSvgPathString({ pathData: "M 10 20 L 100 200", sink, ...noFlip });
 
       expect(sink.moveTo).toHaveBeenCalledWith(10, 20);
       expect(sink.lineTo).toHaveBeenCalledWith(100, 200);
@@ -362,7 +362,7 @@ describe("executeSvgPath", () => {
     it("respects initial position", () => {
       const sink = createMockSink();
 
-      executeSvgPathString("l 50 50", sink, 100, 100, noFlip);
+      executeSvgPathString({ pathData: "l 50 50", sink, initialX: 100, initialY: 100, ...noFlip });
 
       expect(sink.lineTo).toHaveBeenCalledWith(150, 150);
     });
@@ -373,7 +373,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const path = "M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 Z";
 
-      executeSvgPathString(path, sink, 0, 0, noFlip);
+      executeSvgPathString({ pathData: path, sink, ...noFlip });
 
       expect(sink.moveTo).toHaveBeenCalledWith(10, 30);
       expect(sink.curveTo).toHaveBeenCalled(); // Arcs converted to beziers
@@ -385,7 +385,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const path = "M 0 0 L 100 0 l 0 100 L 0 100 l 0 -100 Z";
 
-      executeSvgPathString(path, sink, 0, 0, noFlip);
+      executeSvgPathString({ pathData: path, sink, ...noFlip });
 
       expect(sink.moveTo).toHaveBeenCalledWith(0, 0);
       expect(sink.lineTo).toHaveBeenNthCalledWith(1, 100, 0);
@@ -402,7 +402,7 @@ describe("executeSvgPath", () => {
       const commands = parseSvgPath("M 10 20 L 100 200");
 
       // Default is flipY: true
-      executeSvgPath(commands, sink);
+      executeSvgPath({ commands, sink });
 
       expect(sink.moveTo).toHaveBeenCalledWith(10, -20);
       expect(sink.lineTo).toHaveBeenCalledWith(100, -200);
@@ -412,7 +412,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 10 20 L 100 200");
 
-      executeSvgPath(commands, sink, 0, 0, { flipY: false });
+      executeSvgPath({ commands, sink, flipY: false });
 
       expect(sink.moveTo).toHaveBeenCalledWith(10, 20);
       expect(sink.lineTo).toHaveBeenCalledWith(100, 200);
@@ -422,7 +422,7 @@ describe("executeSvgPath", () => {
       const sink = createMockSink();
       const commands = parseSvgPath("M 0 0 l 50 50");
 
-      executeSvgPath(commands, sink);
+      executeSvgPath({ commands, sink });
 
       // With Y flip: 0 + (-50) = -50
       expect(sink.lineTo).toHaveBeenCalledWith(50, -50);
@@ -433,7 +433,7 @@ describe("executeSvgPath", () => {
       // A simple arc - sweep flag should be inverted when Y is flipped
       const commands = parseSvgPath("M 0 0 A 50 50 0 0 1 100 0");
 
-      executeSvgPath(commands, sink);
+      executeSvgPath({ commands, sink });
 
       // Arc should complete (be converted to beziers)
       expect(sink.curveTo).toHaveBeenCalled();

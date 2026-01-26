@@ -241,9 +241,9 @@ export class PathBuilder {
       translateY: options.translateY,
     };
 
-    executeSvgPathString(
+    executeSvgPathString({
       pathData,
-      {
+      sink: {
         moveTo: (x: number, y: number) => {
           this.moveTo(x, y);
         },
@@ -260,10 +260,10 @@ export class PathBuilder {
           this.close();
         },
       },
-      this.currentX,
-      this.currentY,
-      executorOptions,
-    );
+      initialX: this.currentX,
+      initialY: this.currentY,
+      ...executorOptions,
+    });
 
     return this;
   }

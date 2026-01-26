@@ -115,25 +115,37 @@ interface ExecutorState {
  * normalization, so the sink receives only absolute coordinates
  * and standard path operations.
  *
- * @param commands - Parsed SVG path commands
- * @param sink - Callback interface for path operations
- * @param initialX - Initial X coordinate (default: 0)
- * @param initialY - Initial Y coordinate (default: 0)
- * @param options - Execution options (flipY, etc.)
+ * @param options - Execution options
+ * @param options.commands - Parsed SVG path commands
+ * @param options.sink - Callback interface for path operations
+ * @param options.initialX - Initial X coordinate (default: 0)
+ * @param options.initialY - Initial Y coordinate (default: 0)
+ * @param options.flipY - Flip Y coordinates for PDF (default: true)
+ * @param options.scale - Scale factor (default: 1)
+ * @param options.translateX - X offset after transform (default: 0)
+ * @param options.translateY - Y offset after transform (default: 0)
  * @returns Final position {x, y} after executing all commands
  */
 export function executeSvgPath(
-  commands: SvgPathCommand[],
-  sink: PathSink,
-  initialX = 0,
-  initialY = 0,
-  options: SvgPathExecutorOptions = {},
+  options: {
+    commands: SvgPathCommand[];
+    sink: PathSink;
+    initialX?: number;
+    initialY?: number;
+  } & SvgPathExecutorOptions,
 ): { x: number; y: number } {
-  const flipY = options.flipY ?? true;
+  const {
+    commands,
+    sink,
+    initialX = 0,
+    initialY = 0,
+    flipY = true,
+    scale = 1,
+    translateX = 0,
+    translateY = 0,
+  } = options;
+
   const yFlip = flipY ? -1 : 1;
-  const scale = options.scale ?? 1;
-  const translateX = options.translateX ?? 0;
-  const translateY = options.translateY ?? 0;
 
   const initialOutputX = initialX + translateX;
   const initialOutputY = initialY + translateY;
@@ -177,110 +189,152 @@ function transformY(y: number, state: ExecutorState): number {
 function executeCommand(cmd: SvgPathCommand, state: ExecutorState, sink: PathSink): void {
   switch (cmd.type) {
     case "M":
-      executeMoveTo(cmd.x, cmd.y, false, state, sink);
+      executeMoveTo({ x: cmd.x, y: cmd.y, relative: false, state, sink });
       break;
     case "m":
-      executeMoveTo(cmd.x, cmd.y, true, state, sink);
+      executeMoveTo({ x: cmd.x, y: cmd.y, relative: true, state, sink });
       break;
 
     case "L":
-      executeLineTo(cmd.x, cmd.y, false, state, sink);
+      executeLineTo({ x: cmd.x, y: cmd.y, relative: false, state, sink });
       break;
     case "l":
-      executeLineTo(cmd.x, cmd.y, true, state, sink);
+      executeLineTo({ x: cmd.x, y: cmd.y, relative: true, state, sink });
       break;
 
     case "H":
-      // Absolute horizontal: transform X, keep current Y (already in output space)
-      executeHorizontalLine(cmd.x, false, state, sink);
+      executeHorizontalLine({ x: cmd.x, relative: false, state, sink });
       break;
     case "h":
-      // Relative horizontal: add scaled delta to current X
-      executeHorizontalLine(cmd.x, true, state, sink);
+      executeHorizontalLine({ x: cmd.x, relative: true, state, sink });
       break;
 
     case "V":
-      // Absolute vertical: keep current X, transform Y
-      executeVerticalLine(cmd.y, false, state, sink);
+      executeVerticalLine({ y: cmd.y, relative: false, state, sink });
       break;
     case "v":
-      // Relative vertical: add scaled & flipped delta to current Y
-      executeVerticalLine(cmd.y, true, state, sink);
+      executeVerticalLine({ y: cmd.y, relative: true, state, sink });
       break;
 
     case "C":
-      executeCubicCurve(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y, false, state, sink);
+      executeCubicCurve({
+        x1: cmd.x1,
+        y1: cmd.y1,
+        x2: cmd.x2,
+        y2: cmd.y2,
+        x: cmd.x,
+        y: cmd.y,
+        relative: false,
+        state,
+        sink,
+      });
       break;
     case "c":
-      executeCubicCurve(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y, true, state, sink);
+      executeCubicCurve({
+        x1: cmd.x1,
+        y1: cmd.y1,
+        x2: cmd.x2,
+        y2: cmd.y2,
+        x: cmd.x,
+        y: cmd.y,
+        relative: true,
+        state,
+        sink,
+      });
       break;
 
     case "S":
-      executeSmoothCubic(cmd.x2, cmd.y2, cmd.x, cmd.y, false, state, sink);
+      executeSmoothCubic({
+        x2: cmd.x2,
+        y2: cmd.y2,
+        x: cmd.x,
+        y: cmd.y,
+        relative: false,
+        state,
+        sink,
+      });
       break;
     case "s":
-      executeSmoothCubic(cmd.x2, cmd.y2, cmd.x, cmd.y, true, state, sink);
+      executeSmoothCubic({
+        x2: cmd.x2,
+        y2: cmd.y2,
+        x: cmd.x,
+        y: cmd.y,
+        relative: true,
+        state,
+        sink,
+      });
       break;
 
     case "Q":
-      executeQuadratic(cmd.x1, cmd.y1, cmd.x, cmd.y, false, state, sink);
+      executeQuadratic({
+        x1: cmd.x1,
+        y1: cmd.y1,
+        x: cmd.x,
+        y: cmd.y,
+        relative: false,
+        state,
+        sink,
+      });
       break;
     case "q":
-      executeQuadratic(cmd.x1, cmd.y1, cmd.x, cmd.y, true, state, sink);
+      executeQuadratic({ x1: cmd.x1, y1: cmd.y1, x: cmd.x, y: cmd.y, relative: true, state, sink });
       break;
 
     case "T":
-      executeSmoothQuadratic(cmd.x, cmd.y, false, state, sink);
+      executeSmoothQuadratic({ x: cmd.x, y: cmd.y, relative: false, state, sink });
       break;
     case "t":
-      executeSmoothQuadratic(cmd.x, cmd.y, true, state, sink);
+      executeSmoothQuadratic({ x: cmd.x, y: cmd.y, relative: true, state, sink });
       break;
 
     case "A":
-      executeArc(
-        cmd.rx,
-        cmd.ry,
-        cmd.xAxisRotation,
-        cmd.largeArcFlag,
-        cmd.sweepFlag,
-        cmd.x,
-        cmd.y,
-        false,
+      executeArc({
+        rx: cmd.rx,
+        ry: cmd.ry,
+        xAxisRotation: cmd.xAxisRotation,
+        largeArcFlag: cmd.largeArcFlag,
+        sweepFlag: cmd.sweepFlag,
+        x: cmd.x,
+        y: cmd.y,
+        relative: false,
         state,
         sink,
-      );
+      });
       break;
     case "a":
-      executeArc(
-        cmd.rx,
-        cmd.ry,
-        cmd.xAxisRotation,
-        cmd.largeArcFlag,
-        cmd.sweepFlag,
-        cmd.x,
-        cmd.y,
-        true,
+      executeArc({
+        rx: cmd.rx,
+        ry: cmd.ry,
+        xAxisRotation: cmd.xAxisRotation,
+        largeArcFlag: cmd.largeArcFlag,
+        sweepFlag: cmd.sweepFlag,
+        x: cmd.x,
+        y: cmd.y,
+        relative: true,
         state,
         sink,
-      );
+      });
       break;
 
     case "Z":
     case "z":
-      executeClose(state, sink);
+      executeClose({ state, sink });
       break;
   }
 
   state.lastCommand = cmd.type;
 }
 
-function executeMoveTo(
-  x: number,
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeMoveTo(options: {
+  x: number;
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { x, y, relative, state, sink } = options;
+
   // For relative: add delta to current position (in SVG space, before transform)
   // For absolute: use the coordinate directly (in SVG space)
   // We track position in OUTPUT space, so we need to work backwards for relative
@@ -299,13 +353,15 @@ function executeMoveTo(
   state.lastControlY = outY;
 }
 
-function executeLineTo(
-  x: number,
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeLineTo(options: {
+  x: number;
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { x, y, relative, state, sink } = options;
+
   const outX = relative ? state.currentX + x * state.scale : transformX(x, state);
   const outY = relative ? state.currentY + y * state.yFlip * state.scale : transformY(y, state);
 
@@ -317,12 +373,14 @@ function executeLineTo(
   state.lastControlY = outY;
 }
 
-function executeHorizontalLine(
-  x: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeHorizontalLine(options: {
+  x: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { x, relative, state, sink } = options;
+
   const outX = relative ? state.currentX + x * state.scale : transformX(x, state);
 
   // Y stays the same (already in output space)
@@ -333,12 +391,14 @@ function executeHorizontalLine(
   state.lastControlY = state.currentY;
 }
 
-function executeVerticalLine(
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeVerticalLine(options: {
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { y, relative, state, sink } = options;
+
   const outY = relative ? state.currentY + y * state.yFlip * state.scale : transformY(y, state);
 
   // X stays the same (already in output space)
@@ -349,17 +409,19 @@ function executeVerticalLine(
   state.lastControlY = outY;
 }
 
-function executeCubicCurve(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  x: number,
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeCubicCurve(options: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  x: number;
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { x1, y1, x2, y2, x, y, relative, state, sink } = options;
+
   const outX1 = relative ? state.currentX + x1 * state.scale : transformX(x1, state);
   const outY1 = relative ? state.currentY + y1 * state.yFlip * state.scale : transformY(y1, state);
   const outX2 = relative ? state.currentX + x2 * state.scale : transformX(x2, state);
@@ -376,15 +438,17 @@ function executeCubicCurve(
   state.lastControlY = outY2;
 }
 
-function executeSmoothCubic(
-  x2: number,
-  y2: number,
-  x: number,
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeSmoothCubic(options: {
+  x2: number;
+  y2: number;
+  x: number;
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { x2, y2, x, y, relative, state, sink } = options;
+
   // Reflect the last control point across current point to get first control point
   // (already in output space)
   let cp1x: number;
@@ -418,15 +482,17 @@ function executeSmoothCubic(
   state.lastControlY = outY2;
 }
 
-function executeQuadratic(
-  x1: number,
-  y1: number,
-  x: number,
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeQuadratic(options: {
+  x1: number;
+  y1: number;
+  x: number;
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { x1, y1, x, y, relative, state, sink } = options;
+
   const outCpX = relative ? state.currentX + x1 * state.scale : transformX(x1, state);
   const outCpY = relative ? state.currentY + y1 * state.yFlip * state.scale : transformY(y1, state);
   const outX = relative ? state.currentX + x * state.scale : transformX(x, state);
@@ -441,13 +507,15 @@ function executeQuadratic(
   state.lastControlY = outCpY;
 }
 
-function executeSmoothQuadratic(
-  x: number,
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeSmoothQuadratic(options: {
+  x: number;
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { x, y, relative, state, sink } = options;
+
   // Reflect the last control point across current point (already in output space)
   let cpx: number;
   let cpy: number;
@@ -478,18 +546,20 @@ function executeSmoothQuadratic(
   state.lastControlY = cpy;
 }
 
-function executeArc(
-  rx: number,
-  ry: number,
-  xAxisRotation: number,
-  largeArcFlag: boolean,
-  sweepFlag: boolean,
-  x: number,
-  y: number,
-  relative: boolean,
-  state: ExecutorState,
-  sink: PathSink,
-): void {
+function executeArc(options: {
+  rx: number;
+  ry: number;
+  xAxisRotation: number;
+  largeArcFlag: boolean;
+  sweepFlag: boolean;
+  x: number;
+  y: number;
+  relative: boolean;
+  state: ExecutorState;
+  sink: PathSink;
+}): void {
+  const { rx, ry, xAxisRotation, largeArcFlag, sweepFlag, x, y, relative, state, sink } = options;
+
   const outX = relative ? state.currentX + x * state.scale : transformX(x, state);
   const outY = relative ? state.currentY + y * state.yFlip * state.scale : transformY(y, state);
 
@@ -524,7 +594,9 @@ function executeArc(
   state.lastControlY = outY;
 }
 
-function executeClose(state: ExecutorState, sink: PathSink): void {
+function executeClose(options: { state: ExecutorState; sink: PathSink }): void {
+  const { state, sink } = options;
+
   sink.close();
 
   // After close, current point returns to subpath start
@@ -543,11 +615,15 @@ function executeClose(state: ExecutorState, sink: PathSink): void {
  * top-left origin to PDF's bottom-left origin. Set `flipY: false` in
  * options to disable this behavior.
  *
- * @param pathData - SVG path d string
- * @param sink - Callback interface for path operations
- * @param initialX - Initial X coordinate (default: 0)
- * @param initialY - Initial Y coordinate (default: 0)
- * @param options - Execution options (flipY, etc.)
+ * @param options - Execution options
+ * @param options.pathData - SVG path d string
+ * @param options.sink - Callback interface for path operations
+ * @param options.initialX - Initial X coordinate (default: 0)
+ * @param options.initialY - Initial Y coordinate (default: 0)
+ * @param options.flipY - Flip Y coordinates for PDF (default: true)
+ * @param options.scale - Scale factor (default: 1)
+ * @param options.translateX - X offset after transform (default: 0)
+ * @param options.translateY - Y offset after transform (default: 0)
  * @returns Final position {x, y} after executing all commands
  *
  * @example
@@ -560,17 +636,19 @@ function executeClose(state: ExecutorState, sink: PathSink): void {
  *   close: () => console.log(`Z`),
  * };
  *
- * executeSvgPathString("M 10 10 L 100 10 L 100 100 Z", sink);
+ * executeSvgPathString({ pathData: "M 10 10 L 100 10 L 100 100 Z", sink });
  * ```
  */
 export function executeSvgPathString(
-  pathData: string,
-  sink: PathSink,
-  initialX = 0,
-  initialY = 0,
-  options: SvgPathExecutorOptions = {},
+  options: {
+    pathData: string;
+    sink: PathSink;
+    initialX?: number;
+    initialY?: number;
+  } & SvgPathExecutorOptions,
 ): { x: number; y: number } {
+  const { pathData, sink, initialX, initialY, ...executorOptions } = options;
   const commands = parseSvgPath(pathData);
 
-  return executeSvgPath(commands, sink, initialX, initialY, options);
+  return executeSvgPath({ commands, sink, initialX, initialY, ...executorOptions });
 }
