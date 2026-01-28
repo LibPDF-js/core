@@ -19,8 +19,9 @@ const KAPPA = 0.5522847498307936;
 
 /**
  * Callback type for appending content to a page.
+ * Accepts a string (for ASCII-only content) or raw bytes.
  */
-export type ContentAppender = (content: string) => void;
+export type ContentAppender = (content: string | Uint8Array) => void;
 
 /**
  * Callback type for registering a graphics state and returning its name.

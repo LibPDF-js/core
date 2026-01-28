@@ -69,9 +69,15 @@ import type { WidgetAnnotation } from "#src/document/forms/widget-annotation";
 import { EmbeddedFont } from "#src/fonts/embedded-font";
 import { parseFont } from "#src/fonts/font-factory";
 import type { PdfFont } from "#src/fonts/pdf-font";
-import { getStandard14BasicMetrics, isStandard14Font } from "#src/fonts/standard-14";
+import {
+  getEncodingForStandard14,
+  getStandard14BasicMetrics,
+  isStandard14Font,
+  isWinAnsiStandard14,
+} from "#src/fonts/standard-14";
 import { parseToUnicode } from "#src/fonts/to-unicode";
 // Annotation utilities - imported here to avoid dynamic require issues
+import { concatBytes } from "#src/helpers/buffer";
 import { black } from "#src/helpers/colors";
 import {
   beginText,
@@ -2160,9 +2166,12 @@ export class PDFPage {
 
   /**
    * Create and register a content stream.
+   *
+   * Accepts either a string (for ASCII-only content like operator names and numbers)
+   * or raw bytes (for content that may contain non-ASCII data).
    */
-  private createContentStream(content: string): PdfRef | PdfStream {
-    const bytes = new TextEncoder().encode(content);
+  private createContentStream(content: string | Uint8Array): PdfRef | PdfStream {
+    const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
     const stream = new PdfStream([], bytes);
 
     // If we have a context, register the stream and return a ref
@@ -2177,9 +2186,11 @@ export class PDFPage {
   /**
    * Prepend content to the page's content stream (for background drawing).
    */
-  private prependContent(content: string): void {
+  private prependContent(content: string | Uint8Array): void {
     const existingContents = this.dict.get("Contents");
-    const newContent = this.createContentStream(`${content}\n`);
+    const contentWithNewline =
+      typeof content === "string" ? `${content}\n` : concatBytes([content, new Uint8Array([0x0a])]);
+    const newContent = this.createContentStream(contentWithNewline);
 
     if (!existingContents) {
       // No existing content - just set our stream
@@ -2229,9 +2240,11 @@ export class PDFPage {
    * we wrap the existing content in q/Q so any CTM changes are isolated,
    * then append our content which runs with the default CTM.
    */
-  private appendContent(content: string): void {
+  private appendContent(content: string | Uint8Array): void {
     const existingContents = this.dict.get("Contents");
-    const newContent = this.createContentStream(`\n${content}`);
+    const contentWithNewline =
+      typeof content === "string" ? `\n${content}` : concatBytes([new Uint8Array([0x0a]), content]);
+    const newContent = this.createContentStream(contentWithNewline);
 
     if (!existingContents) {
       // No existing content - just set our stream
@@ -2352,11 +2365,23 @@ export class PDFPage {
 
   /**
    * Append operators to the page content stream.
+   *
+   * Uses Operator.toBytes() directly to avoid UTF-8 round-trip corruption
+   * of non-ASCII bytes in PdfString operands (e.g., WinAnsi-encoded text).
    */
   private appendOperators(ops: Operator[]): void {
-    const content = ops.map(op => op.toString()).join("\n");
+    const newline = new Uint8Array([0x0a]);
+    const parts: Uint8Array[] = [];
 
-    this.appendContent(content);
+    for (let i = 0; i < ops.length; i++) {
+      if (i > 0) {
+        parts.push(newline);
+      }
+
+      parts.push(ops[i].toBytes());
+    }
+
+    this.appendContent(concatBytes(parts));
   }
 
   /**
@@ -2390,11 +2415,20 @@ export class PDFPage {
       }
 
       // Create new font dict
-      const fontDict = PdfDict.of({
-        Type: PdfName.of("Font"),
-        Subtype: PdfName.of("Type1"),
-        BaseFont: PdfName.of(font),
-      });
+      // Add /Encoding WinAnsiEncoding for non-Symbol/ZapfDingbats fonts.
+      // Symbol and ZapfDingbats use their built-in encoding (no /Encoding entry).
+      const fontDict = isWinAnsiStandard14(font)
+        ? PdfDict.of({
+            Type: PdfName.of("Font"),
+            Subtype: PdfName.of("Type1"),
+            BaseFont: PdfName.of(font),
+            Encoding: PdfName.of("WinAnsiEncoding"),
+          })
+        : PdfDict.of({
+            Type: PdfName.of("Font"),
+            Subtype: PdfName.of("Type1"),
+            BaseFont: PdfName.of(font),
+          });
 
       const fontName = this.generateUniqueName(fonts, "F");
       fonts.set(fontName, fontDict);
@@ -2429,11 +2463,32 @@ export class PDFPage {
 
   /**
    * Encode text to a PDF string for the given font.
+   *
+   * Standard 14 fonts use WinAnsiEncoding (or SymbolEncoding/ZapfDingbatsEncoding).
+   * Unencodable characters are substituted with .notdef (byte 0x00).
+   * Embedded fonts use Identity-H encoding with glyph IDs.
    */
   private encodeTextForFont(text: string, font: FontInput): PdfString {
     if (typeof font === "string") {
-      // Standard 14 font - use WinAnsi encoding (Latin-1 subset)
-      return PdfString.fromString(text);
+      // Standard 14 font - use the appropriate encoding
+      const encoding = getEncodingForStandard14(font);
+      const codes: number[] = [];
+
+      for (const char of text) {
+        if (encoding.canEncode(char)) {
+          // biome-ignore lint/style/noNonNullAssertion: canEncode guarantees getCode succeeds
+          codes.push(encoding.getCode(char.codePointAt(0)!)!);
+        } else {
+          // Substitute unencodable characters with .notdef (byte 0x00)
+          codes.push(0x00);
+        }
+      }
+
+      const bytes = new Uint8Array(codes);
+
+      // Use hex format for defense-in-depth: hex strings are pure ASCII
+      // and immune to any string encoding transformation
+      return PdfString.fromBytes(bytes);
     }
 
     // Embedded font - use Identity-H encoding with GIDs
