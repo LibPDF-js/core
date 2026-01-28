@@ -5,58 +5,58 @@ This document outlines the architecture of @libpdf/core. It's a living document 
 ## Layer Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      High-Level API                             │
+┌──────────────────────────────────────────────────────────────────┐
+│                      High-Level API                              │
 │   (PDF, PDFPage, PDFForm, PDFAttachments, PDFSignature, PDFImage)│
-├─────────────────────────────────────────────────────────────────┤
-│                    Annotations Layer                            │
-│   (PDFAnnotation types, appearance generation, flattening)      │
-├─────────────────────────────────────────────────────────────────┤
-│                       Text Layer                                │
-│     (TextExtractor, TextState, LineGrouper, text-search)        │
-├─────────────────────────────────────────────────────────────────┤
-│                      Drawing Layer                              │
-│    (DrawingContext, PathBuilder, TextLayout, ColorHelpers)      │
-├─────────────────────────────────────────────────────────────────┤
-│                     Document Layer                              │
-│    (ObjectRegistry, ObjectCopier, AcroForm, ChangeCollector)    │
-├─────────────────────────────────────────────────────────────────┤
-│                     Signatures Layer                            │
-│  (Signers, CMS Formats, Timestamp, Revocation, DSS, Placeholder)│
-├─────────────────────────────────────────────────────────────────┤
-│                       Images Layer                              │
-│            (JPEG embedding, PNG embedding, PDFImage)            │
-├─────────────────────────────────────────────────────────────────┤
-│                       Fonts Layer                               │
-│    (FontFactory, FontEmbedder, SimpleFont, CompositeFont)       │
-├─────────────────────────────────────────────────────────────────┤
-│                      Fontbox Layer                              │
-│         (TTF/CFF/Type1 parsing, subsetting, encoding)           │
-├─────────────────────────────────────────────────────────────────┤
-│                       Layers (OCG)                              │
-│            (Layer detection, flattening)                        │
-├─────────────────────────────────────────────────────────────────┤
-│                     DocumentParser                              │
-│           Top-level orchestration and document access           │
-├─────────────────────────────────────────────────────────────────┤
-│                     Security Layer                              │
-│   (StandardSecurityHandler, Ciphers, Key Derivation, Encryption)│
-├─────────────────────────────────────────────────────────────────┤
-│                      Object Layer                               │
-│    (PdfDict, PdfArray, PdfStream, PdfRef, PdfName, etc.)        │
-├─────────────────────────────────────────────────────────────────┤
-│                    Parser Components                            │
-│  (TokenReader, ObjectParser, XRefParser, BruteForceParser)      │
-├─────────────────────────────────────────────────────────────────┤
-│                       Filters                                   │
-│         (Flate, LZW, ASCII85, ASCIIHex, etc.)                   │
-├─────────────────────────────────────────────────────────────────┤
-│                       Writer                                    │
-│        (PDFWriter, Serializer, XRefWriter)                      │
-├─────────────────────────────────────────────────────────────────┤
-│                      I/O Layer                                  │
-│              (Scanner, BinaryWriter)                            │
-└─────────────────────────────────────────────────────────────────┘
+├──────────────────────────────────────────────────────────────────┤
+│                    Annotations Layer                             │
+│   (PDFAnnotation types, appearance generation, flattening)       │
+├──────────────────────────────────────────────────────────────────┤
+│                       Text Layer                                 │
+│     (TextExtractor, TextState, LineGrouper, text-search)         │
+├──────────────────────────────────────────────────────────────────┤
+│                      Drawing Layer                               │
+│    (DrawingContext, PathBuilder, TextLayout, ColorHelpers)       │
+├──────────────────────────────────────────────────────────────────┤
+│                     Document Layer                               │
+│    (ObjectRegistry, ObjectCopier, AcroForm, ChangeCollector)     │
+├──────────────────────────────────────────────────────────────────┤
+│                     Signatures Layer                             │
+│  (Signers, CMS Formats, Timestamp, Revocation, DSS, Placeholder) │
+├──────────────────────────────────────────────────────────────────┤
+│                       Images Layer                               │
+│            (JPEG embedding, PNG embedding, PDFImage)             │
+├──────────────────────────────────────────────────────────────────┤
+│                       Fonts Layer                                │
+│    (FontFactory, FontEmbedder, SimpleFont, CompositeFont)        │
+├──────────────────────────────────────────────────────────────────┤
+│                      Fontbox Layer                               │
+│         (TTF/CFF/Type1 parsing, subsetting, encoding)            │
+├──────────────────────────────────────────────────────────────────┤
+│                       Layers (OCG)                               │
+│            (Layer detection, flattening)                         │
+├──────────────────────────────────────────────────────────────────┤
+│                     DocumentParser                               │
+│           Top-level orchestration and document access            │
+├──────────────────────────────────────────────────────────────────┤
+│                     Security Layer                               │
+│   (StandardSecurityHandler, Ciphers, Key Derivation, Encryption) │
+├──────────────────────────────────────────────────────────────────┤
+│                      Object Layer                                │
+│    (PdfDict, PdfArray, PdfStream, PdfRef, PdfName, etc.)         │
+├──────────────────────────────────────────────────────────────────┤
+│                    Parser Components                             │
+│  (TokenReader, ObjectParser, XRefParser, BruteForceParser)       │
+├──────────────────────────────────────────────────────────────────┤
+│                       Filters                                    │
+│         (Flate, LZW, ASCII85, ASCIIHex, etc.)                    │
+├──────────────────────────────────────────────────────────────────┤
+│                       Writer                                     │
+│        (PDFWriter, Serializer, XRefWriter)                       │
+├──────────────────────────────────────────────────────────────────┤
+│                      I/O Layer                                   │
+│              (Scanner, BinaryWriter)                             │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
