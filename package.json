@@ -45,6 +45,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "bench": "vitest bench",
     "build": "tsdown",
     "docs:build": "bun run --cwd apps/docs build",
     "docs:dev": "bun run --cwd apps/docs dev",
@@ -79,6 +80,7 @@
     "oxfmt": "^0.24.0",
     "oxlint": "^1.39.0",
     "oxlint-tsgolint": "^0.11.1",
+    "pdf-lib": "^1.17.1",
     "tsdown": "^0.18.4",
     "typescript": "^5",
     "vitest": "^4.0.16"
