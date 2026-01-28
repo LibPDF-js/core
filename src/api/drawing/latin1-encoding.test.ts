@@ -283,11 +283,11 @@ describe("Latin-1 / WinAnsi encoding for Standard 14 fonts", () => {
       const bytes = await pdf.save();
       const pdfText = String.fromCharCode(...bytes);
 
-      // Should NOT contain the UTF-8 encoding of é (0xC3 0xA1)
+      // Should NOT contain the UTF-8 encoding of é (0xC3 0xA9)
       // Should contain the hex-encoded WinAnsi byte 0xE9
       expect(pdfText).toContain("<E9>");
-      // The UTF-8 sequence C3A1 should NOT appear as a literal string operand
-      expect(pdfText).not.toMatch(/\(.*\xC3\xA1.*\)/);
+      // The UTF-8 sequence C3A9 should NOT appear as a literal string operand
+      expect(pdfText).not.toMatch(/\(.*\xC3\xA9.*\)/);
     });
 
     it("encodes Euro sign correctly in 0x80-0x9F range", async () => {
