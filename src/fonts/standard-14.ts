@@ -12,6 +12,11 @@
  * Data extracted from pdf.js metrics.js (Mozilla, Apache 2.0 License)
  */
 
+import type { FontEncoding } from "#src/fonts/encodings/encoding";
+import { SymbolEncoding } from "#src/fonts/encodings/symbol";
+import { WinAnsiEncoding } from "#src/fonts/encodings/win-ansi";
+import { ZapfDingbatsEncoding } from "#src/fonts/encodings/zapf-dingbats";
+
 /**
  * Standard 14 font names.
  */
@@ -91,6 +96,37 @@ export function getBaseFontName(name: string): string {
 }
 
 /**
+ * Get the font encoding for a Standard 14 font.
+ *
+ * - Symbol → SymbolEncoding
+ * - ZapfDingbats → ZapfDingbatsEncoding
+ * - All others (Helvetica, Times, Courier) → WinAnsiEncoding
+ */
+export function getEncodingForStandard14(name: string): FontEncoding {
+  const baseName = getBaseFontName(name);
+
+  if (baseName === "Symbol") {
+    return SymbolEncoding.instance;
+  }
+
+  if (baseName === "ZapfDingbats") {
+    return ZapfDingbatsEncoding.instance;
+  }
+
+  return WinAnsiEncoding.instance;
+}
+
+/**
+ * Check if a Standard 14 font uses WinAnsiEncoding.
+ * Returns false for Symbol and ZapfDingbats (they use built-in encodings).
+ */
+export function isWinAnsiStandard14(name: string): boolean {
+  const baseName = getBaseFontName(name);
+
+  return baseName !== "Symbol" && baseName !== "ZapfDingbats";
+}
+
+/**
  * Get basic metrics (ascent, descent, etc.) for a Standard 14 font.
  */
 export function getStandard14BasicMetrics(name: string): FontBasicMetrics | undefined {
@@ -156,7 +192,7 @@ export function getStandard14DefaultWidth(fontName: string): number {
  * This is a subset of the Adobe Glyph List.
  */
 const CHAR_TO_GLYPH: Record<number, string> = {
-  // ASCII printable characters
+  // ASCII printable characters (0x20-0x7E)
   32: "space",
   33: "exclam",
   34: "quotedbl",
@@ -254,6 +290,133 @@ const CHAR_TO_GLYPH: Record<number, string> = {
   124: "bar",
   125: "braceright",
   126: "asciitilde",
+
+  // WinAnsi 0x80-0x9F range (Unicode code points)
+  0x20ac: "Euro", // €
+  0x201a: "quotesinglbase", // ‚
+  0x0192: "florin", // ƒ
+  0x201e: "quotedblbase", // „
+  0x2026: "ellipsis", // …
+  0x2020: "dagger", // †
+  0x2021: "daggerdbl", // ‡
+  0x02c6: "circumflex", // ˆ
+  0x2030: "perthousand", // ‰
+  0x0160: "Scaron", // Š
+  0x2039: "guilsinglleft", // ‹
+  0x0152: "OE", // Œ
+  0x017d: "Zcaron", // Ž
+  0x2018: "quoteleft", // '
+  0x2019: "quoteright", // '
+  0x201c: "quotedblleft", // "
+  0x201d: "quotedblright", // "
+  0x2022: "bullet", // •
+  0x2013: "endash", // –
+  0x2014: "emdash", // —
+  0x02dc: "tilde", // ˜
+  0x2122: "trademark", // ™
+  0x0161: "scaron", // š
+  0x203a: "guilsinglright", // ›
+  0x0153: "oe", // œ
+  0x017e: "zcaron", // ž
+  0x0178: "Ydieresis", // Ÿ
+
+  // Latin-1 Supplement 0xA0-0xFF (Unicode = code point)
+  0x00a0: "space", // NBSP
+  0x00a1: "exclamdown", // ¡
+  0x00a2: "cent", // ¢
+  0x00a3: "sterling", // £
+  0x00a4: "currency", // ¤
+  0x00a5: "yen", // ¥
+  0x00a6: "brokenbar", // ¦
+  0x00a7: "section", // §
+  0x00a8: "dieresis", // ¨
+  0x00a9: "copyright", // ©
+  0x00aa: "ordfeminine", // ª
+  0x00ab: "guillemotleft", // «
+  0x00ac: "logicalnot", // ¬
+  0x00ad: "hyphen", // soft hyphen
+  0x00ae: "registered", // ®
+  0x00af: "macron", // ¯
+  0x00b0: "degree", // °
+  0x00b1: "plusminus", // ±
+  0x00b2: "twosuperior", // ²
+  0x00b3: "threesuperior", // ³
+  0x00b4: "acute", // ´
+  0x00b5: "mu", // µ
+  0x00b6: "paragraph", // ¶
+  0x00b7: "periodcentered", // ·
+  0x00b8: "cedilla", // ¸
+  0x00b9: "onesuperior", // ¹
+  0x00ba: "ordmasculine", // º
+  0x00bb: "guillemotright", // »
+  0x00bc: "onequarter", // ¼
+  0x00bd: "onehalf", // ½
+  0x00be: "threequarters", // ¾
+  0x00bf: "questiondown", // ¿
+  0x00c0: "Agrave", // À
+  0x00c1: "Aacute", // Á
+  0x00c2: "Acircumflex", // Â
+  0x00c3: "Atilde", // Ã
+  0x00c4: "Adieresis", // Ä
+  0x00c5: "Aring", // Å
+  0x00c6: "AE", // Æ
+  0x00c7: "Ccedilla", // Ç
+  0x00c8: "Egrave", // È
+  0x00c9: "Eacute", // É
+  0x00ca: "Ecircumflex", // Ê
+  0x00cb: "Edieresis", // Ë
+  0x00cc: "Igrave", // Ì
+  0x00cd: "Iacute", // Í
+  0x00ce: "Icircumflex", // Î
+  0x00cf: "Idieresis", // Ï
+  0x00d0: "Eth", // Ð
+  0x00d1: "Ntilde", // Ñ
+  0x00d2: "Ograve", // Ò
+  0x00d3: "Oacute", // Ó
+  0x00d4: "Ocircumflex", // Ô
+  0x00d5: "Otilde", // Õ
+  0x00d6: "Odieresis", // Ö
+  0x00d7: "multiply", // ×
+  0x00d8: "Oslash", // Ø
+  0x00d9: "Ugrave", // Ù
+  0x00da: "Uacute", // Ú
+  0x00db: "Ucircumflex", // Û
+  0x00dc: "Udieresis", // Ü
+  0x00dd: "Yacute", // Ý
+  0x00de: "Thorn", // Þ
+  0x00df: "germandbls", // ß
+  0x00e0: "agrave", // à
+  0x00e1: "aacute", // á
+  0x00e2: "acircumflex", // â
+  0x00e3: "atilde", // ã
+  0x00e4: "adieresis", // ä
+  0x00e5: "aring", // å
+  0x00e6: "ae", // æ
+  0x00e7: "ccedilla", // ç
+  0x00e8: "egrave", // è
+  0x00e9: "eacute", // é
+  0x00ea: "ecircumflex", // ê
+  0x00eb: "edieresis", // ë
+  0x00ec: "igrave", // ì
+  0x00ed: "iacute", // í
+  0x00ee: "icircumflex", // î
+  0x00ef: "idieresis", // ï
+  0x00f0: "eth", // ð
+  0x00f1: "ntilde", // ñ
+  0x00f2: "ograve", // ò
+  0x00f3: "oacute", // ó
+  0x00f4: "ocircumflex", // ô
+  0x00f5: "otilde", // õ
+  0x00f6: "odieresis", // ö
+  0x00f7: "divide", // ÷
+  0x00f8: "oslash", // ø
+  0x00f9: "ugrave", // ù
+  0x00fa: "uacute", // ú
+  0x00fb: "ucircumflex", // û
+  0x00fc: "udieresis", // ü
+  0x00fd: "yacute", // ý
+  0x00fe: "thorn", // þ
+  0x00ff: "ydieresis", // ÿ
 };
 
 /**
