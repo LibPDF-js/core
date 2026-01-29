@@ -11,5 +11,9 @@ export default defineConfig({
       exclude: ["src/**/*.test.ts", "src/test-utils.ts"],
       reporter: ["text", "html"],
     },
+    benchmark: {
+      include: ["benchmarks/**/*.bench.ts"],
+      exclude: ["**/node_modules/**", "**/checkouts/**"],
+    },
   },
 });
