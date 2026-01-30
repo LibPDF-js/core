@@ -6,6 +6,7 @@
  */
 
 import type { Operator } from "#src/content/operators";
+import { KAPPA } from "#src/helpers/constants";
 import {
   clip,
   clipEvenOdd,
@@ -20,11 +21,6 @@ import { executeSvgPathString, type SvgPathExecutorOptions } from "#src/svg/path
 import { wrapPathOps } from "./operations";
 import type { PDFPattern, PDFShading } from "./resources";
 import type { PathOptions } from "./types";
-
-/**
- * Magic number for circular Bezier approximation.
- */
-const KAPPA = 0.5522847498307936;
 
 /**
  * Callback type for appending content to a page.
@@ -292,21 +288,11 @@ export class PathBuilder {
     executeSvgPathString({
       pathData,
       sink: {
-        moveTo: (x: number, y: number) => {
-          this.moveTo(x, y);
-        },
-        lineTo: (x: number, y: number) => {
-          this.lineTo(x, y);
-        },
-        curveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) => {
-          this.curveTo(cp1x, cp1y, cp2x, cp2y, x, y);
-        },
-        quadraticCurveTo: (cpx: number, cpy: number, x: number, y: number) => {
-          this.quadraticCurveTo(cpx, cpy, x, y);
-        },
-        close: () => {
-          this.close();
-        },
+        moveTo: this.moveTo.bind(this),
+        lineTo: this.lineTo.bind(this),
+        curveTo: this.curveTo.bind(this),
+        quadraticCurveTo: this.quadraticCurveTo.bind(this),
+        close: this.close.bind(this),
       },
       initialX: this.currentX,
       initialY: this.currentY,
@@ -387,27 +373,9 @@ export class PathBuilder {
       gsName = this.registerGraphicsState(options.opacity, options.borderOpacity);
     }
 
-    // Register fill pattern if provided
-    let fillPatternName: string | undefined;
-    if (options.pattern) {
-      if (!this.registerPattern) {
-        throw new Error(
-          "Pattern fills require pattern support. Use page.drawPath() which provides this.",
-        );
-      }
-      fillPatternName = this.registerPattern(options.pattern);
-    }
-
-    // Register stroke pattern if provided
-    let strokePatternName: string | undefined;
-    if (options.borderPattern) {
-      if (!this.registerPattern) {
-        throw new Error(
-          "Pattern strokes require pattern support. Use page.drawPath() which provides this.",
-        );
-      }
-      strokePatternName = this.registerPattern(options.borderPattern);
-    }
+    // Register fill and stroke patterns if provided
+    const fillPatternName = this.ensurePatternRegistered(options.pattern);
+    const strokePatternName = this.ensurePatternRegistered(options.borderPattern);
 
     // Map PathOptions to PathOpsOptions
     const ops = wrapPathOps(this.pathOps, {
@@ -426,6 +394,23 @@ export class PathBuilder {
     });
 
     this.emitOps(ops);
+  }
+
+  /**
+   * Register a pattern and return its name, or undefined if no pattern.
+   */
+  private ensurePatternRegistered(pattern: PDFPattern | undefined): string | undefined {
+    if (!pattern) {
+      return undefined;
+    }
+
+    if (!this.registerPattern) {
+      throw new Error(
+        "Pattern fills/strokes require pattern support. Use page.drawPath() which provides this.",
+      );
+    }
+
+    return this.registerPattern(pattern);
   }
 
   /**

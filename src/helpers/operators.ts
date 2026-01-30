@@ -76,10 +76,10 @@ export const popGraphicsState = (): Operator => Operator.of(Op.PopGraphicsState)
  * ```typescript
  * // Using Matrix instance
  * const matrix = Matrix.identity().translate(100, 200).scale(2, 2);
- * concatMatrix(matrix)
+ * ops.concatMatrix(matrix)
  *
  * // Using individual components
- * concatMatrix(1, 0, 0, 1, 100, 200)  // translate
+ * ops.concatMatrix(1, 0, 0, 1, 100, 200)  // translate
  * ```
  */
 export function concatMatrix(matrix: Matrix): Operator;
@@ -756,12 +756,14 @@ export const paintXObject = (name: string): Operator =>
  * @example
  * ```typescript
  * // Fill a rectangle with a gradient
- * ops.pushGraphicsState()
- * ops.rectangle(50, 50, 100, 100)
- * ops.clip()
- * ops.endPath()
- * ops.paintShading(shadingName)
- * ops.popGraphicsState()
+ * page.drawOperators([
+ *   ops.pushGraphicsState(),
+ *   ops.rectangle(50, 50, 100, 100),
+ *   ops.clip(),
+ *   ops.endPath(),
+ *   ops.paintShading(shadingName),
+ *   ops.popGraphicsState(),
+ * ]);
  * ```
  */
 export const paintShading = (name: string): Operator =>

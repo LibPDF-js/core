@@ -326,32 +326,37 @@ function createGradientFunction(stops: { offset: number; color: Color }[]): PdfD
     throw new Error("Gradient requires at least 2 color stops");
   }
 
-  if (stops.length === 2) {
+  // Sort stops by offset to ensure correct gradient rendering
+  const sortedStops = [...stops].sort((a, b) => a.offset - b.offset);
+
+  if (sortedStops.length === 2) {
     // Simple case: two stops, use exponential interpolation
-    return createExponentialFunction(stops[0], stops[1]);
+    return createExponentialFunction(sortedStops[0], sortedStops[1]);
   }
 
   // Multiple stops: create stitching function
-  return createStitchingFunction(stops);
+  return createStitchingFunction(sortedStops);
 }
 
 /**
  * Extract RGB values from a Color object.
  */
 function getRGB(color: Color): [number, number, number] {
-  if (color.type === "RGB") {
-    return [color.red, color.green, color.blue];
-  }
+  switch (color.type) {
+    case "RGB":
+      return [color.red, color.green, color.blue];
+    case "Grayscale":
+      return [color.gray, color.gray, color.gray];
+    case "CMYK": {
+      // CMYK to RGB: R = (1-C)(1-K), G = (1-M)(1-K), B = (1-Y)(1-K)
+      const k = color.black;
+      const r = (1 - color.cyan) * (1 - k);
+      const g = (1 - color.magenta) * (1 - k);
+      const b = (1 - color.yellow) * (1 - k);
 
-  if (color.type === "Grayscale") {
-    return [color.gray, color.gray, color.gray];
+      return [r, g, b];
+    }
   }
-
-  // CMYK - convert to RGB
-  const r = 1 - Math.min(1, color.cyan + color.black);
-  const g = 1 - Math.min(1, color.magenta + color.black);
-  const b = 1 - Math.min(1, color.yellow + color.black);
-  return [r, g, b];
 }
 
 /**
@@ -484,6 +489,8 @@ export function createTilingPatternStream(
 
 /**
  * Create an extended graphics state dictionary.
+ *
+ * Opacity values are clamped to the range [0, 1].
  */
 export function createExtGStateDict(options: ExtGStateOptions): PdfDict {
   const dict = new PdfDict();

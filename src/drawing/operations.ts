@@ -8,6 +8,7 @@
 import type { Operator } from "#src/content/operators";
 import type { Color } from "#src/helpers/colors";
 import { ColorSpace } from "#src/helpers/colorspace";
+import { KAPPA } from "#src/helpers/constants";
 import {
   closePath,
   concatMatrix,
@@ -42,16 +43,6 @@ import { PdfArray } from "#src/objects/pdf-array";
 import { PdfNumber } from "#src/objects/pdf-number";
 
 import { type LineCap, type LineJoin, lineCapToNumber, lineJoinToNumber } from "./types";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Magic number for circular Bezier approximation.
- * 4 * (sqrt(2) - 1) / 3
- */
-const KAPPA = 0.5522847498307936;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Color Operators
@@ -455,14 +446,7 @@ export function wrapPathOps(pathOps: Operator[], options: PathOpsOptions): Opera
   const hasFill = !!options.fillColor || !!options.fillPatternName;
   const hasStroke = !!options.strokeColor || !!options.strokePatternName;
   const evenOdd = options.windingRule === "evenodd";
-
-  if (hasFill && hasStroke) {
-    ops.push(evenOdd ? fillAndStrokeEvenOdd() : fillAndStroke());
-  } else if (hasFill) {
-    ops.push(evenOdd ? fillEvenOdd() : fill());
-  } else if (hasStroke) {
-    ops.push(stroke());
-  }
+  ops.push(getPaintOpWithWinding(hasFill, hasStroke, evenOdd));
 
   ops.push(popGraphicsState());
 
@@ -483,6 +467,21 @@ function getPaintOp(hasFill: boolean, hasStroke: boolean): Operator {
 
   if (hasFill) {
     return fill();
+  }
+
+  return stroke();
+}
+
+/**
+ * Get the appropriate paint operator with winding rule support.
+ */
+function getPaintOpWithWinding(hasFill: boolean, hasStroke: boolean, evenOdd: boolean): Operator {
+  if (hasFill && hasStroke) {
+    return evenOdd ? fillAndStrokeEvenOdd() : fillAndStroke();
+  }
+
+  if (hasFill) {
+    return evenOdd ? fillEvenOdd() : fill();
   }
 
   return stroke();
