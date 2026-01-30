@@ -66,6 +66,28 @@ import {
 } from "#src/document/forms/fields";
 import { TerminalField } from "#src/document/forms/fields/base";
 import type { WidgetAnnotation } from "#src/document/forms/widget-annotation";
+import {
+  drawCircleOps,
+  drawEllipseOps,
+  drawLineOps,
+  drawRectangleOps,
+  setFillColor,
+} from "#src/drawing/operations";
+import { PathBuilder } from "#src/drawing/path-builder";
+import type { PDFFormXObject, PDFExtGState, PDFPattern, PDFShading } from "#src/drawing/resources";
+import { layoutJustifiedLine, layoutText, measureText } from "#src/drawing/text-layout";
+import type {
+  DrawCircleOptions,
+  DrawEllipseOptions,
+  DrawImageOptions,
+  DrawLineOptions,
+  DrawRectangleOptions,
+  DrawSvgPathOptions,
+  DrawTextOptions,
+  FontInput,
+  Rotation,
+} from "#src/drawing/types";
+import { resolveRotationOrigin } from "#src/drawing/types";
 import { EmbeddedFont } from "#src/fonts/embedded-font";
 import { parseFont } from "#src/fonts/font-factory";
 import type { PdfFont } from "#src/fonts/pdf-font";
@@ -103,27 +125,6 @@ import { TextExtractor } from "#src/text/text-extractor";
 import { searchPage } from "#src/text/text-search";
 import type { ExtractTextOptions, FindTextOptions, PageText, TextMatch } from "#src/text/types";
 
-import {
-  drawCircleOps,
-  drawEllipseOps,
-  drawLineOps,
-  drawRectangleOps,
-  setFillColor,
-} from "./drawing/operations";
-import { PathBuilder } from "./drawing/path-builder";
-import { layoutJustifiedLine, layoutText, measureText } from "./drawing/text-layout";
-import type {
-  DrawCircleOptions,
-  DrawEllipseOptions,
-  DrawImageOptions,
-  DrawLineOptions,
-  DrawRectangleOptions,
-  DrawSvgPathOptions,
-  DrawTextOptions,
-  FontInput,
-  Rotation,
-} from "./drawing/types";
-import { resolveRotationOrigin } from "./drawing/types";
 import type { PDFContext } from "./pdf-context";
 import type { PDFEmbeddedPage } from "./pdf-embedded-page";
 
@@ -228,6 +229,9 @@ export class PDFPage {
 
   /** Document context for registering objects */
   private readonly ctx: PDFContext;
+
+  /** Resource cache for deduplication - maps object refs to resource names */
+  private _resourceCache: Map<PdfRef, string> = new Map();
 
   constructor(ref: PdfRef, dict: PdfDict, index: number, ctx: PDFContext) {
     this.ref = ref;
@@ -1414,6 +1418,439 @@ export class PDFPage {
     // Default: fill with black if no color specified
     const fillOptions = hasFill ? options : { ...options, color: black };
     builder.fill(fillOptions);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Low-Level Drawing API
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Emit raw PDF operators to the page content stream.
+   *
+   * This is the low-level drawing API that gives you direct control over
+   * PDF content stream operators. Use this when you need advanced features
+   * like matrix transforms, graphics state stack, gradients, or patterns
+   * that aren't available through the high-level drawing methods.
+   *
+   * **Important**: The caller is responsible for valid operator sequences.
+   * Invalid sequences may produce corrupted PDFs that won't render correctly.
+   *
+   * @param operators - Array of operators to emit
+   *
+   * @example
+   * ```typescript
+   * import { PDF, ops } from "@libpdf/core";
+   *
+   * const pdf = await PDF.create();
+   * const page = pdf.addPage();
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.concatMatrix(1, 0, 0, 1, 100, 200),  // translate
+   *   ops.setNonStrokingRGB(1, 0, 0),
+   *   ops.rectangle(0, 0, 50, 50),
+   *   ops.fill(),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  drawOperators(operators: Operator[]): void {
+    this.appendOperators(operators);
+  }
+
+  /**
+   * Register a font resource and return its operator name.
+   *
+   * The same font registered multiple times returns the same name (deduplication).
+   *
+   * @param font - Font to register (EmbeddedFont or Standard 14 font name)
+   * @returns The resource name for use with operators (e.g., "F0")
+   *
+   * @example
+   * ```typescript
+   * const font = await pdf.embedFont(fontBytes);
+   * const fontName = page.registerFont(font);
+   *
+   * page.drawOperators([
+   *   ops.beginText(),
+   *   ops.setFont(fontName, 12),
+   *   ops.showText("Hello"),
+   *   ops.endText(),
+   * ]);
+   * ```
+   */
+  registerFont(font: FontInput): string {
+    // Get the font reference first
+    let fontRef: PdfRef | null = null;
+
+    if (typeof font === "string") {
+      // Standard 14 font - we need to add it to resources and get a ref
+      // These are inline dicts, not references, so we use the addFontResource helper
+      return this.addFontResource(font);
+    }
+
+    // Embedded font - get reference
+    fontRef = this.ctx.getFontRef(font);
+
+    if (!fontRef) {
+      throw new Error("Font must be prepared before registering");
+    }
+
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(fontRef);
+
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // Register the font
+    const resources = this.getResources();
+    let fonts = resources.get("Font");
+
+    if (!(fonts instanceof PdfDict)) {
+      fonts = new PdfDict();
+      resources.set("Font", fonts);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of fonts) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === fontRef.objectNumber &&
+        value.generation === fontRef.generation
+      ) {
+        this._resourceCache.set(fontRef, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(fonts, "F");
+    fonts.set(name, fontRef);
+    this._resourceCache.set(fontRef, name);
+
+    return name;
+  }
+
+  /**
+   * Register an image resource and return its operator name.
+   *
+   * The same image registered multiple times returns the same name (deduplication).
+   *
+   * @param image - The PDFImage to register
+   * @returns The resource name for use with paintXObject operator (e.g., "Im0")
+   *
+   * @example
+   * ```typescript
+   * const image = await pdf.embedImage(imageBytes);
+   * const imageName = page.registerImage(image);
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.concatMatrix(100, 0, 0, 100, 200, 500),
+   *   ops.paintXObject(imageName),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerImage(image: PDFImage): string {
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(image.ref);
+
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // Register the image
+    const resources = this.getResources();
+    let xobjects = resources.get("XObject");
+
+    if (!(xobjects instanceof PdfDict)) {
+      xobjects = new PdfDict();
+      resources.set("XObject", xobjects);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of xobjects) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === image.ref.objectNumber &&
+        value.generation === image.ref.generation
+      ) {
+        this._resourceCache.set(image.ref, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(xobjects, "Im");
+    xobjects.set(name, image.ref);
+    this._resourceCache.set(image.ref, name);
+
+    return name;
+  }
+
+  /**
+   * Register a shading (gradient) resource and return its operator name.
+   *
+   * The same shading registered multiple times returns the same name (deduplication).
+   *
+   * @param shading - The PDFShading to register
+   * @returns The resource name for use with paintShading operator (e.g., "Sh0")
+   *
+   * @example
+   * ```typescript
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 100, 0],
+   *   stops: [{ offset: 0, color: rgb(1, 0, 0) }, { offset: 1, color: rgb(0, 0, 1) }],
+   * });
+   * const shadingName = page.registerShading(gradient);
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.rectangle(50, 50, 100, 100),
+   *   ops.clip(),
+   *   ops.endPath(),
+   *   ops.paintShading(shadingName),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerShading(shading: PDFShading): string {
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(shading.ref);
+
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // Register the shading
+    const resources = this.getResources();
+    let shadings = resources.get("Shading");
+
+    if (!(shadings instanceof PdfDict)) {
+      shadings = new PdfDict();
+      resources.set("Shading", shadings);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of shadings) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === shading.ref.objectNumber &&
+        value.generation === shading.ref.generation
+      ) {
+        this._resourceCache.set(shading.ref, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(shadings, "Sh");
+    shadings.set(name, shading.ref);
+    this._resourceCache.set(shading.ref, name);
+
+    return name;
+  }
+
+  /**
+   * Register a pattern resource and return its operator name.
+   *
+   * The same pattern registered multiple times returns the same name (deduplication).
+   *
+   * @param pattern - The PDFPattern to register
+   * @returns The resource name for use with setNonStrokingColorN operator (e.g., "P0")
+   *
+   * @example
+   * ```typescript
+   * const pattern = pdf.createTilingPattern({
+   *   bbox: [0, 0, 10, 10],
+   *   xStep: 10,
+   *   yStep: 10,
+   *   paint: ctx => {
+   *     ctx.drawOperators([
+   *       ops.setNonStrokingRGB(0.8, 0.8, 0.8),
+   *       ops.rectangle(0, 0, 5, 5),
+   *       ops.fill(),
+   *     ]);
+   *   },
+   * });
+   * const patternName = page.registerPattern(pattern);
+   *
+   * page.drawOperators([
+   *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+   *   ops.setNonStrokingColorN(patternName),
+   *   ops.rectangle(100, 100, 200, 200),
+   *   ops.fill(),
+   * ]);
+   * ```
+   */
+  registerPattern(pattern: PDFPattern): string {
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(pattern.ref);
+
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // Register the pattern
+    const resources = this.getResources();
+    let patterns = resources.get("Pattern");
+
+    if (!(patterns instanceof PdfDict)) {
+      patterns = new PdfDict();
+      resources.set("Pattern", patterns);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of patterns) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === pattern.ref.objectNumber &&
+        value.generation === pattern.ref.generation
+      ) {
+        this._resourceCache.set(pattern.ref, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(patterns, "P");
+    patterns.set(name, pattern.ref);
+    this._resourceCache.set(pattern.ref, name);
+
+    return name;
+  }
+
+  /**
+   * Register an extended graphics state resource and return its operator name.
+   *
+   * The same ExtGState registered multiple times returns the same name (deduplication).
+   *
+   * @param state - The PDFExtGState to register
+   * @returns The resource name for use with setGraphicsState operator (e.g., "GS0")
+   *
+   * @example
+   * ```typescript
+   * const gs = pdf.createExtGState({
+   *   fillOpacity: 0.5,
+   *   strokeOpacity: 0.8,
+   *   blendMode: "Multiply",
+   * });
+   * const gsName = page.registerExtGState(gs);
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.setGraphicsState(gsName),
+   *   ops.setNonStrokingRGB(1, 0, 0),
+   *   ops.rectangle(100, 100, 50, 50),
+   *   ops.fill(),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerExtGState(state: PDFExtGState): string {
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(state.ref);
+
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // Register the graphics state
+    const resources = this.getResources();
+    let extGState = resources.get("ExtGState");
+
+    if (!(extGState instanceof PdfDict)) {
+      extGState = new PdfDict();
+      resources.set("ExtGState", extGState);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of extGState) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === state.ref.objectNumber &&
+        value.generation === state.ref.generation
+      ) {
+        this._resourceCache.set(state.ref, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(extGState, "GS");
+    extGState.set(name, state.ref);
+    this._resourceCache.set(state.ref, name);
+
+    return name;
+  }
+
+  /**
+   * Register a Form XObject resource and return its operator name.
+   *
+   * The same XObject registered multiple times returns the same name (deduplication).
+   *
+   * @param xobject - The PDFFormXObject or PDFEmbeddedPage to register
+   * @returns The resource name for use with paintXObject operator (e.g., "Fm0")
+   *
+   * @example
+   * ```typescript
+   * const stamp = pdf.createFormXObject({
+   *   bbox: [0, 0, 100, 50],
+   *   paint: ctx => {
+   *     ctx.drawOperators([
+   *       ops.setNonStrokingRGB(1, 0, 0),
+   *       ops.rectangle(0, 0, 100, 50),
+   *       ops.fill(),
+   *     ]);
+   *   },
+   * });
+   * const xobjectName = page.registerXObject(stamp);
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.concatMatrix(1, 0, 0, 1, 200, 700),
+   *   ops.paintXObject(xobjectName),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerXObject(xobject: PDFFormXObject | PDFEmbeddedPage): string {
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(xobject.ref);
+
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // Register the XObject
+    const resources = this.getResources();
+    let xobjects = resources.get("XObject");
+
+    if (!(xobjects instanceof PdfDict)) {
+      xobjects = new PdfDict();
+      resources.set("XObject", xobjects);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of xobjects) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === xobject.ref.objectNumber &&
+        value.generation === xobject.ref.generation
+      ) {
+        this._resourceCache.set(xobject.ref, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(xobjects, "Fm");
+    xobjects.set(name, xobject.ref);
+    this._resourceCache.set(xobject.ref, name);
+
+    return name;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,5 @@
+import { layoutJustifiedLine, layoutText, measureText } from "#src/drawing/text-layout";
 import { describe, expect, it } from "vitest";
-
-import { layoutJustifiedLine, layoutText, measureText } from "./text-layout";
 
 describe("measureText", () => {
   it("measures text width with Standard 14 font", () => {

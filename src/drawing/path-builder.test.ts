@@ -1,7 +1,6 @@
+import { PathBuilder } from "#src/drawing/path-builder";
 import { rgb } from "#src/helpers/colors";
 import { describe, expect, it, vi } from "vitest";
-
-import { PathBuilder } from "./path-builder";
 
 describe("PathBuilder", () => {
   function createBuilder() {

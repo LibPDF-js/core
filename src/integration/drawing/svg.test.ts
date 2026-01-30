@@ -5,12 +5,11 @@
  * in the test-output directory.
  */
 
+import { PDF } from "#src/api/pdf";
 import { black, blue, grayscale, green, red, rgb } from "#src/helpers/colors";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { isPdfHeader, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
-
-import { PDF } from "../pdf";
 
 describe("SVG Path Integration", () => {
   it("fills SVG paths with black by default", () => {

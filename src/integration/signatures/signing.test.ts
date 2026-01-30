@@ -5,12 +5,11 @@
  * from loading a PDF to producing a signed document.
  */
 
+import { PDF } from "#src/api/pdf";
+import { P12Signer } from "#src/signatures/signers";
+import { HttpTimestampAuthority } from "#src/signatures/timestamp";
+import { loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
-
-import { PDF } from "../api/pdf";
-import { loadFixture, saveTestOutput } from "../test-utils";
-import { P12Signer } from "./signers";
-import { HttpTimestampAuthority } from "./timestamp";
 
 /** Test P12 files with different encryption formats */
 const P12_FILES = {

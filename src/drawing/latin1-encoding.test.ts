@@ -5,6 +5,7 @@
  * characters using WinAnsiEncoding, avoiding UTF-8 round-trip corruption.
  */
 
+import { PDF } from "#src/api/pdf";
 import {
   getEncodingForStandard14,
   getGlyphName,
@@ -14,8 +15,6 @@ import {
 import { red } from "#src/helpers/colors";
 import { isPdfHeader, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
-
-import { PDF } from "../pdf";
 
 describe("Latin-1 / WinAnsi encoding for Standard 14 fonts", () => {
   // ─────────────────────────────────────────────────────────────────────────────
