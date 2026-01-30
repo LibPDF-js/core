@@ -877,6 +877,12 @@ export class PDFPage {
       gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
     }
 
+    // Register patterns if provided
+    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
+    const strokePatternName = options.borderPattern
+      ? this.registerPattern(options.borderPattern)
+      : undefined;
+
     // Calculate rotation center if rotating
     let rotate: { angle: number; originX: number; originY: number } | undefined;
 
@@ -893,7 +899,9 @@ export class PDFPage {
       width: options.width,
       height: options.height,
       fillColor: options.color,
+      fillPatternName,
       strokeColor: options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       dashArray: options.borderDashArray,
       dashPhase: options.borderDashPhase,
@@ -972,12 +980,20 @@ export class PDFPage {
       gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
     }
 
+    // Register patterns if provided
+    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
+    const strokePatternName = options.borderPattern
+      ? this.registerPattern(options.borderPattern)
+      : undefined;
+
     const ops = drawCircleOps({
       cx: options.x,
       cy: options.y,
       radius: options.radius,
       fillColor: options.color,
+      fillPatternName,
       strokeColor: options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       graphicsStateName: gsName ? `/${gsName}` : undefined,
     });
@@ -1022,13 +1038,21 @@ export class PDFPage {
       rotate = { angle: options.rotate.angle, originX: origin.x, originY: origin.y };
     }
 
+    // Register patterns if provided
+    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
+    const strokePatternName = options.borderPattern
+      ? this.registerPattern(options.borderPattern)
+      : undefined;
+
     const ops = drawEllipseOps({
       cx: options.x,
       cy: options.y,
       rx: options.xRadius,
       ry: options.yRadius,
       fillColor: options.color,
+      fillPatternName,
       strokeColor: options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       graphicsStateName: gsName ? `/${gsName}` : undefined,
       rotate,
@@ -1420,8 +1444,8 @@ export class PDFPage {
     });
 
     // Determine if we should fill, stroke, or both
-    const hasFill = options.color !== undefined;
-    const hasStroke = options.borderColor !== undefined;
+    const hasFill = options.color !== undefined || options.pattern !== undefined;
+    const hasStroke = options.borderColor !== undefined || options.borderPattern !== undefined;
 
     if (hasFill && hasStroke) {
       builder.fillAndStroke(options);
@@ -1435,7 +1459,7 @@ export class PDFPage {
       return;
     }
 
-    // Default: fill with black if no color specified
+    // Default: fill with black if no color specified and no pattern
     const fillOptions = hasFill ? options : { ...options, color: black };
     builder.fill(fillOptions);
   }

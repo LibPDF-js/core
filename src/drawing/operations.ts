@@ -111,7 +111,11 @@ export interface RectangleOpsOptions {
   width: number;
   height: number;
   fillColor?: Color;
+  /** Fill pattern name (already registered, e.g., "P0") */
+  fillPatternName?: string;
   strokeColor?: Color;
+  /** Stroke pattern name (already registered, e.g., "P0") */
+  strokePatternName?: string;
   strokeWidth?: number;
   dashArray?: number[];
   dashPhase?: number;
@@ -147,15 +151,22 @@ export function drawRectangleOps(options: RectangleOpsOptions): Operator[] {
   if (options.strokeColor) {
     ops.push(setStrokeColor(options.strokeColor));
     ops.push(setLineWidth(options.strokeWidth ?? 1));
-
-    if (options.dashArray && options.dashArray.length > 0) {
-      ops.push(setDash(options.dashArray, options.dashPhase ?? 0));
-    }
+  } else if (options.strokePatternName) {
+    ops.push(setStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setStrokingColorN(options.strokePatternName));
+    ops.push(setLineWidth(options.strokeWidth ?? 1));
   }
 
-  // Set fill color
+  if (options.dashArray && options.dashArray.length > 0) {
+    ops.push(setDash(options.dashArray, options.dashPhase ?? 0));
+  }
+
+  // Set fill color or pattern
   if (options.fillColor) {
     ops.push(setFillColor(options.fillColor));
+  } else if (options.fillPatternName) {
+    ops.push(setNonStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setNonStrokingColorN(options.fillPatternName));
   }
 
   // Draw the path
@@ -174,7 +185,9 @@ export function drawRectangleOps(options: RectangleOpsOptions): Operator[] {
   }
 
   // Paint the path
-  ops.push(getPaintOp(!!options.fillColor, !!options.strokeColor));
+  const hasFill = !!options.fillColor || !!options.fillPatternName;
+  const hasStroke = !!options.strokeColor || !!options.strokePatternName;
+  ops.push(getPaintOp(hasFill, hasStroke));
 
   ops.push(popGraphicsState());
 
@@ -271,7 +284,11 @@ export interface EllipseOpsOptions {
   rx: number;
   ry: number;
   fillColor?: Color;
+  /** Fill pattern name (already registered, e.g., "P0") */
+  fillPatternName?: string;
   strokeColor?: Color;
+  /** Stroke pattern name (already registered, e.g., "P0") */
+  strokePatternName?: string;
   strokeWidth?: number;
   graphicsStateName?: string;
   rotate?: { angle: number; originX: number; originY: number };
@@ -303,18 +320,27 @@ export function drawEllipseOps(options: EllipseOpsOptions): Operator[] {
   if (options.strokeColor) {
     ops.push(setStrokeColor(options.strokeColor));
     ops.push(setLineWidth(options.strokeWidth ?? 1));
+  } else if (options.strokePatternName) {
+    ops.push(setStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setStrokingColorN(options.strokePatternName));
+    ops.push(setLineWidth(options.strokeWidth ?? 1));
   }
 
-  // Set fill color
+  // Set fill color or pattern
   if (options.fillColor) {
     ops.push(setFillColor(options.fillColor));
+  } else if (options.fillPatternName) {
+    ops.push(setNonStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setNonStrokingColorN(options.fillPatternName));
   }
 
   // Draw the ellipse path using 4 Bezier curves
   ops.push(...ellipsePathOps(options.cx, options.cy, options.rx, options.ry));
 
   // Paint the path
-  ops.push(getPaintOp(!!options.fillColor, !!options.strokeColor));
+  const hasFill = !!options.fillColor || !!options.fillPatternName;
+  const hasStroke = !!options.strokeColor || !!options.strokePatternName;
+  ops.push(getPaintOp(hasFill, hasStroke));
 
   ops.push(popGraphicsState());
 
