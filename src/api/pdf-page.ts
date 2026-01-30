@@ -1312,8 +1312,7 @@ export class PDFPage {
    * Start building a custom path.
    *
    * Returns a PathBuilder with a fluent API for constructing paths.
-   * The path is drawn when you call stroke(), fill(), fillAndStroke(),
-   * fillWithShading(), or fillWithPattern().
+   * The path is drawn when you call stroke(), fill(), or fillAndStroke().
    *
    * @example
    * ```typescript
@@ -1336,20 +1335,21 @@ export class PDFPage {
    *     borderColor: rgb(0, 0, 1),
    *   });
    *
-   * // Circle with gradient fill
+   * // Circle with gradient fill (using shading pattern)
    * const gradient = pdf.createAxialShading({
    *   coords: [0, 0, 100, 0],
    *   stops: [{ offset: 0, color: rgb(1, 0, 0) }, { offset: 1, color: rgb(0, 0, 1) }],
    * });
+   * const gradientPattern = pdf.createShadingPattern({ shading: gradient });
    * page.drawPath()
    *   .circle(200, 200, 50)
-   *   .fillWithShading(gradient);
+   *   .fill({ pattern: gradientPattern });
    *
-   * // Rectangle with pattern fill
+   * // Rectangle with tiling pattern fill
    * const pattern = pdf.createTilingPattern({...});
    * page.drawPath()
    *   .rectangle(50, 300, 100, 100)
-   *   .fillWithPattern(pattern);
+   *   .fill({ pattern });
    * ```
    */
   drawPath(): PathBuilder {
