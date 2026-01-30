@@ -49,20 +49,7 @@ describe("Low-Level Drawing Integration", () => {
         const x = rotationX[i];
         const y = 620;
 
-        // Draw pivot point (dot)
-        page.drawOperators([
-          ops.pushGraphicsState(),
-          ops.setNonStrokingGray(0),
-          ops.moveTo(x - 3, y),
-          ops.curveTo(x - 3, y + 1.65, x - 1.65, y + 3, x, y + 3),
-          ops.curveTo(x + 1.65, y + 3, x + 3, y + 1.65, x + 3, y),
-          ops.curveTo(x + 3, y - 1.65, x + 1.65, y - 3, x, y - 3),
-          ops.curveTo(x - 1.65, y - 3, x - 3, y - 1.65, x - 3, y),
-          ops.fill(),
-          ops.popGraphicsState(),
-        ]);
-
-        // Draw rotated rectangle
+        // Draw rotated rectangle first (so pivot dot appears on top)
         page.drawOperators([
           ops.pushGraphicsState(),
           ops.concatMatrix(
@@ -76,13 +63,28 @@ describe("Low-Level Drawing Integration", () => {
           ops.popGraphicsState(),
         ]);
 
-        // Label angle
+        // Draw pivot point (larger red dot for visibility)
+        const dotRadius = 4;
+        const k = dotRadius * 0.5522847498;
+        page.drawOperators([
+          ops.pushGraphicsState(),
+          ops.setNonStrokingRGB(0.8, 0.2, 0.2), // Red dot
+          ops.moveTo(x - dotRadius, y),
+          ops.curveTo(x - dotRadius, y + k, x - k, y + dotRadius, x, y + dotRadius),
+          ops.curveTo(x + k, y + dotRadius, x + dotRadius, y + k, x + dotRadius, y),
+          ops.curveTo(x + dotRadius, y - k, x + k, y - dotRadius, x, y - dotRadius),
+          ops.curveTo(x - k, y - dotRadius, x - dotRadius, y - k, x - dotRadius, y),
+          ops.fill(),
+          ops.popGraphicsState(),
+        ]);
+
+        // Label angle (centered below)
         page.drawOperators([
           ops.beginText(),
           ops.setFont(bodyFont, 12),
           ops.setNonStrokingGray(0),
-          ops.moveText(x - 5, 530),
-          ops.showText(String(angle)),
+          ops.moveText(x - 8, 555),
+          ops.showText(`${angle}°`),
           ops.endText(),
         ]);
       }
@@ -209,22 +211,35 @@ describe("Low-Level Drawing Integration", () => {
         ops.endText(),
       ]);
 
-      // Rotate 12
-      page.drawOperators([
-        ops.beginText(),
-        ops.setFont(bodyFont, 10),
-        ops.setNonStrokingGray(0.3),
-        ops.moveText(520, 386),
-        ops.showText("Rotate 12"),
-        ops.endText(),
-      ]);
-
-      // Scale+Rot
+      // Rotate 12 degrees
       page.drawOperators([
         ops.pushGraphicsState(),
         ops.concatMatrix(
           Matrix.identity()
-            .translate(520, 340)
+            .translate(410, 378)
+            .rotate((12 * Math.PI) / 180),
+        ),
+        ops.beginText(),
+        ops.setFont(titleFont, 14),
+        ops.setNonStrokingRGB(0.32, 0.53, 0.73),
+        ops.moveText(0, 0),
+        ops.showText("Abc"),
+        ops.endText(),
+        ops.popGraphicsState(),
+        ops.beginText(),
+        ops.setFont(bodyFont, 10),
+        ops.setNonStrokingGray(0.3),
+        ops.moveText(520, 378),
+        ops.showText("Rotate 12°"),
+        ops.endText(),
+      ]);
+
+      // Scale + Rotate combined
+      page.drawOperators([
+        ops.pushGraphicsState(),
+        ops.concatMatrix(
+          Matrix.identity()
+            .translate(410, 340)
             .rotate((15 * Math.PI) / 180)
             .scale(1.3, 1.3),
         ),
@@ -238,8 +253,8 @@ describe("Low-Level Drawing Integration", () => {
         ops.beginText(),
         ops.setFont(bodyFont, 10),
         ops.setNonStrokingGray(0.3),
-        ops.moveText(520, 355),
-        ops.showText("Scale+Rot"),
+        ops.moveText(520, 340),
+        ops.showText("Scale 1.3x + Rot 15°"),
         ops.endText(),
       ]);
 
