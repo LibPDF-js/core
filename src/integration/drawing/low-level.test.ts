@@ -89,26 +89,13 @@ describe("Low-Level Drawing Integration", () => {
         ]);
       }
 
-      // "Abc" text with rotation (at right side)
-      page.drawOperators([
-        ops.pushGraphicsState(),
-        ops.concatMatrix(Matrix.identity().translate(520, 620)),
-        ops.beginText(),
-        ops.setFont(titleFont, 24),
-        ops.setNonStrokingRGB(0.32, 0.53, 0.73),
-        ops.moveText(0, 0),
-        ops.showText("Abc"),
-        ops.endText(),
-        ops.popGraphicsState(),
-      ]);
-
       // Subtitle for rotation
       page.drawOperators([
         ops.beginText(),
         ops.setFont(bodyFont, 10),
         ops.setNonStrokingGray(0.3),
-        ops.moveText(50, 510),
-        ops.showText("Rectangles rotate counter-clockwise around pivot (dot)"),
+        ops.moveText(50, 545),
+        ops.showText("Rectangles rotate counter-clockwise around pivot (red dot)"),
         ops.endText(),
       ]);
 
@@ -116,8 +103,8 @@ describe("Low-Level Drawing Integration", () => {
       page.drawOperators([
         ops.beginText(),
         ops.setFont(titleFont, 14),
-        ops.moveText(50, 480),
-        ops.showText("Scale (same 30x20 rectangle):"),
+        ops.moveText(50, 510),
+        ops.showText("Scale (30x20 rect):"),
         ops.endText(),
       ]);
 
@@ -127,12 +114,12 @@ describe("Low-Level Drawing Integration", () => {
         { sx: 2, sy: 2, label: "2x" },
         { sx: 2, sy: 1, label: "2x,1x" },
       ];
-      const scaleX = [100, 190, 300, 430];
+      const scaleX = [70, 140, 230, 350];
 
       for (let i = 0; i < scaleFactors.length; i++) {
         const { sx, sy, label } = scaleFactors[i];
         const x = scaleX[i];
-        const y = 420;
+        const y = 450;
 
         page.drawOperators([
           ops.pushGraphicsState(),
@@ -143,120 +130,76 @@ describe("Low-Level Drawing Integration", () => {
           ops.popGraphicsState(),
         ]);
 
-        // Label
+        // Label below
         page.drawOperators([
           ops.beginText(),
-          ops.setFont(bodyFont, 12),
+          ops.setFont(bodyFont, 10),
           ops.setNonStrokingGray(0),
-          ops.moveText(x, 395),
+          ops.moveText(x, 435),
           ops.showText(label),
           ops.endText(),
         ]);
       }
 
-      // "Abc" scaled text
-      page.drawOperators([
-        ops.pushGraphicsState(),
-        ops.concatMatrix(Matrix.identity().translate(300, 455).scale(1, 1.5)),
-        ops.beginText(),
-        ops.setFont(titleFont, 14),
-        ops.setNonStrokingRGB(0.32, 0.53, 0.73),
-        ops.moveText(0, 0),
-        ops.showText("Abc"),
-        ops.endText(),
-        ops.popGraphicsState(),
-      ]);
-
-      // Section 3: Combined Transforms
+      // Section 3: Combined Transforms on text
       page.drawOperators([
         ops.beginText(),
         ops.setFont(titleFont, 14),
-        ops.moveText(350, 480),
+        ops.moveText(50, 400),
         ops.showText("Combined Transforms:"),
         ops.endText(),
       ]);
 
-      // Identity
-      page.drawOperators([
-        ops.pushGraphicsState(),
-        ops.concatMatrix(Matrix.identity().translate(460, 450)),
-        ops.beginText(),
-        ops.setFont(titleFont, 14),
-        ops.setNonStrokingRGB(0.32, 0.53, 0.73),
-        ops.moveText(0, 0),
-        ops.showText("Abc"),
-        ops.endText(),
-        ops.popGraphicsState(),
-        ops.beginText(),
-        ops.setFont(bodyFont, 10),
-        ops.setNonStrokingGray(0.3),
-        ops.moveText(520, 450),
-        ops.showText("Identity"),
-        ops.endText(),
-      ]);
+      const combExamples = [
+        { x: 50, y: 355, transform: Matrix.identity(), label: "Identity" },
+        { x: 140, y: 355, transform: Matrix.identity().scale(1.5, 1.5), label: "Scale 1.5x" },
+        {
+          x: 260,
+          y: 355,
+          transform: Matrix.identity().rotate((15 * Math.PI) / 180),
+          label: "Rotate 15°",
+        },
+        {
+          x: 380,
+          y: 355,
+          transform: Matrix.identity()
+            .scale(1.2, 1.2)
+            .rotate((20 * Math.PI) / 180),
+          label: "Scale+Rot",
+        },
+        {
+          x: 500,
+          y: 355,
+          transform: Matrix.identity().scale(1, 2),
+          label: "Stretch Y",
+        },
+      ];
 
-      // Scale 1.5x
-      page.drawOperators([
-        ops.pushGraphicsState(),
-        ops.concatMatrix(Matrix.identity().translate(410, 410).scale(1.5, 1.5)),
-        ops.setNonStrokingRGB(0.32, 0.53, 0.73),
-        ops.rectangle(0, 0, 60, 16),
-        ops.fill(),
-        ops.popGraphicsState(),
-        ops.beginText(),
-        ops.setFont(bodyFont, 10),
-        ops.setNonStrokingGray(0.3),
-        ops.moveText(520, 418),
-        ops.showText("Scale 1.5x"),
-        ops.endText(),
-      ]);
+      for (const { x, y, transform, label } of combExamples) {
+        // Draw transformed "Abc"
+        // Transform first, then translate (transform * translate puts origin at x,y)
+        page.drawOperators([
+          ops.pushGraphicsState(),
+          ops.concatMatrix(transform.multiply(Matrix.translate(x, y))),
+          ops.beginText(),
+          ops.setFont(titleFont, 16),
+          ops.setNonStrokingRGB(0.32, 0.53, 0.73),
+          ops.moveText(0, 0),
+          ops.showText("Abc"),
+          ops.endText(),
+          ops.popGraphicsState(),
+        ]);
 
-      // Rotate 12 degrees
-      page.drawOperators([
-        ops.pushGraphicsState(),
-        ops.concatMatrix(
-          Matrix.identity()
-            .translate(410, 378)
-            .rotate((12 * Math.PI) / 180),
-        ),
-        ops.beginText(),
-        ops.setFont(titleFont, 14),
-        ops.setNonStrokingRGB(0.32, 0.53, 0.73),
-        ops.moveText(0, 0),
-        ops.showText("Abc"),
-        ops.endText(),
-        ops.popGraphicsState(),
-        ops.beginText(),
-        ops.setFont(bodyFont, 10),
-        ops.setNonStrokingGray(0.3),
-        ops.moveText(520, 378),
-        ops.showText("Rotate 12°"),
-        ops.endText(),
-      ]);
-
-      // Scale + Rotate combined
-      page.drawOperators([
-        ops.pushGraphicsState(),
-        ops.concatMatrix(
-          Matrix.identity()
-            .translate(410, 340)
-            .rotate((15 * Math.PI) / 180)
-            .scale(1.3, 1.3),
-        ),
-        ops.beginText(),
-        ops.setFont(titleFont, 14),
-        ops.setNonStrokingRGB(0.32, 0.53, 0.73),
-        ops.moveText(0, 0),
-        ops.showText("Abc"),
-        ops.endText(),
-        ops.popGraphicsState(),
-        ops.beginText(),
-        ops.setFont(bodyFont, 10),
-        ops.setNonStrokingGray(0.3),
-        ops.moveText(520, 340),
-        ops.showText("Scale 1.3x + Rot 15°"),
-        ops.endText(),
-      ]);
+        // Label below
+        page.drawOperators([
+          ops.beginText(),
+          ops.setFont(bodyFont, 9),
+          ops.setNonStrokingGray(0.3),
+          ops.moveText(x, 320),
+          ops.showText(label),
+          ops.endText(),
+        ]);
+      }
 
       // Section 4: Practical Example - Diagonal Watermarks
       page.drawOperators([
@@ -268,17 +211,20 @@ describe("Low-Level Drawing Integration", () => {
       ]);
 
       // Draw two document mockups
-      const docWidth = 200;
-      const docHeight = 200;
+      const docWidth = 180;
+      const docHeight = 220;
 
       // Document 1 with DRAFT watermark
-      const doc1X = 70;
-      const doc1Y = 70;
+      const doc1X = 60;
+      const doc1Y = 55;
 
       // Document border/background
       page.drawOperators([
         ops.pushGraphicsState(),
-        ops.setStrokingGray(0.8),
+        ops.setNonStrokingGray(0.98),
+        ops.rectangle(doc1X, doc1Y, docWidth, docHeight),
+        ops.fill(),
+        ops.setStrokingGray(0.7),
         ops.setLineWidth(1),
         ops.rectangle(doc1X, doc1Y, docWidth, docHeight),
         ops.stroke(),
@@ -286,41 +232,47 @@ describe("Low-Level Drawing Integration", () => {
       ]);
 
       // Fake text lines
-      for (let i = 0; i < 8; i++) {
-        const lineY = doc1Y + docHeight - 40 - i * 20;
-        const lineWidth = 120 + Math.random() * 50;
+      for (let i = 0; i < 9; i++) {
+        const lineY = doc1Y + docHeight - 30 - i * 22;
+        const lineWidth = 100 + (i % 3) * 30;
         page.drawOperators([
-          ops.setNonStrokingGray(0.85),
-          ops.rectangle(doc1X + 20, lineY, lineWidth, 8),
+          ops.setNonStrokingGray(0.8),
+          ops.rectangle(doc1X + 15, lineY, lineWidth, 10),
           ops.fill(),
         ]);
       }
 
-      // DRAFT watermark (red, rotated)
+      // DRAFT watermark (red, rotated) - centered in document
+      const draft1CenterX = doc1X + docWidth / 2;
+      const draft1CenterY = doc1Y + docHeight / 2;
       page.drawOperators([
         ops.pushGraphicsState(),
         ops.concatMatrix(
           Matrix.identity()
-            .translate(doc1X + 50, doc1Y + 60)
-            .rotate((-35 * Math.PI) / 180),
+            .translate(draft1CenterX, draft1CenterY)
+            .rotate((-30 * Math.PI) / 180),
         ),
         ops.beginText(),
-        ops.setFont(titleFont, 48),
-        ops.setNonStrokingRGB(0.8, 0.4, 0.4),
-        ops.moveText(0, 0),
+        ops.setFont(titleFont, 44),
+        ops.setNonStrokingRGB(0.9, 0.3, 0.3),
+        // Center the text (DRAFT is ~5 chars, ~25pt each at 44pt = ~110pt wide)
+        ops.moveText(-55, -15),
         ops.showText("DRAFT"),
         ops.endText(),
         ops.popGraphicsState(),
       ]);
 
       // Document 2 with APPROVED watermark
-      const doc2X = 330;
-      const doc2Y = 70;
+      const doc2X = 320;
+      const doc2Y = 55;
 
       // Document border/background
       page.drawOperators([
         ops.pushGraphicsState(),
-        ops.setStrokingGray(0.8),
+        ops.setNonStrokingGray(0.98),
+        ops.rectangle(doc2X, doc2Y, docWidth, docHeight),
+        ops.fill(),
+        ops.setStrokingGray(0.7),
         ops.setLineWidth(1),
         ops.rectangle(doc2X, doc2Y, docWidth, docHeight),
         ops.stroke(),
@@ -328,28 +280,31 @@ describe("Low-Level Drawing Integration", () => {
       ]);
 
       // Fake text lines
-      for (let i = 0; i < 8; i++) {
-        const lineY = doc2Y + docHeight - 40 - i * 20;
-        const lineWidth = 120 + Math.random() * 50;
+      for (let i = 0; i < 9; i++) {
+        const lineY = doc2Y + docHeight - 30 - i * 22;
+        const lineWidth = 100 + (i % 3) * 30;
         page.drawOperators([
-          ops.setNonStrokingGray(0.85),
-          ops.rectangle(doc2X + 20, lineY, lineWidth, 8),
+          ops.setNonStrokingGray(0.8),
+          ops.rectangle(doc2X + 15, lineY, lineWidth, 10),
           ops.fill(),
         ]);
       }
 
-      // APPROVED watermark (green, rotated)
+      // APPROVED watermark (green, rotated) - centered in document
+      const draft2CenterX = doc2X + docWidth / 2;
+      const draft2CenterY = doc2Y + docHeight / 2;
       page.drawOperators([
         ops.pushGraphicsState(),
         ops.concatMatrix(
           Matrix.identity()
-            .translate(doc2X + 30, doc2Y + 50)
-            .rotate((-35 * Math.PI) / 180),
+            .translate(draft2CenterX, draft2CenterY)
+            .rotate((-30 * Math.PI) / 180),
         ),
         ops.beginText(),
-        ops.setFont(titleFont, 36),
-        ops.setNonStrokingRGB(0.2, 0.6, 0.4),
-        ops.moveText(0, 0),
+        ops.setFont(titleFont, 32),
+        ops.setNonStrokingRGB(0.2, 0.7, 0.3),
+        // Center the text (APPROVED is ~8 chars)
+        ops.moveText(-65, -10),
         ops.showText("APPROVED"),
         ops.endText(),
         ops.popGraphicsState(),
