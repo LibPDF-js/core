@@ -2,6 +2,7 @@
  * Drawing API types and option interfaces.
  */
 
+import type { PDFPattern } from "#src/drawing/resources";
 import type { EmbeddedFont } from "#src/fonts/embedded-font";
 import type { Standard14FontName } from "#src/fonts/standard-14";
 import type { Color } from "#src/helpers/colors";
@@ -363,13 +364,44 @@ export interface DrawSvgPathOptions {
 
 /**
  * Options for path painting.
+ *
+ * @example
+ * ```typescript
+ * // Solid color fill
+ * page.drawPath().rectangle(0, 0, 100, 100).fill({ color: rgb(1, 0, 0) });
+ *
+ * // Pattern fill (tiling or shading pattern)
+ * const gradient = pdf.createAxialShading({...});
+ * const pattern = pdf.createShadingPattern({ shading: gradient });
+ * page.drawPath().circle(50, 50, 30).fill({ pattern });
+ *
+ * // Stroke with pattern
+ * page.drawPath().rectangle(0, 0, 100, 100).stroke({
+ *   borderPattern: pattern,
+ *   borderWidth: 5,
+ * });
+ * ```
  */
 export interface PathOptions {
-  /** Fill color (omit for no fill) */
+  /** Fill color (omit for no fill, mutually exclusive with pattern) */
   color?: Color;
-  /** Stroke color (omit for no stroke) */
+  /**
+   * Fill pattern (tiling or shading pattern).
+   *
+   * Use instead of color to fill with a gradient or repeating pattern.
+   * Mutually exclusive with color.
+   */
+  pattern?: PDFPattern;
+  /** Stroke color (omit for no stroke, mutually exclusive with borderPattern) */
   borderColor?: Color;
-  /** Stroke width in points (default: 1 if borderColor set) */
+  /**
+   * Stroke pattern (tiling or shading pattern).
+   *
+   * Use instead of borderColor to stroke with a gradient or repeating pattern.
+   * Mutually exclusive with borderColor.
+   */
+  borderPattern?: PDFPattern;
+  /** Stroke width in points (default: 1 if borderColor/borderPattern set) */
   borderWidth?: number;
   /** Line cap style */
   lineCap?: LineCap;

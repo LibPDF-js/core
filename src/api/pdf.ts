@@ -25,15 +25,26 @@ import {
   calculateAxialCoords,
   createAxialShadingDict,
   createExtGStateDict,
-  createFormXObjectDict,
+  createFormXObjectStream,
   createRadialShadingDict,
-  createTilingPatternDict,
+  createShadingPatternDict,
+  createTilingPatternStream,
   ExtGStateResource,
   FormXObjectResource,
-  PatternResource,
+  serializeOperators,
+  ShadingPatternResource,
   ShadingResource,
+  TilingPatternResource,
+  type ShadingPatternOptions,
 } from "#src/drawing/factory";
-import type { PDFFormXObject, PDFExtGState, PDFPattern, PDFShading } from "#src/drawing/resources";
+import type {
+  PDFFormXObject,
+  PDFExtGState,
+  PDFPattern,
+  PDFShading,
+  PDFShadingPattern,
+  PDFTilingPattern,
+} from "#src/drawing/resources";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format";
 import { resolvePageSize } from "#src/helpers/page-size";
@@ -2272,10 +2283,7 @@ export class PDF {
   /**
    * Create a tiling pattern.
    *
-   * Note: Resources (fonts, images, etc.) used in the paint callback must be
-   * pre-embedded on the PDF. The pattern paint callback is synchronous.
-   *
-   * @param options - Pattern options including bbox, step sizes, and paint callback
+   * @param options - Pattern options including bbox, step sizes, and operators
    * @returns PDFPattern resource for use with page.registerPattern()
    *
    * @example
@@ -2284,23 +2292,65 @@ export class PDF {
    *   bbox: [0, 0, 10, 10],
    *   xStep: 10,
    *   yStep: 10,
-   *   paint: ctx => {
-   *     ctx.drawOperators([
-   *       ops.setNonStrokingRGB(0.8, 0.8, 0.8),
-   *       ops.rectangle(0, 0, 5, 5),
-   *       ops.fill(),
-   *     ]);
-   *   },
+   *   operators: [
+   *     ops.setNonStrokingRGB(0.8, 0.8, 0.8),
+   *     ops.rectangle(0, 0, 5, 5),
+   *     ops.fill(),
+   *   ],
    * });
    * const patternName = page.registerPattern(pattern);
    * ```
    */
-  createTilingPattern(options: TilingPatternOptions): PDFPattern {
-    // TODO: Implement pattern content stream generation
-    // For now, create an empty pattern as a placeholder
-    const dict = createTilingPatternDict(options, new Uint8Array(0));
+  createTilingPattern(options: TilingPatternOptions): PDFTilingPattern {
+    const contentBytes = serializeOperators(options.operators);
+    const stream = createTilingPatternStream(options, contentBytes);
+    const ref = this.register(stream);
+    return new TilingPatternResource(ref);
+  }
+
+  /**
+   * Create a shading pattern from a shading (gradient).
+   *
+   * Shading patterns wrap a gradient so it can be used as a fill or stroke color,
+   * just like tiling patterns. This is the recommended way to use gradients with
+   * PathBuilder and high-level drawing methods.
+   *
+   * @param options - Shading pattern options (shading and optional matrix)
+   * @returns PDFShadingPattern resource for use with page.registerPattern()
+   *
+   * @example
+   * ```typescript
+   * // Create a gradient
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 100, 0],
+   *   stops: [
+   *     { offset: 0, color: rgb(1, 0, 0) },
+   *     { offset: 1, color: rgb(0, 0, 1) },
+   *   ],
+   * });
+   *
+   * // Wrap in a pattern
+   * const gradientPattern = pdf.createShadingPattern({ shading: gradient });
+   *
+   * // Use with PathBuilder
+   * page.drawPath()
+   *   .circle(200, 200, 50)
+   *   .fill({ pattern: gradientPattern });
+   *
+   * // Or register and use directly
+   * const patternName = page.registerPattern(gradientPattern);
+   * page.drawOperators([
+   *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+   *   ops.setNonStrokingColorN(patternName),
+   *   ops.rectangle(100, 100, 200, 200),
+   *   ops.fill(),
+   * ]);
+   * ```
+   */
+  createShadingPattern(options: ShadingPatternOptions): PDFShadingPattern {
+    const dict = createShadingPatternDict(options);
     const ref = this.register(dict);
-    return new PatternResource(ref);
+    return new ShadingPatternResource(ref, options.shading);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2336,23 +2386,18 @@ export class PDF {
   /**
    * Create a Form XObject (reusable content).
    *
-   * Note: Resources (fonts, images, etc.) used in the paint callback must be
-   * pre-embedded on the PDF. The paint callback is synchronous.
-   *
-   * @param options - Form XObject options including bbox and paint callback
+   * @param options - Form XObject options including bbox and operators
    * @returns PDFFormXObject resource for use with page.registerXObject()
    *
    * @example
    * ```typescript
    * const stamp = pdf.createFormXObject({
    *   bbox: [0, 0, 100, 50],
-   *   paint: ctx => {
-   *     ctx.drawOperators([
-   *       ops.setNonStrokingRGB(1, 0, 0),
-   *       ops.rectangle(0, 0, 100, 50),
-   *       ops.fill(),
-   *     ]);
-   *   },
+   *   operators: [
+   *     ops.setNonStrokingRGB(1, 0, 0),
+   *     ops.rectangle(0, 0, 100, 50),
+   *     ops.fill(),
+   *   ],
    * });
    * const xobjectName = page.registerXObject(stamp);
    *
@@ -2368,10 +2413,9 @@ export class PDF {
    * ```
    */
   createFormXObject(options: FormXObjectOptions): PDFFormXObject {
-    // TODO: Implement Form XObject content stream generation
-    // For now, create an empty form as a placeholder
-    const dict = createFormXObjectDict(options, new Uint8Array(0));
-    const ref = this.register(dict);
+    const contentBytes = serializeOperators(options.operators);
+    const stream = createFormXObjectStream(options, contentBytes);
+    const ref = this.register(stream);
     return new FormXObjectResource(ref, options.bbox);
   }
 

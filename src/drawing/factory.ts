@@ -5,7 +5,16 @@
  * shading, pattern, and extended graphics state resources.
  */
 
-import type { PDFFormXObject, PDFExtGState, PDFPattern, PDFShading } from "#src/drawing/resources";
+import type { Operator } from "#src/content/operators";
+import type {
+  PDFFormXObject,
+  PDFExtGState,
+  PDFPattern,
+  PDFShading,
+  PDFShadingPattern,
+  PDFTilingPattern,
+} from "#src/drawing/resources";
+import { concatBytes } from "#src/helpers/buffer";
 import type { Color } from "#src/helpers/colors";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfBool } from "#src/objects/pdf-bool";
@@ -15,63 +24,235 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Coordinate Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Axial (linear) shading coordinates: start point (x0, y0) to end point (x1, y1).
+ *
+ * The gradient is drawn along the line from (x0, y0) to (x1, y1).
+ */
+export type AxialCoords = [x0: number, y0: number, x1: number, y1: number];
+
+/**
+ * Radial shading coordinates: two circles defined by center and radius.
+ *
+ * - First circle: center (x0, y0), radius r0
+ * - Second circle: center (x1, y1), radius r1
+ *
+ * The gradient blends between the two circles.
+ */
+export type RadialCoords = [x0: number, y0: number, r0: number, x1: number, y1: number, r1: number];
+
+/**
+ * Bounding box in PDF coordinate space.
+ *
+ * Defines a rectangle as [x, y, width, height] where (x, y) is the lower-left corner.
+ * Used for patterns, Form XObjects, and clipping regions.
+ */
+export type BBox = [x: number, y: number, width: number, height: number];
+
+/**
+ * A color stop in a gradient.
+ *
+ * @example
+ * ```typescript
+ * const stops: ColorStop[] = [
+ *   { offset: 0, color: rgb(1, 0, 0) },    // Red at start
+ *   { offset: 0.5, color: rgb(1, 1, 0) },  // Yellow at midpoint
+ *   { offset: 1, color: rgb(0, 1, 0) },    // Green at end
+ * ];
+ * ```
+ */
+export interface ColorStop {
+  /** Position along the gradient (0 = start, 1 = end) */
+  offset: number;
+  /** Color at this position */
+  color: Color;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shading Options
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * Options for creating an axial (linear) shading.
+ *
+ * @example
+ * ```typescript
+ * const gradient = pdf.createAxialShading({
+ *   coords: [0, 0, 100, 0],  // Horizontal gradient, 100pt wide
+ *   stops: [
+ *     { offset: 0, color: rgb(1, 0, 0) },
+ *     { offset: 1, color: rgb(0, 0, 1) },
+ *   ],
+ * });
+ * ```
  */
 export interface AxialShadingOptions {
-  /** Coordinates [x0, y0, x1, y1] defining the start and end points */
-  coords: [number, number, number, number];
-  /** Color stops defining the gradient */
-  stops: { offset: number; color: Color }[];
-  /** Whether to extend the gradient beyond the start (index 0) and end (index 1) */
+  /**
+   * Line segment defining the gradient direction: [x0, y0, x1, y1].
+   *
+   * - (x0, y0): Start point where offset 0 colors appear
+   * - (x1, y1): End point where offset 1 colors appear
+   */
+  coords: AxialCoords;
+  /** Color stops defining the gradient colors and positions */
+  stops: ColorStop[];
+  /**
+   * Whether to extend the gradient beyond its bounds.
+   *
+   * - [true, true] (default): Extend both ends with the endpoint colors
+   * - [false, false]: No extension, transparent beyond bounds
+   */
   extend?: [boolean, boolean];
 }
 
 /**
  * Options for creating a radial shading.
+ *
+ * @example
+ * ```typescript
+ * // Classic radial gradient: point to circle
+ * const radial = pdf.createRadialShading({
+ *   coords: [50, 50, 0, 50, 50, 50],  // From center point to 50pt radius
+ *   stops: [
+ *     { offset: 0, color: rgb(1, 1, 1) },  // White at center
+ *     { offset: 1, color: rgb(0, 0, 0) },  // Black at edge
+ *   ],
+ * });
+ * ```
  */
 export interface RadialShadingOptions {
-  /** Coordinates [x0, y0, r0, x1, y1, r1] defining the two circles */
-  coords: [number, number, number, number, number, number];
-  /** Color stops defining the gradient */
-  stops: { offset: number; color: Color }[];
-  /** Whether to extend the gradient beyond the start (index 0) and end (index 1) circles */
+  /**
+   * Two circles defining the gradient: [x0, y0, r0, x1, y1, r1].
+   *
+   * - First circle: center (x0, y0), radius r0
+   * - Second circle: center (x1, y1), radius r1
+   *
+   * Common patterns:
+   * - Point-to-circle: r0 = 0 for a classic radial gradient from center
+   * - Circle-to-circle: Both radii > 0 for cone/spotlight effects
+   */
+  coords: RadialCoords;
+  /** Color stops defining the gradient colors and positions */
+  stops: ColorStop[];
+  /**
+   * Whether to extend the gradient beyond its bounds.
+   *
+   * - [true, true] (default): Extend both ends
+   * - [false, false]: No extension
+   */
   extend?: [boolean, boolean];
 }
 
 /**
- * Options for creating a linear gradient using angle and length.
+ * Options for creating a linear gradient using CSS-style angle and length.
+ *
+ * This is a convenience wrapper around axial shading that uses familiar
+ * CSS gradient conventions.
+ *
+ * @example
+ * ```typescript
+ * // Horizontal gradient (left to right)
+ * const gradient = pdf.createLinearGradient({
+ *   angle: 90,    // CSS: 0 = up, 90 = right, 180 = down, 270 = left
+ *   length: 100,  // Gradient spans 100pt
+ *   stops: [
+ *     { offset: 0, color: rgb(1, 0, 0) },
+ *     { offset: 1, color: rgb(0, 0, 1) },
+ *   ],
+ * });
+ * ```
  */
 export interface LinearGradientOptions {
-  /** Angle in degrees (CSS convention: 0 = up, 90 = right, 180 = down, 270 = left) */
+  /**
+   * Angle in degrees using CSS convention:
+   * - 0: Bottom to top
+   * - 90: Left to right
+   * - 180: Top to bottom
+   * - 270: Right to left
+   */
   angle: number;
   /** Length of the gradient in points */
   length: number;
-  /** Color stops defining the gradient */
-  stops: { offset: number; color: Color }[];
+  /** Color stops defining the gradient colors and positions */
+  stops: ColorStop[];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pattern Options
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Options for creating a tiling pattern.
+ *
+ * Tiling patterns repeat a small graphic cell to fill an area. The cell is
+ * defined by operators that draw into the bbox, and the pattern tiles with
+ * the specified step sizes.
+ *
+ * @example
+ * ```typescript
+ * // Checkerboard pattern
+ * const pattern = pdf.createTilingPattern({
+ *   bbox: [0, 0, 10, 10],
+ *   xStep: 10,
+ *   yStep: 10,
+ *   operators: [
+ *     ops.setNonStrokingGray(0.8),
+ *     ops.rectangle(0, 0, 5, 5),
+ *     ops.fill(),
+ *   ],
+ * });
+ * ```
  */
 export interface TilingPatternOptions {
-  /** Bounding box [x, y, width, height] */
-  bbox: [number, number, number, number];
-  /** Horizontal spacing between pattern cells */
+  /**
+   * Bounding box of the pattern cell: [x, y, width, height].
+   *
+   * Defines the coordinate space for the pattern's operators.
+   * Usually starts at [0, 0, width, height].
+   */
+  bbox: BBox;
+  /**
+   * Horizontal distance between pattern cell origins.
+   *
+   * Set equal to bbox width for seamless tiling, or larger for gaps.
+   */
   xStep: number;
-  /** Vertical spacing between pattern cells */
+  /**
+   * Vertical distance between pattern cell origins.
+   *
+   * Set equal to bbox height for seamless tiling, or larger for gaps.
+   */
   yStep: number;
-  /** Paint callback that draws the pattern content */
-  paint: (ctx: PatternContext) => void;
+  /** Operators that draw the pattern cell content */
+  operators: Operator[];
 }
 
 /**
- * Context passed to pattern paint callbacks.
+ * PDF blend modes for compositing.
+ *
+ * These control how colors are combined when drawing over existing content.
  */
-export interface PatternContext {
-  /** Draw operators into the pattern content stream */
-  drawOperators: (operators: unknown[]) => void;
-}
+export type BlendMode =
+  | "Normal"
+  | "Multiply"
+  | "Screen"
+  | "Overlay"
+  | "Darken"
+  | "Lighten"
+  | "ColorDodge"
+  | "ColorBurn"
+  | "HardLight"
+  | "SoftLight"
+  | "Difference"
+  | "Exclusion"
+  | "Hue"
+  | "Saturation"
+  | "Color"
+  | "Luminosity";
 
 /**
  * Options for creating extended graphics state.
@@ -81,8 +262,8 @@ export interface ExtGStateOptions {
   fillOpacity?: number;
   /** Stroke opacity (0-1) */
   strokeOpacity?: number;
-  /** Blend mode (e.g., "Multiply", "Screen", "Overlay") */
-  blendMode?: string;
+  /** Blend mode for compositing */
+  blendMode?: BlendMode;
 }
 
 /**
@@ -248,15 +429,42 @@ export function calculateAxialCoords(
 }
 
 /**
- * Create a tiling pattern dictionary.
+ * Serialize operators to bytes for content streams.
+ *
+ * Uses Operator.toBytes() directly to avoid UTF-8 round-trip corruption
+ * of non-ASCII bytes in PdfString operands (e.g., WinAnsi-encoded text).
  */
-export function createTilingPatternDict(
+export function serializeOperators(ops: Operator[]): Uint8Array {
+  if (ops.length === 0) {
+    return new Uint8Array(0);
+  }
+
+  const newline = new Uint8Array([0x0a]);
+  const parts: Uint8Array[] = [];
+
+  for (let i = 0; i < ops.length; i++) {
+    if (i > 0) {
+      parts.push(newline);
+    }
+
+    parts.push(ops[i].toBytes());
+  }
+
+  return concatBytes(parts);
+}
+
+/**
+ * Create a tiling pattern stream.
+ *
+ * Tiling patterns are content streams (PdfStream), not plain dictionaries.
+ */
+export function createTilingPatternStream(
   options: TilingPatternOptions,
   contentBytes: Uint8Array,
-): PdfDict {
+): PdfStream {
   const [x, y, width, height] = options.bbox;
 
-  return PdfDict.of({
+  const dict = PdfDict.of({
     Type: PdfName.of("Pattern"),
     PatternType: PdfNumber.of(1), // Tiling pattern
     PaintType: PdfNumber.of(1), // Colored tiling pattern
@@ -270,6 +478,8 @@ export function createTilingPatternDict(
     XStep: PdfNumber.of(options.xStep),
     YStep: PdfNumber.of(options.yStep),
   });
+
+  return new PdfStream(dict, contentBytes);
 }
 
 /**
@@ -308,15 +518,30 @@ export class ShadingResource implements PDFShading {
 }
 
 /**
- * Wrapper class for a pattern resource.
+ * Wrapper class for a tiling pattern resource.
  */
-export class PatternResource implements PDFPattern {
+export class TilingPatternResource implements PDFTilingPattern {
   readonly type = "pattern";
   readonly ref: PdfRef;
   readonly patternType = "tiling";
 
   constructor(ref: PdfRef) {
     this.ref = ref;
+  }
+}
+
+/**
+ * Wrapper class for a shading pattern resource.
+ */
+export class ShadingPatternResource implements PDFShadingPattern {
+  readonly type = "pattern";
+  readonly ref: PdfRef;
+  readonly patternType = "shading";
+  readonly shading: PDFShading;
+
+  constructor(ref: PdfRef, shading: PDFShading) {
+    this.ref = ref;
+    this.shading = shading;
   }
 }
 
@@ -338,42 +563,75 @@ export class ExtGStateResource implements PDFExtGState {
 export class FormXObjectResource implements PDFFormXObject {
   readonly type = "formxobject";
   readonly ref: PdfRef;
-  readonly bbox: [number, number, number, number];
+  readonly bbox: BBox;
 
-  constructor(ref: PdfRef, bbox: [number, number, number, number]) {
+  constructor(ref: PdfRef, bbox: BBox) {
     this.ref = ref;
     this.bbox = bbox;
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Form XObject Options
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Options for creating a Form XObject.
+ * Options for creating a Form XObject (reusable content).
+ *
+ * Form XObjects are like "stamps" - define once, use many times.
+ * They're perfect for watermarks, headers, footers, and repeated graphics.
+ *
+ * @example
+ * ```typescript
+ * // Create a "DRAFT" watermark stamp
+ * const draftStamp = pdf.createFormXObject({
+ *   bbox: [0, 0, 200, 50],
+ *   operators: [
+ *     ops.setNonStrokingRGB(0.9, 0.1, 0.1),
+ *     ops.beginText(),
+ *     ops.setFont(fontName, 36),
+ *     ops.moveText(10, 10),
+ *     ops.showText("DRAFT"),
+ *     ops.endText(),
+ *   ],
+ * });
+ *
+ * // Use on every page
+ * for (const page of pdf.getPages()) {
+ *   const name = page.registerXObject(draftStamp);
+ *   page.drawOperators([
+ *     ops.pushGraphicsState(),
+ *     ops.concatMatrix(1, 0, 0, 1, 200, 700),
+ *     ops.paintXObject(name),
+ *     ops.popGraphicsState(),
+ *   ]);
+ * }
+ * ```
  */
 export interface FormXObjectOptions {
-  /** Bounding box [x, y, width, height] */
-  bbox: [number, number, number, number];
-  /** Paint callback that draws the form content */
-  paint: (ctx: FormXObjectContext) => void;
+  /**
+   * Bounding box of the Form XObject: [x, y, width, height].
+   *
+   * Defines the coordinate space for the form's operators.
+   * Usually starts at [0, 0, width, height].
+   */
+  bbox: BBox;
+  /** Operators that draw the form content */
+  operators: Operator[];
 }
 
 /**
- * Context passed to Form XObject paint callbacks.
+ * Create a Form XObject stream.
+ *
+ * Form XObjects are content streams (PdfStream), not plain dictionaries.
  */
-export interface FormXObjectContext {
-  /** Draw operators into the form content stream */
-  drawOperators: (operators: unknown[]) => void;
-}
-
-/**
- * Create a Form XObject dictionary.
- */
-export function createFormXObjectDict(
+export function createFormXObjectStream(
   options: FormXObjectOptions,
   contentBytes: Uint8Array,
-): PdfDict {
+): PdfStream {
   const [x, y, width, height] = options.bbox;
 
-  return PdfDict.of({
+  const dict = PdfDict.of({
     Type: PdfName.of("XObject"),
     Subtype: PdfName.of("Form"),
     FormType: PdfNumber.of(1),
@@ -384,4 +642,94 @@ export function createFormXObjectDict(
       PdfNumber.of(height),
     ]),
   });
+
+  return new PdfStream(dict, contentBytes);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shading Pattern Options
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Matrix for transforming a shading pattern.
+ *
+ * Standard PDF transformation matrix [a, b, c, d, e, f] where:
+ * - a, d: Scale factors
+ * - b, c: Rotation/skew factors
+ * - e, f: Translation
+ */
+export type PatternMatrix = [a: number, b: number, c: number, d: number, e: number, f: number];
+
+/**
+ * Options for creating a shading pattern.
+ *
+ * Shading patterns wrap a gradient (shading) so it can be used as a fill or
+ * stroke color, just like tiling patterns.
+ *
+ * @example
+ * ```typescript
+ * // Create a gradient
+ * const gradient = pdf.createAxialShading({
+ *   coords: [0, 0, 100, 0],
+ *   stops: [
+ *     { offset: 0, color: rgb(1, 0, 0) },
+ *     { offset: 1, color: rgb(0, 0, 1) },
+ *   ],
+ * });
+ *
+ * // Wrap in a pattern (optionally with transform)
+ * const pattern = pdf.createShadingPattern({
+ *   shading: gradient,
+ *   matrix: [1, 0, 0, 1, 50, 100],  // Translate by (50, 100)
+ * });
+ * ```
+ */
+export interface ShadingPatternOptions {
+  /**
+   * The shading (gradient) to use.
+   *
+   * Created via pdf.createAxialShading() or pdf.createRadialShading().
+   */
+  shading: PDFShading;
+
+  /**
+   * Optional transformation matrix for the pattern.
+   *
+   * Transforms the shading's coordinate space. Useful for positioning
+   * a gradient relative to shapes that will use it.
+   *
+   * Default: identity matrix (no transformation)
+   */
+  matrix?: PatternMatrix;
+}
+
+/**
+ * Create a shading pattern dictionary.
+ *
+ * Shading patterns (PatternType 2) wrap a shading object so it can be used
+ * as a pattern color in fill/stroke operations.
+ */
+export function createShadingPatternDict(options: ShadingPatternOptions): PdfDict {
+  const dict = PdfDict.of({
+    Type: PdfName.of("Pattern"),
+    PatternType: PdfNumber.of(2), // Shading pattern
+    Shading: options.shading.ref,
+  });
+
+  if (options.matrix) {
+    const [a, b, c, d, e, f] = options.matrix;
+    dict.set(
+      "Matrix",
+      new PdfArray([
+        PdfNumber.of(a),
+        PdfNumber.of(b),
+        PdfNumber.of(c),
+        PdfNumber.of(d),
+        PdfNumber.of(e),
+        PdfNumber.of(f),
+      ]),
+    );
+  }
+
+  return dict;
 }

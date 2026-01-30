@@ -6,10 +6,26 @@
  */
 
 import type { Operator } from "#src/content/operators";
-import { clip, clipEvenOdd, closePath, curveTo, lineTo, moveTo } from "#src/helpers/operators";
+import { ColorSpace } from "#src/helpers/colorspace";
+import {
+  clip,
+  clipEvenOdd,
+  closePath,
+  curveTo,
+  endPath,
+  fill as fillOp,
+  lineTo,
+  moveTo,
+  paintShading,
+  popGraphicsState,
+  pushGraphicsState,
+  setNonStrokingColorN,
+  setNonStrokingColorSpace,
+} from "#src/helpers/operators";
 import { executeSvgPathString, type SvgPathExecutorOptions } from "#src/svg/path-executor";
 
 import { wrapPathOps } from "./operations";
+import type { PDFPattern, PDFShading } from "./resources";
 import type { PathOptions } from "./types";
 
 /**
@@ -32,23 +48,53 @@ export type GraphicsStateRegistrar = (
 ) => string | null;
 
 /**
+ * Callback type for registering a shading and returning its name.
+ */
+export type ShadingRegistrar = (shading: PDFShading) => string;
+
+/**
+ * Callback type for registering a pattern and returning its name.
+ */
+export type PatternRegistrar = (pattern: PDFPattern) => string;
+
+/**
  * PathBuilder provides a fluent interface for constructing PDF paths.
  *
  * @example
  * ```typescript
- * // Triangle
+ * // Triangle with solid color
  * page.drawPath()
  *   .moveTo(300, 200)
  *   .lineTo(350, 300)
  *   .lineTo(250, 300)
  *   .close()
  *   .fill({ color: rgb(0, 0, 1) });
+ *
+ * // Rectangle with gradient fill
+ * const gradient = pdf.createAxialShading({
+ *   coords: [0, 0, 100, 0],
+ *   stops: [
+ *     { offset: 0, color: rgb(1, 0, 0) },
+ *     { offset: 1, color: rgb(0, 0, 1) },
+ *   ],
+ * });
+ * page.drawPath()
+ *   .rectangle(50, 50, 100, 100)
+ *   .fillWithShading(gradient);
+ *
+ * // Circle with pattern fill
+ * const pattern = pdf.createTilingPattern({...});
+ * page.drawPath()
+ *   .circle(200, 200, 50)
+ *   .fillWithPattern(pattern);
  * ```
  */
 export class PathBuilder {
   private readonly pathOps: Operator[] = [];
   private readonly appendContent: ContentAppender;
   private readonly registerGraphicsState: GraphicsStateRegistrar;
+  private readonly registerShading?: ShadingRegistrar;
+  private readonly registerPattern?: PatternRegistrar;
 
   /** Current point for quadratic-to-cubic conversion */
   private currentX = 0;
@@ -58,9 +104,16 @@ export class PathBuilder {
   private subpathStartX = 0;
   private subpathStartY = 0;
 
-  constructor(appendContent: ContentAppender, registerGraphicsState: GraphicsStateRegistrar) {
+  constructor(
+    appendContent: ContentAppender,
+    registerGraphicsState: GraphicsStateRegistrar,
+    registerShading?: ShadingRegistrar,
+    registerPattern?: PatternRegistrar,
+  ) {
     this.appendContent = appendContent;
     this.registerGraphicsState = registerGraphicsState;
+    this.registerShading = registerShading;
+    this.registerPattern = registerPattern;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -305,6 +358,93 @@ export class PathBuilder {
     this.paint(options);
   }
 
+  /**
+   * Fill the path with a shading (gradient) using clipping.
+   *
+   * @deprecated Use `fill({ pattern: pdf.createShadingPattern({ shading }) })` instead.
+   * The shading pattern approach is cleaner and more consistent with the rest of the API.
+   *
+   * @param shading - The shading resource to use
+   * @throws Error if PathBuilder was not created with shading support
+   *
+   * @example
+   * ```typescript
+   * // OLD (deprecated):
+   * page.drawPath().rectangle(50, 50, 100, 100).fillWithShading(gradient);
+   *
+   * // NEW (preferred):
+   * const pattern = pdf.createShadingPattern({ shading: gradient });
+   * page.drawPath().rectangle(50, 50, 100, 100).fill({ pattern });
+   * ```
+   */
+  fillWithShading(shading: PDFShading): void {
+    if (!this.registerShading) {
+      throw new Error(
+        "fillWithShading requires shading support. Use page.drawPath() which provides this.",
+      );
+    }
+
+    const shadingName = this.registerShading(shading);
+
+    // Build operators: save state, clip to path, paint shading, restore state
+    const ops: Operator[] = [
+      pushGraphicsState(),
+      ...this.pathOps,
+      clip(),
+      endPath(),
+      paintShading(shadingName),
+      popGraphicsState(),
+    ];
+
+    this.emitOps(ops);
+  }
+
+  /**
+   * Fill the path with a pattern.
+   *
+   * @deprecated Use `fill({ pattern })` instead, which is cleaner and more consistent.
+   *
+   * @param pattern - The pattern resource to use
+   * @throws Error if PathBuilder was not created with pattern support
+   *
+   * @example
+   * ```typescript
+   * // OLD (deprecated):
+   * page.drawPath().circle(200, 200, 50).fillWithPattern(pattern);
+   *
+   * // NEW (preferred):
+   * page.drawPath().circle(200, 200, 50).fill({ pattern });
+   * ```
+   */
+  fillWithPattern(pattern: PDFPattern): void {
+    if (!this.registerPattern) {
+      throw new Error(
+        "fillWithPattern requires pattern support. Use page.drawPath() which provides this.",
+      );
+    }
+
+    const patternName = this.registerPattern(pattern);
+
+    // Build operators: save state, set pattern color space, set pattern, draw path, fill, restore
+    const ops: Operator[] = [
+      pushGraphicsState(),
+      setNonStrokingColorSpace(ColorSpace.Pattern),
+      setNonStrokingColorN(patternName),
+      ...this.pathOps,
+      ...this.getFillOps(),
+      popGraphicsState(),
+    ];
+
+    this.emitOps(ops);
+  }
+
+  /**
+   * Get the fill operators based on default fill behavior.
+   */
+  private getFillOps(): Operator[] {
+    return [fillOp()];
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Clipping
   // ─────────────────────────────────────────────────────────────────────────────
@@ -340,10 +480,34 @@ export class PathBuilder {
       gsName = this.registerGraphicsState(options.opacity, options.borderOpacity);
     }
 
+    // Register fill pattern if provided
+    let fillPatternName: string | undefined;
+    if (options.pattern) {
+      if (!this.registerPattern) {
+        throw new Error(
+          "Pattern fills require pattern support. Use page.drawPath() which provides this.",
+        );
+      }
+      fillPatternName = this.registerPattern(options.pattern);
+    }
+
+    // Register stroke pattern if provided
+    let strokePatternName: string | undefined;
+    if (options.borderPattern) {
+      if (!this.registerPattern) {
+        throw new Error(
+          "Pattern strokes require pattern support. Use page.drawPath() which provides this.",
+        );
+      }
+      strokePatternName = this.registerPattern(options.borderPattern);
+    }
+
     // Map PathOptions to PathOpsOptions
     const ops = wrapPathOps(this.pathOps, {
-      fillColor: options.color,
-      strokeColor: options.borderColor,
+      fillColor: options.pattern ? undefined : options.color, // Pattern takes precedence
+      fillPatternName,
+      strokeColor: options.borderPattern ? undefined : options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       lineCap: options.lineCap,
       lineJoin: options.lineJoin,

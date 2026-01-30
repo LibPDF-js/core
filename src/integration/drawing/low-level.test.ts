@@ -558,233 +558,161 @@ describe("Low-Level Drawing Integration", () => {
         ops.endText(),
       ]);
 
-      // Helper to draw checkerboard pattern manually
-      const drawCheckerboard = (
-        x: number,
-        y: number,
-        width: number,
-        height: number,
-        cellSize: number,
-      ) => {
-        const ops_: ReturnType<typeof ops.pushGraphicsState>[] = [];
-        ops_.push(ops.pushGraphicsState());
-
-        for (let row = 0; row < Math.ceil(height / cellSize); row++) {
-          for (let col = 0; col < Math.ceil(width / cellSize); col++) {
-            // Alternate colors
-            if ((row + col) % 2 === 0) {
-              const cellX = x + col * cellSize;
-              const cellY = y + row * cellSize;
-              const cellW = Math.min(cellSize, x + width - cellX);
-              const cellH = Math.min(cellSize, y + height - cellY);
-
-              if (cellW > 0 && cellH > 0) {
-                ops_.push(ops.setNonStrokingGray(0.3));
-                ops_.push(ops.rectangle(cellX, cellY, cellW, cellH));
-                ops_.push(ops.fill());
-              }
-            }
-          }
-        }
-        ops_.push(ops.popGraphicsState());
-        return ops_;
-      };
-
       // 1. Checkerboard pattern - top left
-      const checkX = 50;
-      const checkY = 480;
-      const checkSize = 200;
+      const checkerPattern = pdf.createTilingPattern({
+        bbox: [0, 0, 36, 36],
+        xStep: 36,
+        yStep: 36,
+        operators: [
+          // Light gray background (fills entire cell)
+          ops.setNonStrokingGray(0.9),
+          ops.rectangle(0, 0, 36, 36),
+          ops.fill(),
+          // Dark gray squares
+          ops.setNonStrokingGray(0.3),
+          ops.rectangle(0, 0, 18, 18),
+          ops.fill(),
+          ops.rectangle(18, 18, 18, 18),
+          ops.fill(),
+        ],
+      });
+      const checkerName = page.registerPattern(checkerPattern);
 
-      // Background
       page.drawOperators([
-        ops.setNonStrokingGray(0.9),
-        ops.rectangle(checkX, checkY, checkSize, checkSize),
+        ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+        ops.setNonStrokingColorN(checkerName),
+        ops.rectangle(50, 480, 200, 200),
         ops.fill(),
       ]);
-
-      // Draw checkerboard
-      page.drawOperators(drawCheckerboard(checkX, checkY, checkSize, checkSize, 18));
 
       // Label
       page.drawOperators([
         ops.beginText(),
         ops.setFont(bodyFont, 12),
         ops.setNonStrokingGray(0),
-        ops.moveText(checkX, checkY - 20),
+        ops.moveText(50, 460),
         ops.showText("Checkerboard"),
         ops.endText(),
       ]);
 
       // 2. Diagonal Lines pattern - top right
-      const diagX = 310;
-      const diagY = 480;
-      const diagSize = 200;
+      const diagPattern = pdf.createTilingPattern({
+        bbox: [0, 0, 8, 8],
+        xStep: 8,
+        yStep: 8,
+        operators: [
+          // Light background
+          ops.setNonStrokingGray(0.95),
+          ops.rectangle(0, 0, 8, 8),
+          ops.fill(),
+          // Diagonal line
+          ops.setStrokingGray(0.5),
+          ops.setLineWidth(0.5),
+          ops.moveTo(0, 0),
+          ops.lineTo(8, 8),
+          ops.stroke(),
+        ],
+      });
+      const diagName = page.registerPattern(diagPattern);
 
-      // Background
       page.drawOperators([
-        ops.setNonStrokingGray(0.95),
-        ops.rectangle(diagX, diagY, diagSize, diagSize),
+        ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+        ops.setNonStrokingColorN(diagName),
+        ops.rectangle(310, 480, 200, 200),
         ops.fill(),
       ]);
-
-      // Draw diagonal lines
-      page.drawOperators([ops.pushGraphicsState()]);
-      page.drawOperators([ops.setStrokingGray(0.5), ops.setLineWidth(0.5)]);
-
-      // Clip to the rectangle
-      page.drawOperators([
-        ops.rectangle(diagX, diagY, diagSize, diagSize),
-        ops.clip(),
-        ops.endPath(),
-      ]);
-
-      // Draw diagonal lines
-      const lineSpacing = 8;
-      for (let i = -diagSize; i < diagSize * 2; i += lineSpacing) {
-        page.drawOperators([
-          ops.moveTo(diagX + i, diagY),
-          ops.lineTo(diagX + i + diagSize, diagY + diagSize),
-          ops.stroke(),
-        ]);
-      }
-      page.drawOperators([ops.popGraphicsState()]);
 
       // Label
       page.drawOperators([
         ops.beginText(),
         ops.setFont(bodyFont, 12),
         ops.setNonStrokingGray(0),
-        ops.moveText(diagX, diagY - 20),
+        ops.moveText(310, 460),
         ops.showText("Diagonal Lines"),
         ops.endText(),
       ]);
 
       // 3. Polka Dots pattern - bottom left
-      const dotsX = 50;
-      const dotsY = 210;
-      const dotsSize = 200;
-      const dotRadius = 4;
-      const dotSpacing = 18;
+      const cx = 9;
+      const cy = 9;
+      const r = 4;
+      const k = 0.552;
+      const dotPattern = pdf.createTilingPattern({
+        bbox: [0, 0, 18, 18],
+        xStep: 18,
+        yStep: 18,
+        operators: [
+          // White background
+          ops.setNonStrokingGray(1),
+          ops.rectangle(0, 0, 18, 18),
+          ops.fill(),
+          // Blue dot (circle using bezier curves)
+          ops.setNonStrokingRGB(0.32, 0.53, 0.73),
+          ops.moveTo(cx + r, cy),
+          ops.curveTo(cx + r, cy + r * k, cx + r * k, cy + r, cx, cy + r),
+          ops.curveTo(cx - r * k, cy + r, cx - r, cy + r * k, cx - r, cy),
+          ops.curveTo(cx - r, cy - r * k, cx - r * k, cy - r, cx, cy - r),
+          ops.curveTo(cx + r * k, cy - r, cx + r, cy - r * k, cx + r, cy),
+          ops.fill(),
+        ],
+      });
+      const dotName = page.registerPattern(dotPattern);
 
-      // Background
       page.drawOperators([
-        ops.setNonStrokingGray(1),
-        ops.rectangle(dotsX, dotsY, dotsSize, dotsSize),
+        ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+        ops.setNonStrokingColorN(dotName),
+        ops.rectangle(50, 210, 200, 200),
         ops.fill(),
       ]);
-
-      // Draw polka dots
-      page.drawOperators([ops.pushGraphicsState()]);
-      page.drawOperators([ops.setNonStrokingRGB(0.32, 0.53, 0.73)]);
-
-      for (let row = 0; row < Math.ceil(dotsSize / dotSpacing); row++) {
-        for (let col = 0; col < Math.ceil(dotsSize / dotSpacing); col++) {
-          const cx = dotsX + col * dotSpacing + dotSpacing / 2;
-          const cy = dotsY + row * dotSpacing + dotSpacing / 2;
-
-          if (cx + dotRadius <= dotsX + dotsSize && cy + dotRadius <= dotsY + dotsSize) {
-            // Draw circle using bezier curves
-            const k = 0.552; // bezier control point ratio for circle
-            page.drawOperators([
-              ops.moveTo(cx + dotRadius, cy),
-              ops.curveTo(
-                cx + dotRadius,
-                cy + dotRadius * k,
-                cx + dotRadius * k,
-                cy + dotRadius,
-                cx,
-                cy + dotRadius,
-              ),
-              ops.curveTo(
-                cx - dotRadius * k,
-                cy + dotRadius,
-                cx - dotRadius,
-                cy + dotRadius * k,
-                cx - dotRadius,
-                cy,
-              ),
-              ops.curveTo(
-                cx - dotRadius,
-                cy - dotRadius * k,
-                cx - dotRadius * k,
-                cy - dotRadius,
-                cx,
-                cy - dotRadius,
-              ),
-              ops.curveTo(
-                cx + dotRadius * k,
-                cy - dotRadius,
-                cx + dotRadius,
-                cy - dotRadius * k,
-                cx + dotRadius,
-                cy,
-              ),
-              ops.fill(),
-            ]);
-          }
-        }
-      }
-      page.drawOperators([ops.popGraphicsState()]);
 
       // Label
       page.drawOperators([
         ops.beginText(),
         ops.setFont(bodyFont, 12),
         ops.setNonStrokingGray(0),
-        ops.moveText(dotsX, dotsY - 20),
+        ops.moveText(50, 190),
         ops.showText("Polka Dots"),
         ops.endText(),
       ]);
 
       // 4. Crosshatch pattern - bottom right
-      const crossX = 310;
-      const crossY = 210;
-      const crossSize = 200;
+      const crossPattern = pdf.createTilingPattern({
+        bbox: [0, 0, 15, 15],
+        xStep: 15,
+        yStep: 15,
+        operators: [
+          // White background
+          ops.setNonStrokingGray(1),
+          ops.rectangle(0, 0, 15, 15),
+          ops.fill(),
+          // Orange grid lines
+          ops.setStrokingRGB(0.8, 0.5, 0.1),
+          ops.setLineWidth(0.5),
+          // Vertical line
+          ops.moveTo(7.5, 0),
+          ops.lineTo(7.5, 15),
+          ops.stroke(),
+          // Horizontal line
+          ops.moveTo(0, 7.5),
+          ops.lineTo(15, 7.5),
+          ops.stroke(),
+        ],
+      });
+      const crossName = page.registerPattern(crossPattern);
 
-      // Background
       page.drawOperators([
-        ops.setNonStrokingGray(1),
-        ops.rectangle(crossX, crossY, crossSize, crossSize),
+        ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+        ops.setNonStrokingColorN(crossName),
+        ops.rectangle(310, 210, 200, 200),
         ops.fill(),
       ]);
-
-      // Draw crosshatch (grid lines)
-      page.drawOperators([ops.pushGraphicsState()]);
-      page.drawOperators([ops.setStrokingRGB(0.8, 0.5, 0.1), ops.setLineWidth(0.5)]);
-
-      // Clip to the rectangle
-      page.drawOperators([
-        ops.rectangle(crossX, crossY, crossSize, crossSize),
-        ops.clip(),
-        ops.endPath(),
-      ]);
-
-      // Vertical lines
-      const gridSpacing = 15;
-      for (let i = 0; i <= crossSize; i += gridSpacing) {
-        page.drawOperators([
-          ops.moveTo(crossX + i, crossY),
-          ops.lineTo(crossX + i, crossY + crossSize),
-          ops.stroke(),
-        ]);
-      }
-
-      // Horizontal lines
-      for (let i = 0; i <= crossSize; i += gridSpacing) {
-        page.drawOperators([
-          ops.moveTo(crossX, crossY + i),
-          ops.lineTo(crossX + crossSize, crossY + i),
-          ops.stroke(),
-        ]);
-      }
-      page.drawOperators([ops.popGraphicsState()]);
 
       // Label
       page.drawOperators([
         ops.beginText(),
         ops.setFont(bodyFont, 12),
         ops.setNonStrokingGray(0),
-        ops.moveText(crossX, crossY - 20),
+        ops.moveText(310, 190),
         ops.showText("Crosshatch"),
         ops.endText(),
       ]);
@@ -868,7 +796,10 @@ describe("Low-Level Drawing Integration", () => {
       ]);
 
       // Each blend mode has a different foreground color to demonstrate the effect
-      const blendModeConfigs = [
+      const blendModeConfigs: {
+        mode: "Multiply" | "Screen" | "Overlay" | "Difference";
+        color: number[];
+      }[] = [
         { mode: "Multiply", color: [0.9, 0.5, 0.1] }, // Orange - multiplies with gray to make brown
         { mode: "Screen", color: [0.1, 0.5, 0.9] }, // Blue - screens with gray to make light blue
         { mode: "Overlay", color: [0.8, 0.2, 0.6] }, // Magenta - overlays with gray
@@ -1144,103 +1075,57 @@ describe("Low-Level Drawing Integration", () => {
       // Create new PDF for this test
       const testPdf = PDF.create();
 
-      // Helper to draw DRAFT stamp (red with outline)
-      const drawDraftStamp = (
-        page: ReturnType<typeof testPdf.addPage>,
-        x: number,
-        y: number,
-        fontName: string,
-      ) => {
-        page.drawOperators([
-          ops.pushGraphicsState(),
+      // Create Form XObjects for each stamp type - these are defined once
+      // and reused across all pages
+
+      // DRAFT stamp (red with outline) - no text since fonts need page registration
+      const draftStamp = testPdf.createFormXObject({
+        bbox: [0, 0, 100, 40],
+        operators: [
           // Red outlined box
           ops.setStrokingRGB(0.8, 0.1, 0.1),
           ops.setNonStrokingRGB(1, 1, 1),
           ops.setLineWidth(2),
-          ops.rectangle(x, y, 100, 40),
+          ops.rectangle(0, 0, 100, 40),
           ops.fillAndStroke(),
           // Inner red box
           ops.setStrokingRGB(0.8, 0.1, 0.1),
           ops.setLineWidth(1),
-          ops.rectangle(x + 3, y + 3, 94, 34),
+          ops.rectangle(3, 3, 94, 34),
           ops.stroke(),
-          ops.popGraphicsState(),
-          // Text
-          ops.beginText(),
-          ops.setFont(fontName, 24),
-          ops.setNonStrokingRGB(0.8, 0.1, 0.1),
-          ops.moveText(x + 10, y + 10),
-          ops.showText("DRAFT"),
-          ops.endText(),
-        ]);
-      };
+        ],
+      });
 
-      // Helper to draw APPROVED stamp (green, rotated)
-      const drawApprovedStamp = (
-        page: ReturnType<typeof testPdf.addPage>,
-        x: number,
-        y: number,
-        fontName: string,
-        angle: number,
-      ) => {
-        page.drawOperators([
-          ops.pushGraphicsState(),
-          ops.concatMatrix(
-            Matrix.identity()
-              .translate(x, y)
-              .rotate((angle * Math.PI) / 180),
-          ),
-          // Green filled box
+      // APPROVED stamp (green filled box)
+      const approvedStamp = testPdf.createFormXObject({
+        bbox: [0, 0, 140, 35],
+        operators: [
           ops.setNonStrokingRGB(0.2, 0.7, 0.35),
           ops.rectangle(0, 0, 140, 35),
           ops.fill(),
-          ops.popGraphicsState(),
-          // Text (also rotated)
-          ops.pushGraphicsState(),
-          ops.concatMatrix(
-            Matrix.identity()
-              .translate(x, y)
-              .rotate((angle * Math.PI) / 180),
-          ),
-          ops.beginText(),
-          ops.setFont(fontName, 20),
-          ops.setNonStrokingRGB(1, 1, 1),
-          ops.moveText(8, 8),
-          ops.showText("APPROVED"),
-          ops.endText(),
-          ops.popGraphicsState(),
-        ]);
-      };
+        ],
+      });
 
-      // Helper to draw CONFIDENTIAL stamp (yellow on navy)
-      const drawConfidentialStamp = (
-        page: ReturnType<typeof testPdf.addPage>,
-        x: number,
-        y: number,
-        fontName: string,
-      ) => {
-        page.drawOperators([
-          ops.pushGraphicsState(),
-          // Navy background
+      // CONFIDENTIAL stamp (navy background)
+      const confidentialStamp = testPdf.createFormXObject({
+        bbox: [0, 0, 180, 35],
+        operators: [
           ops.setNonStrokingRGB(0.1, 0.15, 0.4),
-          ops.rectangle(x, y, 180, 35),
+          ops.rectangle(0, 0, 180, 35),
           ops.fill(),
-          ops.popGraphicsState(),
-          // Yellow text
-          ops.beginText(),
-          ops.setFont(fontName, 18),
-          ops.setNonStrokingRGB(1, 0.9, 0.2),
-          ops.moveText(x + 10, y + 10),
-          ops.showText("CONFIDENTIAL"),
-          ops.endText(),
-        ]);
-      };
+        ],
+      });
 
-      // Create 3 pages with stamps
+      // Create 3 pages with stamps - the XObjects are reused!
       for (let i = 0; i < 3; i++) {
         const page = testPdf.addPage({ width: 612, height: 792 }); // Letter size
         const titleFont = page.registerFont("Helvetica-Bold");
         const bodyFont = page.registerFont("Helvetica");
+
+        // Register the XObjects on this page
+        const draftName = page.registerXObject(draftStamp);
+        const approvedName = page.registerXObject(approvedStamp);
+        const confidentialName = page.registerXObject(confidentialStamp);
 
         // Page content
         page.drawOperators([
@@ -1266,15 +1151,54 @@ describe("Low-Level Drawing Integration", () => {
           ops.endText(),
         ]);
 
-        // Draw stamps
-        // DRAFT stamp - top right
-        drawDraftStamp(page, 470, 730, titleFont);
+        // Draw DRAFT stamp - top right (with text overlay)
+        page.drawOperators([
+          ops.pushGraphicsState(),
+          ops.concatMatrix(Matrix.translate(470, 730)),
+          ops.paintXObject(draftName),
+          ops.popGraphicsState(),
+          // Add text on top
+          ops.beginText(),
+          ops.setFont(titleFont, 24),
+          ops.setNonStrokingRGB(0.8, 0.1, 0.1),
+          ops.moveText(480, 740),
+          ops.showText("DRAFT"),
+          ops.endText(),
+        ]);
 
-        // APPROVED stamp - middle right, rotated
-        drawApprovedStamp(page, 400, 350, titleFont, -20);
+        // Draw APPROVED stamp - middle right, rotated
+        page.drawOperators([
+          ops.pushGraphicsState(),
+          ops.concatMatrix(
+            Matrix.identity()
+              .translate(400, 350)
+              .rotate((-20 * Math.PI) / 180),
+          ),
+          ops.paintXObject(approvedName),
+          // Add text inside (already in rotated space)
+          ops.beginText(),
+          ops.setFont(titleFont, 20),
+          ops.setNonStrokingRGB(1, 1, 1),
+          ops.moveText(8, 8),
+          ops.showText("APPROVED"),
+          ops.endText(),
+          ops.popGraphicsState(),
+        ]);
 
-        // CONFIDENTIAL stamp - bottom left
-        drawConfidentialStamp(page, 50, 50, titleFont);
+        // Draw CONFIDENTIAL stamp - bottom left
+        page.drawOperators([
+          ops.pushGraphicsState(),
+          ops.concatMatrix(Matrix.translate(50, 50)),
+          ops.paintXObject(confidentialName),
+          // Add text on top
+          ops.beginText(),
+          ops.setFont(titleFont, 18),
+          ops.setNonStrokingRGB(1, 0.9, 0.2),
+          ops.moveText(10, 10),
+          ops.showText("CONFIDENTIAL"),
+          ops.endText(),
+          ops.popGraphicsState(),
+        ]);
       }
 
       const bytes = await testPdf.save();
@@ -1792,6 +1716,195 @@ describe("Low-Level Drawing Integration", () => {
 
       const bytes = await pdf.save();
       await saveTestOutput("low-level-api/combined-demo.pdf", bytes);
+      expect(bytes).toBeDefined();
+    });
+  });
+
+  describe("PathBuilder Advanced", () => {
+    it("demonstrates PathBuilder with gradients and patterns", async () => {
+      const page = pdf.addPage({ width: 612, height: 400 });
+      const titleFont = page.registerFont("Helvetica-Bold");
+      const bodyFont = page.registerFont("Helvetica");
+
+      // Title
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(titleFont, 20),
+        ops.setNonStrokingGray(0),
+        ops.moveText(50, 360),
+        ops.showText("PathBuilder with Gradients & Patterns"),
+        ops.endText(),
+      ]);
+
+      // Create gradients and wrap them in shading patterns
+      // Shading patterns allow gradients to be used as fill colors via PathOptions.pattern
+
+      // Gradient for rectangle at x=50 (50 to 200)
+      const rectGradient = pdf.createShadingPattern({
+        shading: pdf.createAxialShading({
+          coords: [50, 0, 200, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 0.2, green: 0.5, blue: 0.9 } },
+            { offset: 0.5, color: { type: "RGB", red: 0.9, green: 0.2, blue: 0.6 } },
+            { offset: 1, color: { type: "RGB", red: 0.9, green: 0.9, blue: 0.2 } },
+          ],
+        }),
+      });
+
+      // Gradient for star at x=450-550
+      const starGradient = pdf.createShadingPattern({
+        shading: pdf.createAxialShading({
+          coords: [450, 0, 550, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 0.2, green: 0.5, blue: 0.9 } },
+            { offset: 0.5, color: { type: "RGB", red: 0.9, green: 0.2, blue: 0.6 } },
+            { offset: 1, color: { type: "RGB", red: 0.9, green: 0.9, blue: 0.2 } },
+          ],
+        }),
+      });
+
+      // Gradient for ellipse at x=260-400
+      const ellipseGradient = pdf.createShadingPattern({
+        shading: pdf.createAxialShading({
+          coords: [260, 0, 400, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 0.2, green: 0.5, blue: 0.9 } },
+            { offset: 0.5, color: { type: "RGB", red: 0.9, green: 0.2, blue: 0.6 } },
+            { offset: 1, color: { type: "RGB", red: 0.9, green: 0.9, blue: 0.2 } },
+          ],
+        }),
+      });
+
+      // Create a tiling pattern for PathBuilder use
+      const tilingPattern = pdf.createTilingPattern({
+        bbox: [0, 0, 12, 12],
+        xStep: 12,
+        yStep: 12,
+        operators: [
+          ops.setNonStrokingRGB(0.3, 0.7, 0.4),
+          ops.moveTo(6, 0),
+          ops.lineTo(12, 6),
+          ops.lineTo(6, 12),
+          ops.lineTo(0, 6),
+          ops.closePath(),
+          ops.fill(),
+        ],
+      });
+
+      // ===== Row 1: Rectangle with gradient =====
+      // Using the new clean API: fill({ pattern: shadingPattern })
+      page.drawPath().rectangle(50, 250, 150, 80).fill({ pattern: rectGradient });
+
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(bodyFont, 11),
+        ops.setNonStrokingGray(0.3),
+        ops.moveText(60, 235),
+        ops.showText("Rectangle + Gradient"),
+        ops.endText(),
+      ]);
+
+      // ===== Row 1: Circle with tiling pattern =====
+      page.drawPath().circle(330, 290, 50).fill({ pattern: tilingPattern });
+
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(bodyFont, 11),
+        ops.setNonStrokingGray(0.3),
+        ops.moveText(290, 235),
+        ops.showText("Circle + Pattern"),
+        ops.endText(),
+      ]);
+
+      // ===== Row 1: Star with gradient =====
+      const starPath = page.drawPath();
+      const starCX = 500,
+        starCY = 290,
+        starOuterR = 50,
+        starInnerR = 20;
+      for (let i = 0; i < 10; i++) {
+        const angle = (i * Math.PI) / 5 - Math.PI / 2;
+        const r = i % 2 === 0 ? starOuterR : starInnerR;
+        const x = starCX + Math.cos(angle) * r;
+        const y = starCY + Math.sin(angle) * r;
+        if (i === 0) {
+          starPath.moveTo(x, y);
+        } else {
+          starPath.lineTo(x, y);
+        }
+      }
+      starPath.close().fill({ pattern: starGradient });
+
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(bodyFont, 11),
+        ops.setNonStrokingGray(0.3),
+        ops.moveText(470, 235),
+        ops.showText("Star + Gradient"),
+        ops.endText(),
+      ]);
+
+      // ===== Row 2: Complex path with tiling pattern =====
+      page
+        .drawPath()
+        .moveTo(50, 180)
+        .curveTo(100, 220, 150, 140, 200, 180)
+        .lineTo(200, 120)
+        .curveTo(150, 160, 100, 80, 50, 120)
+        .close()
+        .fill({ pattern: tilingPattern });
+
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(bodyFont, 11),
+        ops.setNonStrokingGray(0.3),
+        ops.moveText(70, 95),
+        ops.showText("Bezier Shape + Pattern"),
+        ops.endText(),
+      ]);
+
+      // ===== Row 2: Ellipse with gradient =====
+      page.drawPath().ellipse(330, 150, 70, 40).fill({ pattern: ellipseGradient });
+
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(bodyFont, 11),
+        ops.setNonStrokingGray(0.3),
+        ops.moveText(295, 95),
+        ops.showText("Ellipse + Gradient"),
+        ops.endText(),
+      ]);
+
+      // ===== Row 2: Triangle with tiling pattern =====
+      page
+        .drawPath()
+        .moveTo(500, 190)
+        .lineTo(550, 110)
+        .lineTo(450, 110)
+        .close()
+        .fill({ pattern: tilingPattern });
+
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(bodyFont, 11),
+        ops.setNonStrokingGray(0.3),
+        ops.moveText(460, 95),
+        ops.showText("Triangle + Pattern"),
+        ops.endText(),
+      ]);
+
+      // Footer
+      page.drawOperators([
+        ops.beginText(),
+        ops.setFont(bodyFont, 10),
+        ops.setNonStrokingGray(0.4),
+        ops.moveText(50, 40),
+        ops.showText("PathBuilder.fill({ pattern }) enables fluent gradient/pattern fills"),
+        ops.endText(),
+      ]);
+
+      const bytes = await pdf.save();
+      await saveTestOutput("low-level-api/pathbuilder-advanced.pdf", bytes);
       expect(bytes).toBeDefined();
     });
   });

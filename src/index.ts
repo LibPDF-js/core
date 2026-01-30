@@ -202,8 +202,32 @@ export { Matrix } from "./helpers/matrix";
 export * as ops from "./helpers/operators";
 export { ColorSpace } from "./helpers/colorspace";
 
+// Low-level types
+export type {
+  AxialCoords,
+  AxialShadingOptions,
+  BBox,
+  BlendMode,
+  ColorStop,
+  ExtGStateOptions,
+  FormXObjectOptions,
+  LinearGradientOptions,
+  PatternMatrix,
+  RadialCoords,
+  RadialShadingOptions,
+  ShadingPatternOptions,
+  TilingPatternOptions,
+} from "./drawing/factory";
+
 // Low-level resource types (core)
-export type { PDFExtGState, PDFFormXObject, PDFPattern, PDFShading } from "#src/drawing/resources";
+export type {
+  PDFExtGState,
+  PDFFormXObject,
+  PDFPattern,
+  PDFShading,
+  PDFShadingPattern,
+  PDFTilingPattern,
+} from "#src/drawing/resources";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

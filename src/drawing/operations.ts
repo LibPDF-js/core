@@ -7,6 +7,7 @@
 
 import type { Operator } from "#src/content/operators";
 import type { Color } from "#src/helpers/colors";
+import { ColorSpace } from "#src/helpers/colorspace";
 import {
   closePath,
   concatMatrix,
@@ -26,9 +27,13 @@ import {
   setLineWidth,
   setMiterLimit,
   setNonStrokingCMYK,
+  setNonStrokingColorN,
+  setNonStrokingColorSpace,
   setNonStrokingGray,
   setNonStrokingRGB,
   setStrokingCMYK,
+  setStrokingColorN,
+  setStrokingColorSpace,
   setStrokingGray,
   setStrokingRGB,
   stroke,
@@ -355,7 +360,11 @@ export function drawCircleOps(
  */
 export interface PathOpsOptions {
   fillColor?: Color;
+  /** Fill pattern name (already registered, e.g., "/P0") */
+  fillPatternName?: string;
   strokeColor?: Color;
+  /** Stroke pattern name (already registered, e.g., "/P0") */
+  strokePatternName?: string;
   strokeWidth?: number;
   lineCap?: LineCap;
   lineJoin?: LineJoin;
@@ -381,6 +390,11 @@ export function wrapPathOps(pathOps: Operator[], options: PathOpsOptions): Opera
   if (options.strokeColor) {
     ops.push(setStrokeColor(options.strokeColor));
     ops.push(setLineWidth(options.strokeWidth ?? 1));
+  } else if (options.strokePatternName) {
+    // Stroke with pattern
+    ops.push(setStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setStrokingColorN(options.strokePatternName));
+    ops.push(setLineWidth(options.strokeWidth ?? 1));
   }
 
   if (options.lineCap) {
@@ -399,17 +413,21 @@ export function wrapPathOps(pathOps: Operator[], options: PathOpsOptions): Opera
     ops.push(setDash(options.dashArray, options.dashPhase ?? 0));
   }
 
-  // Set fill color
+  // Set fill color or pattern
   if (options.fillColor) {
     ops.push(setFillColor(options.fillColor));
+  } else if (options.fillPatternName) {
+    // Fill with pattern
+    ops.push(setNonStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setNonStrokingColorN(options.fillPatternName));
   }
 
   // Add path construction operators
   ops.push(...pathOps);
 
   // Paint the path
-  const hasFill = !!options.fillColor;
-  const hasStroke = !!options.strokeColor;
+  const hasFill = !!options.fillColor || !!options.fillPatternName;
+  const hasStroke = !!options.strokeColor || !!options.strokePatternName;
   const evenOdd = options.windingRule === "evenodd";
 
   if (hasFill && hasStroke) {

@@ -126,7 +126,7 @@ describe("Factory Creation and Resource Registration", () => {
           bbox: [0, 0, 10, 10],
           xStep: 10,
           yStep: 10,
-          paint: () => {},
+          operators: [],
         });
 
         expect(pattern.type).toBe("pattern");
@@ -140,7 +140,7 @@ describe("Factory Creation and Resource Registration", () => {
           bbox: [0, 0, 10, 10],
           xStep: 10,
           yStep: 10,
-          paint: () => {},
+          operators: [],
         });
         const name = page.registerPattern(pattern);
 
@@ -152,7 +152,7 @@ describe("Factory Creation and Resource Registration", () => {
           bbox: [0, 0, 10, 10],
           xStep: 10,
           yStep: 10,
-          paint: () => {},
+          operators: [],
         });
         const name1 = page.registerPattern(pattern);
         const name2 = page.registerPattern(pattern);
@@ -217,7 +217,7 @@ describe("Factory Creation and Resource Registration", () => {
       it("should create a Form XObject resource", () => {
         const xobject = pdf.createFormXObject({
           bbox: [0, 0, 100, 50],
-          paint: () => {},
+          operators: [],
         });
 
         expect(xobject.type).toBe("formxobject");
@@ -229,7 +229,7 @@ describe("Factory Creation and Resource Registration", () => {
       it("should return an XObject resource name", () => {
         const formXObject = pdf.createFormXObject({
           bbox: [0, 0, 100, 50],
-          paint: () => {},
+          operators: [],
         });
         const name = page.registerXObject(formXObject);
 
@@ -239,7 +239,7 @@ describe("Factory Creation and Resource Registration", () => {
       it("should return same name for same XObject (deduplication)", () => {
         const formXObject = pdf.createFormXObject({
           bbox: [0, 0, 100, 50],
-          paint: () => {},
+          operators: [],
         });
         const name1 = page.registerXObject(formXObject);
         const name2 = page.registerXObject(formXObject);
@@ -284,6 +284,158 @@ describe("Factory Creation and Resource Registration", () => {
         const image = pdf.embedJpeg(jpegBytes);
         const name1 = page.registerImage(image);
         const name2 = page.registerImage(image);
+
+        expect(name1).toBe(name2);
+      });
+    });
+  });
+
+  describe("Convenience Methods", () => {
+    describe("fillRectWithShading", () => {
+      it("should fill a rectangle with a gradient", async () => {
+        const gradient = pdf.createAxialShading({
+          coords: [0, 0, 100, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
+            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
+          ],
+        });
+
+        // Should not throw
+        page.fillRectWithShading(gradient, 50, 50, 100, 100);
+
+        // Verify content was added
+        const bytes = await pdf.save();
+        expect(bytes.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("fillRectWithPattern", () => {
+      it("should fill a rectangle with a pattern", async () => {
+        const { ops } = await import("#src/index");
+        const pattern = pdf.createTilingPattern({
+          bbox: [0, 0, 10, 10],
+          xStep: 10,
+          yStep: 10,
+          operators: [ops.setNonStrokingGray(0.5), ops.rectangle(0, 0, 5, 5), ops.fill()],
+        });
+
+        // Should not throw
+        page.fillRectWithPattern(pattern, 100, 100, 200, 200);
+
+        // Verify content was added
+        const bytes = await pdf.save();
+        expect(bytes.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("Shading Patterns", () => {
+    describe("createShadingPattern", () => {
+      it("should create a shading pattern from a gradient", () => {
+        const gradient = pdf.createAxialShading({
+          coords: [0, 0, 100, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
+            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
+          ],
+        });
+
+        const pattern = pdf.createShadingPattern({ shading: gradient });
+
+        expect(pattern.type).toBe("pattern");
+        expect(pattern.patternType).toBe("shading");
+        expect(pattern.shading).toBe(gradient);
+        expect(pattern.ref).toBeDefined();
+      });
+
+      it("should register and use shading pattern with PathBuilder fill", async () => {
+        const gradient = pdf.createAxialShading({
+          coords: [0, 0, 100, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
+            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
+          ],
+        });
+
+        const pattern = pdf.createShadingPattern({ shading: gradient });
+
+        // Use with PathBuilder fill({ pattern })
+        page.drawPath().rectangle(50, 50, 100, 100).fill({ pattern });
+
+        const bytes = await pdf.save();
+        expect(bytes.length).toBeGreaterThan(0);
+      });
+
+      it("should register and use shading pattern with PathBuilder stroke", async () => {
+        const gradient = pdf.createAxialShading({
+          coords: [0, 0, 100, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
+            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
+          ],
+        });
+
+        const pattern = pdf.createShadingPattern({ shading: gradient });
+
+        // Use with PathBuilder stroke({ borderPattern })
+        page
+          .drawPath()
+          .rectangle(50, 50, 100, 100)
+          .stroke({ borderPattern: pattern, borderWidth: 5 });
+
+        const bytes = await pdf.save();
+        expect(bytes.length).toBeGreaterThan(0);
+      });
+
+      it("should support matrix transformation", () => {
+        const gradient = pdf.createAxialShading({
+          coords: [0, 0, 100, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
+            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
+          ],
+        });
+
+        // Create pattern with translation matrix
+        const pattern = pdf.createShadingPattern({
+          shading: gradient,
+          matrix: [1, 0, 0, 1, 50, 100], // Translate by (50, 100)
+        });
+
+        expect(pattern.type).toBe("pattern");
+        expect(pattern.patternType).toBe("shading");
+      });
+    });
+
+    describe("registerPattern with shading patterns", () => {
+      it("should register shading pattern and return name", () => {
+        const gradient = pdf.createAxialShading({
+          coords: [0, 0, 100, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
+            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
+          ],
+        });
+
+        const pattern = pdf.createShadingPattern({ shading: gradient });
+        const name = page.registerPattern(pattern);
+
+        expect(name).toMatch(/^P\d+$/);
+      });
+
+      it("should deduplicate same shading pattern", () => {
+        const gradient = pdf.createAxialShading({
+          coords: [0, 0, 100, 0],
+          stops: [
+            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
+            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
+          ],
+        });
+
+        const pattern = pdf.createShadingPattern({ shading: gradient });
+        const name1 = page.registerPattern(pattern);
+        const name2 = page.registerPattern(pattern);
 
         expect(name1).toBe(name2);
       });

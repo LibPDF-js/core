@@ -101,6 +101,7 @@ import { parseToUnicode } from "#src/fonts/to-unicode";
 // Annotation utilities - imported here to avoid dynamic require issues
 import { concatBytes } from "#src/helpers/buffer";
 import { black } from "#src/helpers/colors";
+import { ColorSpace } from "#src/helpers/colorspace";
 import {
   beginText,
   concatMatrix,
@@ -112,6 +113,7 @@ import {
   setTextMatrix,
   showText,
 } from "#src/helpers/operators";
+import * as operatorHelpers from "#src/helpers/operators";
 import type { PDFImage } from "#src/images/pdf-image";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -1310,11 +1312,12 @@ export class PDFPage {
    * Start building a custom path.
    *
    * Returns a PathBuilder with a fluent API for constructing paths.
-   * The path is drawn when you call stroke(), fill(), or fillAndStroke().
+   * The path is drawn when you call stroke(), fill(), fillAndStroke(),
+   * fillWithShading(), or fillWithPattern().
    *
    * @example
    * ```typescript
-   * // Triangle
+   * // Triangle with solid color
    * page.drawPath()
    *   .moveTo(100, 100)
    *   .lineTo(200, 100)
@@ -1322,7 +1325,7 @@ export class PDFPage {
    *   .close()
    *   .fill({ color: rgb(1, 0, 0) });
    *
-   * // Complex shape
+   * // Complex shape with fill and stroke
    * page.drawPath()
    *   .moveTo(50, 50)
    *   .curveTo(100, 100, 150, 100, 200, 50)
@@ -1332,6 +1335,21 @@ export class PDFPage {
    *     color: rgb(0.9, 0.9, 1),
    *     borderColor: rgb(0, 0, 1),
    *   });
+   *
+   * // Circle with gradient fill
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 100, 0],
+   *   stops: [{ offset: 0, color: rgb(1, 0, 0) }, { offset: 1, color: rgb(0, 0, 1) }],
+   * });
+   * page.drawPath()
+   *   .circle(200, 200, 50)
+   *   .fillWithShading(gradient);
+   *
+   * // Rectangle with pattern fill
+   * const pattern = pdf.createTilingPattern({...});
+   * page.drawPath()
+   *   .rectangle(50, 300, 100, 100)
+   *   .fillWithPattern(pattern);
    * ```
    */
   drawPath(): PathBuilder {
@@ -1339,6 +1357,8 @@ export class PDFPage {
       content => this.appendContent(content),
       (fillOpacity, strokeOpacity) =>
         this.registerGraphicsStateForOpacity(fillOpacity, strokeOpacity),
+      shading => this.registerShading(shading),
+      pattern => this.registerPattern(pattern),
     );
   }
 
@@ -1663,20 +1683,20 @@ export class PDFPage {
    *
    * @example
    * ```typescript
+   * // Create a checkerboard pattern
    * const pattern = pdf.createTilingPattern({
    *   bbox: [0, 0, 10, 10],
    *   xStep: 10,
    *   yStep: 10,
-   *   paint: ctx => {
-   *     ctx.drawOperators([
-   *       ops.setNonStrokingRGB(0.8, 0.8, 0.8),
-   *       ops.rectangle(0, 0, 5, 5),
-   *       ops.fill(),
-   *     ]);
-   *   },
+   *   operators: [
+   *     ops.setNonStrokingGray(0.8),
+   *     ops.rectangle(0, 0, 5, 5),
+   *     ops.fill(),
+   *   ],
    * });
    * const patternName = page.registerPattern(pattern);
    *
+   * // Fill a rectangle with the pattern
    * page.drawOperators([
    *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
    *   ops.setNonStrokingColorN(patternName),
@@ -1796,18 +1816,24 @@ export class PDFPage {
    *
    * @example
    * ```typescript
+   * // Create a reusable stamp
    * const stamp = pdf.createFormXObject({
    *   bbox: [0, 0, 100, 50],
-   *   paint: ctx => {
-   *     ctx.drawOperators([
-   *       ops.setNonStrokingRGB(1, 0, 0),
-   *       ops.rectangle(0, 0, 100, 50),
-   *       ops.fill(),
-   *     ]);
-   *   },
+   *   operators: [
+   *     ops.setNonStrokingRGB(1, 0, 0),
+   *     ops.rectangle(0, 0, 100, 50),
+   *     ops.fill(),
+   *     ops.beginText(),
+   *     ops.setFont(fontName, 12),
+   *     ops.setNonStrokingGray(1),
+   *     ops.moveText(10, 18),
+   *     ops.showText("STAMP"),
+   *     ops.endText(),
+   *   ],
    * });
    * const xobjectName = page.registerXObject(stamp);
    *
+   * // Use the stamp at different positions
    * page.drawOperators([
    *   ops.pushGraphicsState(),
    *   ops.concatMatrix(1, 0, 0, 1, 200, 700),
@@ -1851,6 +1877,115 @@ export class PDFPage {
     this._resourceCache.set(xobject.ref, name);
 
     return name;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Low-Level Convenience Methods
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Fill a rectangular region with a shading (gradient).
+   *
+   * This is a convenience method that handles the common pattern of:
+   * 1. Registering the shading
+   * 2. Saving graphics state
+   * 3. Setting up a clipping path
+   * 4. Painting the shading
+   * 5. Restoring graphics state
+   *
+   * For more complex shapes (circles, paths), use drawOperators() directly.
+   *
+   * @param shading - The shading resource to use
+   * @param x - X coordinate of the rectangle's lower-left corner
+   * @param y - Y coordinate of the rectangle's lower-left corner
+   * @param width - Width of the rectangle
+   * @param height - Height of the rectangle
+   *
+   * @example
+   * ```typescript
+   * // Create a gradient
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 200, 0],
+   *   stops: [
+   *     { offset: 0, color: rgb(1, 0, 0) },
+   *     { offset: 1, color: rgb(0, 0, 1) },
+   *   ],
+   * });
+   *
+   * // Fill a rectangle with the gradient
+   * page.fillRectWithShading(gradient, 50, 50, 200, 100);
+   * ```
+   */
+  fillRectWithShading(
+    shading: PDFShading,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): void {
+    const shadingName = this.registerShading(shading);
+    const ops = operatorHelpers;
+
+    this.drawOperators([
+      ops.pushGraphicsState(),
+      ops.rectangle(x, y, width, height),
+      ops.clip(),
+      ops.endPath(),
+      ops.paintShading(shadingName),
+      ops.popGraphicsState(),
+    ]);
+  }
+
+  /**
+   * Fill a rectangular region with a pattern.
+   *
+   * This is a convenience method that handles the common pattern of:
+   * 1. Registering the pattern
+   * 2. Setting up the Pattern color space
+   * 3. Painting the rectangle with the pattern
+   *
+   * @param pattern - The pattern resource to use
+   * @param x - X coordinate of the rectangle's lower-left corner
+   * @param y - Y coordinate of the rectangle's lower-left corner
+   * @param width - Width of the rectangle
+   * @param height - Height of the rectangle
+   *
+   * @example
+   * ```typescript
+   * // Create a checkerboard pattern
+   * const pattern = pdf.createTilingPattern({
+   *   bbox: [0, 0, 10, 10],
+   *   xStep: 10,
+   *   yStep: 10,
+   *   operators: [
+   *     ops.setNonStrokingGray(0.8),
+   *     ops.rectangle(0, 0, 5, 5),
+   *     ops.fill(),
+   *   ],
+   * });
+   *
+   * // Fill a rectangle with the pattern
+   * page.fillRectWithPattern(pattern, 100, 100, 200, 200);
+   * ```
+   */
+  fillRectWithPattern(
+    pattern: PDFPattern,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ): void {
+    const patternName = this.registerPattern(pattern);
+    const ops = operatorHelpers;
+
+    this.drawOperators([
+      ops.pushGraphicsState(),
+      ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+      ops.setNonStrokingColorN(patternName),
+      ops.rectangle(x, y, width, height),
+      ops.fill(),
+      ops.popGraphicsState(),
+    ]);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
