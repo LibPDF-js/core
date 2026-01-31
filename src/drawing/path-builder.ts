@@ -27,13 +27,13 @@ import type { PathOptions } from "./types";
  * Callback type for appending content to a page.
  * Accepts a string (for ASCII-only content) or raw bytes.
  */
-export type ContentAppender = (content: string | Uint8Array) => void;
+type ContentAppender = (content: string | Uint8Array) => void;
 
 /**
  * Callback type for registering a graphics state and returning its name.
  * Returns null if no graphics state is needed (both opacities undefined).
  */
-export type GraphicsStateRegistrar = (options: {
+type GraphicsStateRegistrar = (options: {
   fillOpacity?: number;
   strokeOpacity?: number;
 }) => string | null;
@@ -41,12 +41,12 @@ export type GraphicsStateRegistrar = (options: {
 /**
  * Callback type for registering a shading and returning its name.
  */
-export type ShadingRegistrar = (shading: PDFShading) => string;
+type ShadingRegistrar = (shading: PDFShading) => string;
 
 /**
  * Callback type for registering a pattern and returning its name.
  */
-export type PatternRegistrar = (pattern: PDFPattern) => string;
+type PatternRegistrar = (pattern: PDFPattern) => string;
 
 /**
  * PathBuilder provides a fluent interface for constructing PDF paths.
