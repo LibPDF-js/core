@@ -11,9 +11,6 @@
 // Types
 export type { BBox, BlendMode, PatternMatrix } from "./types";
 
-// Operators
-export { serializeOperators } from "./operators";
-
 // Shading
 export type {
   AxialCoords,

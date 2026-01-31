@@ -20,6 +20,7 @@ import { executeSvgPathString, type SvgPathExecutorOptions } from "#src/svg/path
 
 import { wrapPathOps } from "./operations";
 import type { PDFPattern, PDFShading } from "./resources";
+import { serializeOperators } from "./serialize";
 import type { PathOptions } from "./types";
 
 /**
@@ -421,8 +422,6 @@ export class PathBuilder {
    * Emit operators to the page content.
    */
   private emitOps(ops: Operator[]): void {
-    const content = ops.map(op => op.toString()).join("\n");
-
-    this.appendContent(content);
+    this.appendContent(serializeOperators(ops));
   }
 }

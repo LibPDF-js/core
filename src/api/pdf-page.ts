@@ -75,7 +75,8 @@ import {
 } from "#src/drawing/operations";
 import { PathBuilder } from "#src/drawing/path-builder";
 import type { PDFFormXObject, PDFPattern, PDFShading } from "#src/drawing/resources/index";
-import { PDFExtGState, serializeOperators } from "#src/drawing/resources/index";
+import { PDFExtGState } from "#src/drawing/resources/index";
+import { serializeOperators } from "#src/drawing/serialize";
 import { layoutJustifiedLine, layoutText, measureText } from "#src/drawing/text-layout";
 import type {
   DrawCircleOptions,

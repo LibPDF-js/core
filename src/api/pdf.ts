@@ -19,7 +19,6 @@ import {
   PDFShading,
   PDFShadingPattern,
   PDFTilingPattern,
-  serializeOperators,
   type AxialShadingOptions,
   type ExtGStateOptions,
   type FormXObjectOptions,
@@ -29,6 +28,7 @@ import {
   type ShadingPatternOptions,
   type TilingPatternOptions,
 } from "#src/drawing/resources/index";
+import { serializeOperators } from "#src/drawing/serialize";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format";
 import { resolvePageSize } from "#src/helpers/page-size";
