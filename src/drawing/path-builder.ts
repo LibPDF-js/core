@@ -30,11 +30,12 @@ export type ContentAppender = (content: string | Uint8Array) => void;
 
 /**
  * Callback type for registering a graphics state and returning its name.
+ * Returns null if no graphics state is needed (both opacities undefined).
  */
-export type GraphicsStateRegistrar = (
-  fillOpacity?: number,
-  strokeOpacity?: number,
-) => string | null;
+export type GraphicsStateRegistrar = (options: {
+  fillOpacity?: number;
+  strokeOpacity?: number;
+}) => string | null;
 
 /**
  * Callback type for registering a shading and returning its name.
@@ -370,7 +371,10 @@ export class PathBuilder {
     let gsName: string | null = null;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsState(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
 
     // Register fill and stroke patterns if provided

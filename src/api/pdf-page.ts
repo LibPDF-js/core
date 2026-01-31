@@ -499,11 +499,11 @@ export class PDFPage {
 
     // Set opacity if needed (via ExtGState)
     if (options.opacity !== undefined && options.opacity < 1) {
-      const gsName = this.addGraphicsState({
+      const gsName = this.registerGraphicsState({
         fillOpacity: options.opacity,
         strokeOpacity: options.opacity,
       });
-      ops.push(setGraphicsState(gsName));
+      ops.push(setGraphicsState(`/${gsName}`));
     }
 
     // Parse rotation options
@@ -850,10 +850,13 @@ export class PDFPage {
    */
   drawRectangle(options: DrawRectangleOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
 
     // Register patterns if provided
@@ -915,10 +918,10 @@ export class PDFPage {
    */
   drawLine(options: DrawLineOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(undefined, options.opacity);
+      gsName = this.registerGraphicsState({ strokeOpacity: options.opacity });
     }
 
     const ops = drawLineOps({
@@ -953,10 +956,13 @@ export class PDFPage {
    */
   drawCircle(options: DrawCircleOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
 
     // Register patterns if provided
@@ -995,10 +1001,13 @@ export class PDFPage {
    */
   drawEllipse(options: DrawEllipseOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
 
     // Calculate rotation center if rotating
@@ -1091,10 +1100,10 @@ export class PDFPage {
     const fontName = this.addFontResource(font);
 
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined && options.opacity < 1) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, undefined);
+      gsName = this.registerGraphicsState({ fillOpacity: options.opacity });
     }
 
     // Layout the text if multiline
@@ -1250,11 +1259,11 @@ export class PDFPage {
 
     // Apply opacity if needed
     if (options.opacity !== undefined && options.opacity < 1) {
-      const gsName = this.addGraphicsState({
+      const gsName = this.registerGraphicsState({
         fillOpacity: options.opacity,
         strokeOpacity: options.opacity,
       });
-      ops.push(setGraphicsState(gsName));
+      ops.push(setGraphicsState(`/${gsName}`));
     }
 
     // Apply rotation if specified
@@ -1358,8 +1367,13 @@ export class PDFPage {
   drawPath(): PathBuilder {
     return new PathBuilder(
       content => this.appendContent(content),
-      (fillOpacity, strokeOpacity) =>
-        this.registerGraphicsStateForOpacity(fillOpacity, strokeOpacity),
+      options => {
+        if (options.fillOpacity === undefined && options.strokeOpacity === undefined) {
+          return null;
+        }
+
+        return this.registerGraphicsState(options);
+      },
       shading => this.registerShading(shading),
       pattern => this.registerPattern(pattern),
     );
@@ -2562,29 +2576,6 @@ export class PDFPage {
   }
 
   /**
-   * Add a graphics state to the page's resources.
-   * Returns the name assigned to the ExtGState.
-   */
-  private addGraphicsState(options: { fillOpacity?: number; strokeOpacity?: number }): string {
-    const resources = this.getResources();
-    let extGState = resources.get("ExtGState");
-
-    if (!(extGState instanceof PdfDict)) {
-      extGState = new PdfDict();
-      resources.set("ExtGState", extGState);
-    }
-
-    // Create the graphics state dict using factory
-    const gsDict = createExtGStateDict(options);
-
-    // Generate unique name
-    const name = this.generateUniqueName(extGState, "GS");
-    extGState.set(name, gsDict);
-
-    return name;
-  }
-
-  /**
    * Generate a unique name not already in the dictionary.
    */
   private generateUniqueName(dict: PdfDict, prefix: string): string {
@@ -2804,19 +2795,16 @@ export class PDFPage {
   }
 
   /**
-   * Register a graphics state for opacity and return its name.
-   * Returns null if no opacity is needed.
+   * Create and register a graphics state, returning its resource name.
+   *
+   * This is an internal helper for high-level drawing methods.
+   * For the public low-level API, use `pdf.createExtGState()` + `page.registerExtGState()`.
    */
-  private registerGraphicsStateForOpacity(
-    fillOpacity?: number,
-    strokeOpacity?: number,
-  ): string | null {
-    if (fillOpacity === undefined && strokeOpacity === undefined) {
-      return null;
-    }
+  private registerGraphicsState(options: { fillOpacity?: number; strokeOpacity?: number }): string {
+    const dict = createExtGStateDict(options);
+    const ref = this.ctx.register(dict);
 
-    // createExtGStateDict handles clamping internally
-    return this.addGraphicsState({ fillOpacity, strokeOpacity });
+    return this.registerExtGState({ type: "extgstate", ref });
   }
 
   /**

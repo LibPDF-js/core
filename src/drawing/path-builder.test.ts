@@ -160,7 +160,10 @@ describe("PathBuilder", () => {
 
       builder.rectangle(0, 0, 100, 100).fill({ color: rgb(1, 0, 0), opacity: 0.5 });
 
-      expect(registerGraphicsState).toHaveBeenCalledWith(0.5, undefined);
+      expect(registerGraphicsState).toHaveBeenCalledWith({
+        fillOpacity: 0.5,
+        strokeOpacity: undefined,
+      });
     });
 
     it("registers graphics state for border opacity", () => {
@@ -168,7 +171,10 @@ describe("PathBuilder", () => {
 
       builder.rectangle(0, 0, 100, 100).stroke({ borderColor: rgb(0, 0, 1), borderOpacity: 0.7 });
 
-      expect(registerGraphicsState).toHaveBeenCalledWith(undefined, 0.7);
+      expect(registerGraphicsState).toHaveBeenCalledWith({
+        fillOpacity: undefined,
+        strokeOpacity: 0.7,
+      });
     });
   });
 
