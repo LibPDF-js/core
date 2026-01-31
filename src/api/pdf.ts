@@ -13,40 +13,22 @@ import type { FlattenOptions } from "#src/document/forms/form-flattener";
 import { isLinearizationDict } from "#src/document/linearization";
 import { ObjectCopier } from "#src/document/object-copier";
 import { ObjectRegistry } from "#src/document/object-registry";
-import type {
-  AxialShadingOptions,
-  ExtGStateOptions,
-  FormXObjectOptions,
-  ImagePatternOptions,
-  LinearGradientOptions,
-  RadialShadingOptions,
-  TilingPatternOptions,
-} from "#src/drawing/factory";
 import {
-  calculateAxialCoords,
-  createAxialShadingDict,
-  createExtGStateDict,
-  createFormXObjectStream,
-  createImagePatternStream,
-  createRadialShadingDict,
-  createShadingPatternDict,
-  createTilingPatternStream,
-  ExtGStateResource,
-  FormXObjectResource,
-  serializeOperators,
-  ShadingPatternResource,
-  ShadingResource,
-  TilingPatternResource,
-  type ShadingPatternOptions,
-} from "#src/drawing/factory";
-import type {
-  PDFFormXObject,
   PDFExtGState,
-  PDFPattern,
+  PDFFormXObject,
   PDFShading,
   PDFShadingPattern,
   PDFTilingPattern,
-} from "#src/drawing/resources";
+  serializeOperators,
+  type AxialShadingOptions,
+  type ExtGStateOptions,
+  type FormXObjectOptions,
+  type ImagePatternOptions,
+  type LinearGradientOptions,
+  type RadialShadingOptions,
+  type ShadingPatternOptions,
+  type TilingPatternOptions,
+} from "#src/drawing/resources/index";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format";
 import { resolvePageSize } from "#src/helpers/page-size";
@@ -80,7 +62,7 @@ import { deflate } from "pako";
 
 import { PDFAttachments } from "./pdf-attachments";
 import { PDFCatalog } from "./pdf-catalog";
-import { type DocumentInfo, PDFContext } from "./pdf-context";
+import { PDFContext, type DocumentInfo } from "./pdf-context";
 import { PDFEmbeddedPage } from "./pdf-embedded-page";
 import { PDFFonts } from "./pdf-fonts";
 import { PDFForm } from "./pdf-form";
@@ -2220,9 +2202,10 @@ export class PDF {
    * ```
    */
   createAxialShading(options: AxialShadingOptions): PDFShading {
-    const dict = createAxialShadingDict(options);
+    const dict = PDFShading.createAxialDict(options);
     const ref = this.register(dict);
-    return new ShadingResource(ref, "axial");
+
+    return new PDFShading(ref, "axial");
   }
 
   /**
@@ -2244,9 +2227,10 @@ export class PDF {
    * ```
    */
   createRadialShading(options: RadialShadingOptions): PDFShading {
-    const dict = createRadialShadingDict(options);
+    const dict = PDFShading.createRadialDict(options);
     const ref = this.register(dict);
-    return new ShadingResource(ref, "radial");
+
+    return new PDFShading(ref, "radial");
   }
 
   /**
@@ -2269,13 +2253,11 @@ export class PDF {
    * ```
    */
   createLinearGradient(options: LinearGradientOptions): PDFShading {
-    const coords = calculateAxialCoords(options.angle, options.length);
-    const dict = createAxialShadingDict({
-      coords,
-      stops: options.stops,
-    });
+    const coords = PDFShading.calculateAxialCoords(options.angle, options.length);
+    const dict = PDFShading.createAxialDict({ coords, stops: options.stops });
     const ref = this.register(dict);
-    return new ShadingResource(ref, "axial");
+
+    return new PDFShading(ref, "axial");
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2305,9 +2287,10 @@ export class PDF {
    */
   createTilingPattern(options: TilingPatternOptions): PDFTilingPattern {
     const contentBytes = serializeOperators(options.operators);
-    const stream = createTilingPatternStream(options, contentBytes);
+    const stream = PDFTilingPattern.createStream(options, contentBytes);
     const ref = this.register(stream);
-    return new TilingPatternResource(ref);
+
+    return new PDFTilingPattern(ref);
   }
 
   /**
@@ -2356,9 +2339,10 @@ export class PDF {
    * ```
    */
   createImagePattern(options: ImagePatternOptions): PDFTilingPattern {
-    const stream = createImagePatternStream(options);
+    const stream = PDFTilingPattern.createImageStream(options);
     const ref = this.register(stream);
-    return new TilingPatternResource(ref);
+
+    return new PDFTilingPattern(ref);
   }
 
   /**
@@ -2401,9 +2385,10 @@ export class PDF {
    * ```
    */
   createShadingPattern(options: ShadingPatternOptions): PDFShadingPattern {
-    const dict = createShadingPatternDict(options);
+    const dict = PDFShadingPattern.createDict(options);
     const ref = this.register(dict);
-    return new ShadingPatternResource(ref, options.shading);
+
+    return new PDFShadingPattern(ref, options.shading);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2427,9 +2412,10 @@ export class PDF {
    * ```
    */
   createExtGState(options: ExtGStateOptions): PDFExtGState {
-    const dict = createExtGStateDict(options);
+    const dict = PDFExtGState.createDict(options);
     const ref = this.register(dict);
-    return new ExtGStateResource(ref);
+
+    return new PDFExtGState(ref);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2467,9 +2453,11 @@ export class PDF {
    */
   createFormXObject(options: FormXObjectOptions): PDFFormXObject {
     const contentBytes = serializeOperators(options.operators);
-    const stream = createFormXObjectStream(options, contentBytes);
+    const stream = PDFFormXObject.createStream(options, contentBytes);
+
     const ref = this.register(stream);
-    return new FormXObjectResource(ref, options.bbox);
+
+    return new PDFFormXObject(ref, options.bbox);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

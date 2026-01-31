@@ -2,7 +2,7 @@
  * Drawing API types and option interfaces.
  */
 
-import type { PDFPattern } from "#src/drawing/resources";
+import type { PDFPattern } from "#src/drawing/resources/index";
 import type { EmbeddedFont } from "#src/fonts/embedded-font";
 import type { Standard14FontName } from "#src/fonts/standard-14";
 import type { Color } from "#src/helpers/colors";

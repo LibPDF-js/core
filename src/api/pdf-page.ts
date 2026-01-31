@@ -66,7 +66,6 @@ import {
 } from "#src/document/forms/fields";
 import { TerminalField } from "#src/document/forms/fields/base";
 import type { WidgetAnnotation } from "#src/document/forms/widget-annotation";
-import { createExtGStateDict, serializeOperators } from "#src/drawing/factory";
 import {
   drawCircleOps,
   drawEllipseOps,
@@ -75,7 +74,8 @@ import {
   setFillColor,
 } from "#src/drawing/operations";
 import { PathBuilder } from "#src/drawing/path-builder";
-import type { PDFFormXObject, PDFExtGState, PDFPattern, PDFShading } from "#src/drawing/resources";
+import type { PDFFormXObject, PDFPattern, PDFShading } from "#src/drawing/resources/index";
+import { PDFExtGState, serializeOperators } from "#src/drawing/resources/index";
 import { layoutJustifiedLine, layoutText, measureText } from "#src/drawing/text-layout";
 import type {
   DrawCircleOptions,
@@ -2801,7 +2801,7 @@ export class PDFPage {
    * For the public low-level API, use `pdf.createExtGState()` + `page.registerExtGState()`.
    */
   private registerGraphicsState(options: { fillOpacity?: number; strokeOpacity?: number }): string {
-    const dict = createExtGStateDict(options);
+    const dict = PDFExtGState.createDict(options);
     const ref = this.ctx.register(dict);
 
     return this.registerExtGState({ type: "extgstate", ref });
