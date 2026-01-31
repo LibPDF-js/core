@@ -223,7 +223,7 @@ export interface LineOpsOptions {
   endX: number;
   endY: number;
   color?: Color;
-  thickness?: number;
+  strokeWidth?: number;
   dashArray?: number[];
   dashPhase?: number;
   lineCap?: LineCap;
@@ -246,7 +246,7 @@ export function drawLineOps(options: LineOpsOptions): Operator[] {
     ops.push(setStrokeColor(options.color));
   }
 
-  ops.push(setLineWidth(options.thickness ?? 1));
+  ops.push(setLineWidth(options.strokeWidth ?? 1));
 
   if (options.lineCap) {
     ops.push(setLineCap(lineCapToNumber(options.lineCap)));

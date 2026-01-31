@@ -121,13 +121,13 @@ describe("drawLineOps", () => {
     expect(sOp).toBeDefined();
   });
 
-  it("respects line thickness", () => {
+  it("respects line strokeWidth", () => {
     const ops = drawLineOps({
       startX: 0,
       startY: 0,
       endX: 100,
       endY: 100,
-      thickness: 3,
+      strokeWidth: 3,
     });
 
     const wOp = findOp(ops, "w");

@@ -930,7 +930,7 @@ export class PDFPage {
       endX: options.end.x,
       endY: options.end.y,
       color: options.color ?? black,
-      thickness: options.thickness,
+      strokeWidth: options.thickness,
       dashArray: options.dashArray,
       dashPhase: options.dashPhase,
       lineCap: options.lineCap,
