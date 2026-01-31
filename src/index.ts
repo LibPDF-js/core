@@ -211,6 +211,7 @@ export type {
   ColorStop,
   ExtGStateOptions,
   FormXObjectOptions,
+  ImagePatternOptions,
   LinearGradientOptions,
   PatternMatrix,
   RadialCoords,

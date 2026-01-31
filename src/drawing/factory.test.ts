@@ -441,4 +441,66 @@ describe("Factory Creation and Resource Registration", () => {
       });
     });
   });
+
+  describe("Image Patterns", () => {
+    describe("createImagePattern", () => {
+      it("should create an image pattern", async () => {
+        const imageBytes = await loadFixture("images", "red-square.png");
+        const image = pdf.embedImage(imageBytes);
+        const pattern = pdf.createImagePattern({ image });
+
+        expect(pattern.type).toBe("pattern");
+        expect(pattern.patternType).toBe("tiling");
+        expect(pattern.ref).toBeDefined();
+      });
+
+      it("should create an image pattern with custom dimensions", async () => {
+        const imageBytes = await loadFixture("images", "red-square.png");
+        const image = pdf.embedImage(imageBytes);
+        const pattern = pdf.createImagePattern({
+          image,
+          width: 50,
+          height: 50,
+        });
+
+        expect(pattern.type).toBe("pattern");
+        expect(pattern.patternType).toBe("tiling");
+      });
+
+      it("should register and use image pattern to fill a shape", async () => {
+        const imageBytes = await loadFixture("images", "red-square.png");
+        const image = pdf.embedImage(imageBytes);
+        const pattern = pdf.createImagePattern({
+          image,
+          width: 30,
+          height: 30,
+        });
+
+        // Use with PathBuilder fill({ pattern })
+        page.drawPath().rectangle(50, 50, 200, 200).fill({ pattern });
+
+        const bytes = await pdf.save();
+        expect(bytes.length).toBeGreaterThan(0);
+      });
+
+      it("should register image pattern and return name", async () => {
+        const imageBytes = await loadFixture("images", "red-square.png");
+        const image = pdf.embedImage(imageBytes);
+        const pattern = pdf.createImagePattern({ image, width: 50, height: 50 });
+        const name = page.registerPattern(pattern);
+
+        expect(name).toMatch(/^P\d+$/);
+      });
+
+      it("should deduplicate same image pattern", async () => {
+        const imageBytes = await loadFixture("images", "red-square.png");
+        const image = pdf.embedImage(imageBytes);
+        const pattern = pdf.createImagePattern({ image, width: 50, height: 50 });
+        const name1 = page.registerPattern(pattern);
+        const name2 = page.registerPattern(pattern);
+
+        expect(name1).toBe(name2);
+      });
+    });
+  });
 });

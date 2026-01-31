@@ -232,6 +232,53 @@ export interface TilingPatternOptions {
 }
 
 /**
+ * Options for creating an image pattern.
+ *
+ * Image patterns tile an embedded image to fill an area, similar to
+ * CSS `background-image` with `background-repeat: repeat`.
+ *
+ * @example
+ * ```typescript
+ * const image = pdf.embedImage(textureBytes);
+ * const pattern = pdf.createImagePattern({
+ *   image,
+ *   width: 50,   // Tile size in points
+ *   height: 50,
+ * });
+ *
+ * const patternName = page.registerPattern(pattern);
+ * page.drawOperators([
+ *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+ *   ops.setNonStrokingColorN(patternName),
+ *   ops.rectangle(100, 100, 300, 200),
+ *   ops.fill(),
+ * ]);
+ * ```
+ */
+export interface ImagePatternOptions {
+  /**
+   * The embedded image to use as the pattern tile.
+   *
+   * Created via `pdf.embedImage()`, `pdf.embedJpeg()`, or `pdf.embedPng()`.
+   */
+  image: { ref: PdfRef; width: number; height: number };
+
+  /**
+   * Width of each tile in points.
+   *
+   * If not specified, uses the image's natural width in points.
+   */
+  width?: number;
+
+  /**
+   * Height of each tile in points.
+   *
+   * If not specified, uses the image's natural height in points.
+   */
+  height?: number;
+}
+
+/**
  * PDF blend modes for compositing.
  *
  * These control how colors are combined when drawing over existing content.
@@ -482,6 +529,53 @@ export function createTilingPatternStream(
     ]),
     XStep: PdfNumber.of(options.xStep),
     YStep: PdfNumber.of(options.yStep),
+  });
+
+  return new PdfStream(dict, contentBytes);
+}
+
+/**
+ * Create an image pattern stream.
+ *
+ * This creates a tiling pattern that paints an image XObject. The pattern
+ * includes a Resources dictionary referencing the image.
+ *
+ * @param options - Image pattern options
+ * @returns A PdfStream representing the tiling pattern
+ */
+export function createImagePatternStream(options: ImagePatternOptions): PdfStream {
+  const { image } = options;
+
+  // Calculate tile dimensions (default to image's natural size)
+  const tileWidth = options.width ?? image.width;
+  const tileHeight = options.height ?? image.height;
+
+  // Content stream: scale and paint the image
+  // Images are 1x1 by default in PDF, so we scale to tile dimensions
+  // cm operator: [width 0 0 height 0 0] scales the image
+  // Do operator: paints the XObject
+  const contentStr = `q ${tileWidth} 0 0 ${tileHeight} 0 0 cm /Im0 Do Q`;
+  const contentBytes = new TextEncoder().encode(contentStr);
+
+  // Build the pattern dictionary with Resources
+  const dict = PdfDict.of({
+    Type: PdfName.of("Pattern"),
+    PatternType: PdfNumber.of(1), // Tiling pattern
+    PaintType: PdfNumber.of(1), // Colored tiling pattern
+    TilingType: PdfNumber.of(1), // Constant spacing
+    BBox: new PdfArray([
+      PdfNumber.of(0),
+      PdfNumber.of(0),
+      PdfNumber.of(tileWidth),
+      PdfNumber.of(tileHeight),
+    ]),
+    XStep: PdfNumber.of(tileWidth),
+    YStep: PdfNumber.of(tileHeight),
+    Resources: PdfDict.of({
+      XObject: PdfDict.of({
+        Im0: image.ref,
+      }),
+    }),
   });
 
   return new PdfStream(dict, contentBytes);

@@ -17,6 +17,7 @@ import type {
   AxialShadingOptions,
   ExtGStateOptions,
   FormXObjectOptions,
+  ImagePatternOptions,
   LinearGradientOptions,
   RadialShadingOptions,
   TilingPatternOptions,
@@ -26,6 +27,7 @@ import {
   createAxialShadingDict,
   createExtGStateDict,
   createFormXObjectStream,
+  createImagePatternStream,
   createRadialShadingDict,
   createShadingPatternDict,
   createTilingPatternStream,
@@ -2304,6 +2306,57 @@ export class PDF {
   createTilingPattern(options: TilingPatternOptions): PDFTilingPattern {
     const contentBytes = serializeOperators(options.operators);
     const stream = createTilingPatternStream(options, contentBytes);
+    const ref = this.register(stream);
+    return new TilingPatternResource(ref);
+  }
+
+  /**
+   * Create an image pattern for filling shapes with a tiled image.
+   *
+   * This is a convenience method that creates a tiling pattern containing
+   * an embedded image. Similar to CSS `background-image` with `background-repeat`.
+   *
+   * @param options - Image pattern options including the image and tile dimensions
+   * @returns PDFTilingPattern resource for use with page.registerPattern()
+   *
+   * @example
+   * ```typescript
+   * // Create a repeating texture pattern
+   * const texture = pdf.embedImage(textureBytes);
+   * const pattern = pdf.createImagePattern({
+   *   image: texture,
+   *   width: 50,   // Each tile is 50x50 points
+   *   height: 50,
+   * });
+   *
+   * const patternName = page.registerPattern(pattern);
+   * page.drawOperators([
+   *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+   *   ops.setNonStrokingColorN(patternName),
+   *   ops.rectangle(100, 100, 300, 200),
+   *   ops.fill(),
+   * ]);
+   *
+   * // Or use with PathBuilder
+   * page.drawPath()
+   *   .rect(100, 100, 300, 200)
+   *   .fill({ pattern });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Horizontal stripes using repeat-x
+   * const stripe = pdf.embedImage(stripeBytes);
+   * const pattern = pdf.createImagePattern({
+   *   image: stripe,
+   *   width: 100,
+   *   height: 20,
+   *   repeat: "repeat-x",
+   * });
+   * ```
+   */
+  createImagePattern(options: ImagePatternOptions): PDFTilingPattern {
+    const stream = createImagePatternStream(options);
     const ref = this.register(stream);
     return new TilingPatternResource(ref);
   }

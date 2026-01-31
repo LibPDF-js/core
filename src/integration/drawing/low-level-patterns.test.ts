@@ -3,7 +3,7 @@
  */
 
 import { ops, PDF, ColorSpace } from "#src/index";
-import { saveTestOutput } from "#src/test-utils";
+import { loadFixture, saveTestOutput } from "#src/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("Low-Level Drawing: Patterns", () => {
@@ -189,6 +189,126 @@ describe("Low-Level Drawing: Patterns", () => {
 
     const bytes = await pdf.save();
     await saveTestOutput("low-level-api/patterns.pdf", bytes);
+    expect(bytes).toBeDefined();
+  });
+
+  it("demonstrates image patterns with different tile sizes", async () => {
+    const page = pdf.addPage({ width: 612, height: 792 }); // Letter size
+
+    // Load test images
+    const textureBytes = await loadFixture("images", "gradient-circle.png");
+    const texture = pdf.embedImage(textureBytes);
+
+    // Title
+    const titleFont = page.registerFont("Helvetica-Bold");
+    const bodyFont = page.registerFont("Helvetica");
+    page.drawOperators([
+      ops.beginText(),
+      ops.setFont(titleFont, 24),
+      ops.setNonStrokingGray(0),
+      ops.moveText(50, 740),
+      ops.showText("Image Patterns (createImagePattern)"),
+      ops.endText(),
+    ]);
+
+    // 1. Small tiles (20x20) - top left
+    const smallPattern = pdf.createImagePattern({
+      image: texture,
+      width: 20,
+      height: 20,
+    });
+    const smallName = page.registerPattern(smallPattern);
+
+    page.drawOperators([
+      ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+      ops.setNonStrokingColorN(smallName),
+      ops.rectangle(50, 480, 200, 200),
+      ops.fill(),
+    ]);
+
+    page.drawOperators([
+      ops.beginText(),
+      ops.setFont(bodyFont, 12),
+      ops.setNonStrokingGray(0),
+      ops.moveText(50, 460),
+      ops.showText("Small tiles (20x20)"),
+      ops.endText(),
+    ]);
+
+    // 2. Medium tiles (40x40) - top right
+    const mediumPattern = pdf.createImagePattern({
+      image: texture,
+      width: 40,
+      height: 40,
+    });
+    const mediumName = page.registerPattern(mediumPattern);
+
+    page.drawOperators([
+      ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+      ops.setNonStrokingColorN(mediumName),
+      ops.rectangle(310, 480, 200, 200),
+      ops.fill(),
+    ]);
+
+    page.drawOperators([
+      ops.beginText(),
+      ops.setFont(bodyFont, 12),
+      ops.setNonStrokingGray(0),
+      ops.moveText(310, 460),
+      ops.showText("Medium tiles (40x40)"),
+      ops.endText(),
+    ]);
+
+    // 3. Large tiles (80x80) - bottom left
+    const largePattern = pdf.createImagePattern({
+      image: texture,
+      width: 80,
+      height: 80,
+    });
+    const largeName = page.registerPattern(largePattern);
+
+    page.drawOperators([
+      ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+      ops.setNonStrokingColorN(largeName),
+      ops.rectangle(50, 210, 200, 200),
+      ops.fill(),
+    ]);
+
+    page.drawOperators([
+      ops.beginText(),
+      ops.setFont(bodyFont, 12),
+      ops.setNonStrokingGray(0),
+      ops.moveText(50, 190),
+      ops.showText("Large tiles (80x80)"),
+      ops.endText(),
+    ]);
+
+    // 4. Non-square tiles (60x30) - bottom right
+    const rectPattern = pdf.createImagePattern({
+      image: texture,
+      width: 60,
+      height: 30,
+    });
+    const rectName = page.registerPattern(rectPattern);
+
+    page.drawOperators([
+      ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+      ops.setNonStrokingColorN(rectName),
+      ops.rectangle(310, 210, 200, 200),
+      ops.fill(),
+    ]);
+
+    page.drawOperators([
+      ops.beginText(),
+      ops.setFont(bodyFont, 12),
+      ops.setNonStrokingGray(0),
+      ops.moveText(310, 190),
+      ops.showText("Non-square tiles (60x30)"),
+      ops.endText(),
+    ]);
+
+    const bytes = await pdf.save();
+    await saveTestOutput("low-level-api/image-patterns.pdf", bytes);
     expect(bytes).toBeDefined();
   });
 });
