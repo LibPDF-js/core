@@ -493,13 +493,13 @@ export class PDFPage {
     const xobjectName = this.addXObjectResource(embedded.ref);
 
     // Build content stream operators
-    const ops: string[] = [];
-    ops.push("q"); // Save graphics state
+    const ops: Operator[] = [];
+    ops.push(pushGraphicsState());
 
     // Set opacity if needed (via ExtGState)
     if (options.opacity !== undefined && options.opacity < 1) {
       const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
-      ops.push(`/${gsName} gs`);
+      ops.push(setGraphicsState(gsName));
     }
 
     // Parse rotation options
@@ -536,43 +536,33 @@ export class PDFPage {
       const sin = Math.sin(radians);
 
       // Translate to rotation origin
-      ops.push(
-        `1 0 0 1 ${this.formatNumber(rotateOriginX)} ${this.formatNumber(rotateOriginY)} cm`,
-      );
+      ops.push(concatMatrix(1, 0, 0, 1, rotateOriginX, rotateOriginY));
 
       // Rotate
-      ops.push(
-        `${this.formatNumber(cos)} ${this.formatNumber(sin)} ${this.formatNumber(-sin)} ${this.formatNumber(cos)} 0 0 cm`,
-      );
+      ops.push(concatMatrix(cos, sin, -sin, cos, 0, 0));
 
       // Translate back from rotation origin to position, then adjust for BBox and scale
       const offsetX = x - rotateOriginX - embedded.box.x * scaleX;
       const offsetY = y - rotateOriginY - embedded.box.y * scaleY;
 
-      ops.push(
-        `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(offsetX)} ${this.formatNumber(offsetY)} cm`,
-      );
+      ops.push(concatMatrix(scaleX, 0, 0, scaleY, offsetX, offsetY));
     } else {
       // No rotation: simple translate and scale
       const translateX = x - embedded.box.x * scaleX;
       const translateY = y - embedded.box.y * scaleY;
 
-      ops.push(
-        `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(translateX)} ${this.formatNumber(translateY)} cm`,
-      );
+      ops.push(concatMatrix(scaleX, 0, 0, scaleY, translateX, translateY));
     }
 
     // Draw the XObject
-    ops.push(`/${xobjectName} Do`);
+    ops.push(operatorHelpers.paintXObject(xobjectName));
 
-    ops.push("Q"); // Restore graphics state
-
-    const contentOps = ops.join("\n");
+    ops.push(popGraphicsState());
 
     if (options.background) {
-      this.prependContent(contentOps);
+      this.prependOperators(ops);
     } else {
-      this.appendContent(contentOps);
+      this.appendOperators(ops);
     }
   }
 
@@ -1287,13 +1277,13 @@ export class PDFPage {
     const imageName = this.addXObjectResource(image.ref);
 
     // Build operators
-    const ops: string[] = [];
-    ops.push("q"); // Save graphics state
+    const ops: Operator[] = [];
+    ops.push(pushGraphicsState());
 
     // Apply opacity if needed
     if (options.opacity !== undefined && options.opacity < 1) {
       const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
-      ops.push(`/${gsName} gs`);
+      ops.push(setGraphicsState(gsName));
     }
 
     // Apply rotation if specified
@@ -1307,25 +1297,21 @@ export class PDFPage {
       const sin = Math.sin(rad);
 
       // Translate to origin, rotate, translate back
-      ops.push(`1 0 0 1 ${this.formatNumber(origin.x)} ${this.formatNumber(origin.y)} cm`);
-      ops.push(
-        `${this.formatNumber(cos)} ${this.formatNumber(sin)} ${this.formatNumber(-sin)} ${this.formatNumber(cos)} 0 0 cm`,
-      );
-      ops.push(`1 0 0 1 ${this.formatNumber(-origin.x)} ${this.formatNumber(-origin.y)} cm`);
+      ops.push(concatMatrix(1, 0, 0, 1, origin.x, origin.y));
+      ops.push(concatMatrix(cos, sin, -sin, cos, 0, 0));
+      ops.push(concatMatrix(1, 0, 0, 1, -origin.x, -origin.y));
     }
 
     // Apply transformation matrix to scale and position
     // Image XObjects are 1x1 unit, so we scale to desired size
-    ops.push(
-      `${this.formatNumber(width)} 0 0 ${this.formatNumber(height)} ${this.formatNumber(x)} ${this.formatNumber(y)} cm`,
-    );
+    ops.push(concatMatrix(width, 0, 0, height, x, y));
 
     // Draw the image
-    ops.push(`/${imageName} Do`);
+    ops.push(operatorHelpers.paintXObject(imageName));
 
-    ops.push("Q"); // Restore graphics state
+    ops.push(popGraphicsState());
 
-    this.appendContent(ops.join("\n"));
+    this.appendOperators(ops);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2746,21 +2732,6 @@ export class PDFPage {
   }
 
   /**
-   * Format a number for PDF content stream (avoid unnecessary decimals).
-   */
-  private formatNumber(n: number): string {
-    // Round to 4 decimal places to avoid floating point noise
-    const rounded = Math.round(n * 10000) / 10000;
-
-    // Use integer if possible
-    if (Number.isInteger(rounded)) {
-      return String(rounded);
-    }
-
-    return rounded.toString();
-  }
-
-  /**
    * Create and register a content stream.
    *
    * Accepts either a string (for ASCII-only content like operator names and numbers)
@@ -3001,12 +2972,12 @@ export class PDFPage {
   }
 
   /**
-   * Append operators to the page content stream.
+   * Serialize operators to bytes.
    *
    * Uses Operator.toBytes() directly to avoid UTF-8 round-trip corruption
    * of non-ASCII bytes in PdfString operands (e.g., WinAnsi-encoded text).
    */
-  private appendOperators(ops: Operator[]): void {
+  private serializeOperators(ops: Operator[]): Uint8Array {
     const newline = new Uint8Array([0x0a]);
     const parts: Uint8Array[] = [];
 
@@ -3018,7 +2989,21 @@ export class PDFPage {
       parts.push(ops[i].toBytes());
     }
 
-    this.appendContent(concatBytes(parts));
+    return concatBytes(parts);
+  }
+
+  /**
+   * Append operators to the page content stream (foreground).
+   */
+  private appendOperators(ops: Operator[]): void {
+    this.appendContent(this.serializeOperators(ops));
+  }
+
+  /**
+   * Prepend operators to the page content stream (background).
+   */
+  private prependOperators(ops: Operator[]): void {
+    this.prependContent(this.serializeOperators(ops));
   }
 
   /**
