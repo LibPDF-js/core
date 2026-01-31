@@ -66,7 +66,7 @@ import {
 } from "#src/document/forms/fields";
 import { TerminalField } from "#src/document/forms/fields/base";
 import type { WidgetAnnotation } from "#src/document/forms/widget-annotation";
-import { createExtGStateDict } from "#src/drawing/factory";
+import { createExtGStateDict, serializeOperators } from "#src/drawing/factory";
 import {
   drawCircleOps,
   drawEllipseOps,
@@ -1875,115 +1875,6 @@ export class PDFPage {
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Low-Level Convenience Methods
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Fill a rectangular region with a shading (gradient).
-   *
-   * This is a convenience method that handles the common pattern of:
-   * 1. Registering the shading
-   * 2. Saving graphics state
-   * 3. Setting up a clipping path
-   * 4. Painting the shading
-   * 5. Restoring graphics state
-   *
-   * For more complex shapes (circles, paths), use drawOperators() directly.
-   *
-   * @param shading - The shading resource to use
-   * @param x - X coordinate of the rectangle's lower-left corner
-   * @param y - Y coordinate of the rectangle's lower-left corner
-   * @param width - Width of the rectangle
-   * @param height - Height of the rectangle
-   *
-   * @example
-   * ```typescript
-   * // Create a gradient
-   * const gradient = pdf.createAxialShading({
-   *   coords: [0, 0, 200, 0],
-   *   stops: [
-   *     { offset: 0, color: rgb(1, 0, 0) },
-   *     { offset: 1, color: rgb(0, 0, 1) },
-   *   ],
-   * });
-   *
-   * // Fill a rectangle with the gradient
-   * page.fillRectWithShading(gradient, 50, 50, 200, 100);
-   * ```
-   */
-  fillRectWithShading(
-    shading: PDFShading,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-  ): void {
-    const shadingName = this.registerShading(shading);
-    const ops = operatorHelpers;
-
-    this.drawOperators([
-      ops.pushGraphicsState(),
-      ops.rectangle(x, y, width, height),
-      ops.clip(),
-      ops.endPath(),
-      ops.paintShading(shadingName),
-      ops.popGraphicsState(),
-    ]);
-  }
-
-  /**
-   * Fill a rectangular region with a pattern.
-   *
-   * This is a convenience method that handles the common pattern of:
-   * 1. Registering the pattern
-   * 2. Setting up the Pattern color space
-   * 3. Painting the rectangle with the pattern
-   *
-   * @param pattern - The pattern resource to use
-   * @param x - X coordinate of the rectangle's lower-left corner
-   * @param y - Y coordinate of the rectangle's lower-left corner
-   * @param width - Width of the rectangle
-   * @param height - Height of the rectangle
-   *
-   * @example
-   * ```typescript
-   * // Create a checkerboard pattern
-   * const pattern = pdf.createTilingPattern({
-   *   bbox: [0, 0, 10, 10],
-   *   xStep: 10,
-   *   yStep: 10,
-   *   operators: [
-   *     ops.setNonStrokingGray(0.8),
-   *     ops.rectangle(0, 0, 5, 5),
-   *     ops.fill(),
-   *   ],
-   * });
-   *
-   * // Fill a rectangle with the pattern
-   * page.fillRectWithPattern(pattern, 100, 100, 200, 200);
-   * ```
-   */
-  fillRectWithPattern(
-    pattern: PDFPattern,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-  ): void {
-    const patternName = this.registerPattern(pattern);
-    const ops = operatorHelpers;
-
-    this.drawOperators([
-      ops.pushGraphicsState(),
-      ops.setNonStrokingColorSpace(ColorSpace.Pattern),
-      ops.setNonStrokingColorN(patternName),
-      ops.rectangle(x, y, width, height),
-      ops.fill(),
-      ops.popGraphicsState(),
-    ]);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
   // Annotations
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2929,38 +2820,17 @@ export class PDFPage {
   }
 
   /**
-   * Serialize operators to bytes.
-   *
-   * Uses Operator.toBytes() directly to avoid UTF-8 round-trip corruption
-   * of non-ASCII bytes in PdfString operands (e.g., WinAnsi-encoded text).
-   */
-  private serializeOperators(ops: Operator[]): Uint8Array {
-    const newline = new Uint8Array([0x0a]);
-    const parts: Uint8Array[] = [];
-
-    for (let i = 0; i < ops.length; i++) {
-      if (i > 0) {
-        parts.push(newline);
-      }
-
-      parts.push(ops[i].toBytes());
-    }
-
-    return concatBytes(parts);
-  }
-
-  /**
    * Append operators to the page content stream (foreground).
    */
   private appendOperators(ops: Operator[]): void {
-    this.appendContent(this.serializeOperators(ops));
+    this.appendContent(serializeOperators(ops));
   }
 
   /**
    * Prepend operators to the page content stream (background).
    */
   private prependOperators(ops: Operator[]): void {
-    this.prependContent(this.serializeOperators(ops));
+    this.prependContent(serializeOperators(ops));
   }
 
   /**

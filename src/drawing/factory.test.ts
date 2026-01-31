@@ -290,46 +290,6 @@ describe("Factory Creation and Resource Registration", () => {
     });
   });
 
-  describe("Convenience Methods", () => {
-    describe("fillRectWithShading", () => {
-      it("should fill a rectangle with a gradient", async () => {
-        const gradient = pdf.createAxialShading({
-          coords: [0, 0, 100, 0],
-          stops: [
-            { offset: 0, color: { type: "RGB", red: 1, green: 0, blue: 0 } },
-            { offset: 1, color: { type: "RGB", red: 0, green: 0, blue: 1 } },
-          ],
-        });
-
-        // Should not throw
-        page.fillRectWithShading(gradient, 50, 50, 100, 100);
-
-        // Verify content was added
-        const bytes = await pdf.save();
-        expect(bytes.length).toBeGreaterThan(0);
-      });
-    });
-
-    describe("fillRectWithPattern", () => {
-      it("should fill a rectangle with a pattern", async () => {
-        const { ops } = await import("#src/index");
-        const pattern = pdf.createTilingPattern({
-          bbox: [0, 0, 10, 10],
-          xStep: 10,
-          yStep: 10,
-          operators: [ops.setNonStrokingGray(0.5), ops.rectangle(0, 0, 5, 5), ops.fill()],
-        });
-
-        // Should not throw
-        page.fillRectWithPattern(pattern, 100, 100, 200, 200);
-
-        // Verify content was added
-        const bytes = await pdf.save();
-        expect(bytes.length).toBeGreaterThan(0);
-      });
-    });
-  });
-
   describe("Shading Patterns", () => {
     describe("createShadingPattern", () => {
       it("should create a shading pattern from a gradient", () => {
