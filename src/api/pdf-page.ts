@@ -1509,56 +1509,19 @@ export class PDFPage {
    * ```
    */
   registerFont(font: FontInput): string {
-    // Get the font reference first
-    let fontRef: PdfRef | null = null;
-
     if (typeof font === "string") {
-      // Standard 14 font - we need to add it to resources and get a ref
-      // These are inline dicts, not references, so we use the addFontResource helper
+      // Standard 14 font - inline dicts, not references
       return this.addFontResource(font);
     }
 
     // Embedded font - get reference
-    fontRef = this.ctx.getFontRef(font);
+    const fontRef = this.ctx.getFontRef(font);
 
     if (!fontRef) {
       throw new Error("Font must be prepared before registering");
     }
 
-    // Check cache for deduplication
-    const cachedName = this._resourceCache.get(fontRef);
-
-    if (cachedName) {
-      return cachedName;
-    }
-
-    // Register the font
-    const resources = this.getResources();
-    let fonts = resources.get("Font");
-
-    if (!(fonts instanceof PdfDict)) {
-      fonts = new PdfDict();
-      resources.set("Font", fonts);
-    }
-
-    // Check if this exact ref is already registered
-    for (const [existingName, value] of fonts) {
-      if (
-        value instanceof PdfRef &&
-        value.objectNumber === fontRef.objectNumber &&
-        value.generation === fontRef.generation
-      ) {
-        this._resourceCache.set(fontRef, existingName.value);
-        return existingName.value;
-      }
-    }
-
-    // Generate unique name and register
-    const name = this.generateUniqueName(fonts, "F");
-    fonts.set(name, fontRef);
-    this._resourceCache.set(fontRef, name);
-
-    return name;
+    return this.registerResource(fontRef, "Font", "F");
   }
 
   /**
@@ -1583,40 +1546,7 @@ export class PDFPage {
    * ```
    */
   registerImage(image: PDFImage): string {
-    // Check cache for deduplication
-    const cachedName = this._resourceCache.get(image.ref);
-
-    if (cachedName) {
-      return cachedName;
-    }
-
-    // Register the image
-    const resources = this.getResources();
-    let xobjects = resources.get("XObject");
-
-    if (!(xobjects instanceof PdfDict)) {
-      xobjects = new PdfDict();
-      resources.set("XObject", xobjects);
-    }
-
-    // Check if this exact ref is already registered
-    for (const [existingName, value] of xobjects) {
-      if (
-        value instanceof PdfRef &&
-        value.objectNumber === image.ref.objectNumber &&
-        value.generation === image.ref.generation
-      ) {
-        this._resourceCache.set(image.ref, existingName.value);
-        return existingName.value;
-      }
-    }
-
-    // Generate unique name and register
-    const name = this.generateUniqueName(xobjects, "Im");
-    xobjects.set(name, image.ref);
-    this._resourceCache.set(image.ref, name);
-
-    return name;
+    return this.registerResource(image.ref, "XObject", "Im");
   }
 
   /**
@@ -1646,40 +1576,7 @@ export class PDFPage {
    * ```
    */
   registerShading(shading: PDFShading): string {
-    // Check cache for deduplication
-    const cachedName = this._resourceCache.get(shading.ref);
-
-    if (cachedName) {
-      return cachedName;
-    }
-
-    // Register the shading
-    const resources = this.getResources();
-    let shadings = resources.get("Shading");
-
-    if (!(shadings instanceof PdfDict)) {
-      shadings = new PdfDict();
-      resources.set("Shading", shadings);
-    }
-
-    // Check if this exact ref is already registered
-    for (const [existingName, value] of shadings) {
-      if (
-        value instanceof PdfRef &&
-        value.objectNumber === shading.ref.objectNumber &&
-        value.generation === shading.ref.generation
-      ) {
-        this._resourceCache.set(shading.ref, existingName.value);
-        return existingName.value;
-      }
-    }
-
-    // Generate unique name and register
-    const name = this.generateUniqueName(shadings, "Sh");
-    shadings.set(name, shading.ref);
-    this._resourceCache.set(shading.ref, name);
-
-    return name;
+    return this.registerResource(shading.ref, "Shading", "Sh");
   }
 
   /**
@@ -1715,40 +1612,7 @@ export class PDFPage {
    * ```
    */
   registerPattern(pattern: PDFPattern): string {
-    // Check cache for deduplication
-    const cachedName = this._resourceCache.get(pattern.ref);
-
-    if (cachedName) {
-      return cachedName;
-    }
-
-    // Register the pattern
-    const resources = this.getResources();
-    let patterns = resources.get("Pattern");
-
-    if (!(patterns instanceof PdfDict)) {
-      patterns = new PdfDict();
-      resources.set("Pattern", patterns);
-    }
-
-    // Check if this exact ref is already registered
-    for (const [existingName, value] of patterns) {
-      if (
-        value instanceof PdfRef &&
-        value.objectNumber === pattern.ref.objectNumber &&
-        value.generation === pattern.ref.generation
-      ) {
-        this._resourceCache.set(pattern.ref, existingName.value);
-        return existingName.value;
-      }
-    }
-
-    // Generate unique name and register
-    const name = this.generateUniqueName(patterns, "P");
-    patterns.set(name, pattern.ref);
-    this._resourceCache.set(pattern.ref, name);
-
-    return name;
+    return this.registerResource(pattern.ref, "Pattern", "P");
   }
 
   /**
@@ -1779,40 +1643,7 @@ export class PDFPage {
    * ```
    */
   registerExtGState(state: PDFExtGState): string {
-    // Check cache for deduplication
-    const cachedName = this._resourceCache.get(state.ref);
-
-    if (cachedName) {
-      return cachedName;
-    }
-
-    // Register the graphics state
-    const resources = this.getResources();
-    let extGState = resources.get("ExtGState");
-
-    if (!(extGState instanceof PdfDict)) {
-      extGState = new PdfDict();
-      resources.set("ExtGState", extGState);
-    }
-
-    // Check if this exact ref is already registered
-    for (const [existingName, value] of extGState) {
-      if (
-        value instanceof PdfRef &&
-        value.objectNumber === state.ref.objectNumber &&
-        value.generation === state.ref.generation
-      ) {
-        this._resourceCache.set(state.ref, existingName.value);
-        return existingName.value;
-      }
-    }
-
-    // Generate unique name and register
-    const name = this.generateUniqueName(extGState, "GS");
-    extGState.set(name, state.ref);
-    this._resourceCache.set(state.ref, name);
-
-    return name;
+    return this.registerResource(state.ref, "ExtGState", "GS");
   }
 
   /**
@@ -1852,40 +1683,7 @@ export class PDFPage {
    * ```
    */
   registerXObject(xobject: PDFFormXObject | PDFEmbeddedPage): string {
-    // Check cache for deduplication
-    const cachedName = this._resourceCache.get(xobject.ref);
-
-    if (cachedName) {
-      return cachedName;
-    }
-
-    // Register the XObject
-    const resources = this.getResources();
-    let xobjects = resources.get("XObject");
-
-    if (!(xobjects instanceof PdfDict)) {
-      xobjects = new PdfDict();
-      resources.set("XObject", xobjects);
-    }
-
-    // Check if this exact ref is already registered
-    for (const [existingName, value] of xobjects) {
-      if (
-        value instanceof PdfRef &&
-        value.objectNumber === xobject.ref.objectNumber &&
-        value.generation === xobject.ref.generation
-      ) {
-        this._resourceCache.set(xobject.ref, existingName.value);
-        return existingName.value;
-      }
-    }
-
-    // Generate unique name and register
-    const name = this.generateUniqueName(xobjects, "Fm");
-    xobjects.set(name, xobject.ref);
-    this._resourceCache.set(xobject.ref, name);
-
-    return name;
+    return this.registerResource(xobject.ref, "XObject", "Fm");
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2586,6 +2384,53 @@ export class PDFPage {
       counter++;
       name = `${prefix}${counter}`;
     }
+
+    return name;
+  }
+
+  /**
+   * Register a resource reference in a resource subdictionary.
+   *
+   * Handles deduplication via cache and existing entry scanning.
+   *
+   * @param ref - The object reference to register
+   * @param resourceType - The resource subdictionary key (e.g., "Font", "XObject")
+   * @param prefix - The name prefix (e.g., "F", "Im", "Sh")
+   * @returns The resource name for use in operators
+   */
+  private registerResource(ref: PdfRef, resourceType: string, prefix: string): string {
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(ref);
+
+    if (cachedName) {
+      return cachedName;
+    }
+
+    // Get or create the resource subdictionary
+    const resources = this.getResources();
+    let subdict = resources.get(resourceType);
+
+    if (!(subdict instanceof PdfDict)) {
+      subdict = new PdfDict();
+      resources.set(resourceType, subdict);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of subdict) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === ref.objectNumber &&
+        value.generation === ref.generation
+      ) {
+        this._resourceCache.set(ref, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(subdict, prefix);
+    subdict.set(name, ref);
+    this._resourceCache.set(ref, name);
 
     return name;
   }
