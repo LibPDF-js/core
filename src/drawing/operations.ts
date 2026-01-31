@@ -377,10 +377,10 @@ export function drawCircleOps(
  */
 export interface PathOpsOptions {
   fillColor?: Color;
-  /** Fill pattern name (already registered, e.g., "/P0") */
+  /** Fill pattern name (already registered, e.g., "P0") */
   fillPatternName?: string;
   strokeColor?: Color;
-  /** Stroke pattern name (already registered, e.g., "/P0") */
+  /** Stroke pattern name (already registered, e.g., "P0") */
   strokePatternName?: string;
   strokeWidth?: number;
   lineCap?: LineCap;
