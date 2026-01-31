@@ -47,3 +47,6 @@ examples/output/
 
 # Debug files
 debug/
+
+# Temporary files
+tmp/
