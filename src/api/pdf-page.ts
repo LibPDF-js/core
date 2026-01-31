@@ -66,6 +66,7 @@ import {
 } from "#src/document/forms/fields";
 import { TerminalField } from "#src/document/forms/fields/base";
 import type { WidgetAnnotation } from "#src/document/forms/widget-annotation";
+import { createExtGStateDict } from "#src/drawing/factory";
 import {
   drawCircleOps,
   drawEllipseOps,
@@ -498,7 +499,10 @@ export class PDFPage {
 
     // Set opacity if needed (via ExtGState)
     if (options.opacity !== undefined && options.opacity < 1) {
-      const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
+      const gsName = this.addGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.opacity,
+      });
       ops.push(setGraphicsState(gsName));
     }
 
@@ -1282,7 +1286,10 @@ export class PDFPage {
 
     // Apply opacity if needed
     if (options.opacity !== undefined && options.opacity < 1) {
-      const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
+      const gsName = this.addGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.opacity,
+      });
       ops.push(setGraphicsState(gsName));
     }
 
@@ -2689,7 +2696,7 @@ export class PDFPage {
    * Add a graphics state to the page's resources.
    * Returns the name assigned to the ExtGState.
    */
-  private addGraphicsState(params: { ca?: number; CA?: number }): string {
+  private addGraphicsState(options: { fillOpacity?: number; strokeOpacity?: number }): string {
     const resources = this.getResources();
     let extGState = resources.get("ExtGState");
 
@@ -2698,16 +2705,8 @@ export class PDFPage {
       resources.set("ExtGState", extGState);
     }
 
-    // Create the graphics state dict
-    const gsDict = new PdfDict();
-
-    if (params.ca !== undefined) {
-      gsDict.set("ca", PdfNumber.of(params.ca)); // Non-stroking (fill) opacity
-    }
-
-    if (params.CA !== undefined) {
-      gsDict.set("CA", PdfNumber.of(params.CA)); // Stroking opacity
-    }
+    // Create the graphics state dict using factory
+    const gsDict = createExtGStateDict(options);
 
     // Generate unique name
     const name = this.generateUniqueName(extGState, "GS");
@@ -2958,17 +2957,8 @@ export class PDFPage {
       return null;
     }
 
-    const params: { ca?: number; CA?: number } = {};
-
-    if (fillOpacity !== undefined) {
-      params.ca = Math.max(0, Math.min(1, fillOpacity)); // Non-stroking (fill) opacity
-    }
-
-    if (strokeOpacity !== undefined) {
-      params.CA = Math.max(0, Math.min(1, strokeOpacity)); // Stroking opacity
-    }
-
-    return this.addGraphicsState(params);
+    // createExtGStateDict handles clamping internally
+    return this.addGraphicsState({ fillOpacity, strokeOpacity });
   }
 
   /**
