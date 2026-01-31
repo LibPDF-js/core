@@ -30,7 +30,7 @@ describe("Low-Level Drawing: Patterns", () => {
 
     // 1. Checkerboard pattern - top left
     const checkerPattern = pdf.createTilingPattern({
-      bbox: [0, 0, 36, 36],
+      bbox: { x: 0, y: 0, width: 36, height: 36 },
       xStep: 36,
       yStep: 36,
       operators: [
@@ -67,7 +67,7 @@ describe("Low-Level Drawing: Patterns", () => {
 
     // 2. Diagonal Lines pattern - top right
     const diagPattern = pdf.createTilingPattern({
-      bbox: [0, 0, 8, 8],
+      bbox: { x: 0, y: 0, width: 8, height: 8 },
       xStep: 8,
       yStep: 8,
       operators: [
@@ -108,7 +108,7 @@ describe("Low-Level Drawing: Patterns", () => {
     const r = 4;
     const k = 0.552;
     const dotPattern = pdf.createTilingPattern({
-      bbox: [0, 0, 18, 18],
+      bbox: { x: 0, y: 0, width: 18, height: 18 },
       xStep: 18,
       yStep: 18,
       operators: [
@@ -147,7 +147,7 @@ describe("Low-Level Drawing: Patterns", () => {
 
     // 4. Crosshatch pattern - bottom right
     const crossPattern = pdf.createTilingPattern({
-      bbox: [0, 0, 15, 15],
+      bbox: { x: 0, y: 0, width: 15, height: 15 },
       xStep: 15,
       yStep: 15,
       operators: [

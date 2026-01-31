@@ -16,7 +16,7 @@ describe("Low-Level Drawing: Form XObjects", () => {
 
     // DRAFT stamp (red with outline) - no text since fonts need page registration
     const draftStamp = testPdf.createFormXObject({
-      bbox: [0, 0, 100, 40],
+      bbox: { x: 0, y: 0, width: 100, height: 40 },
       operators: [
         // Red outlined box
         ops.setStrokingRGB(0.8, 0.1, 0.1),
@@ -34,13 +34,13 @@ describe("Low-Level Drawing: Form XObjects", () => {
 
     // APPROVED stamp (green filled box)
     const approvedStamp = testPdf.createFormXObject({
-      bbox: [0, 0, 140, 35],
+      bbox: { x: 0, y: 0, width: 140, height: 35 },
       operators: [ops.setNonStrokingRGB(0.2, 0.7, 0.35), ops.rectangle(0, 0, 140, 35), ops.fill()],
     });
 
     // CONFIDENTIAL stamp (navy background)
     const confidentialStamp = testPdf.createFormXObject({
-      bbox: [0, 0, 180, 35],
+      bbox: { x: 0, y: 0, width: 180, height: 35 },
       operators: [ops.setNonStrokingRGB(0.1, 0.15, 0.4), ops.rectangle(0, 0, 180, 35), ops.fill()],
     });
 

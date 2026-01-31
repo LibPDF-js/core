@@ -9,10 +9,15 @@
 /**
  * Bounding box in PDF coordinate space.
  *
- * Defines a rectangle as [x, y, width, height] where (x, y) is the lower-left corner.
+ * Defines a rectangle where (x, y) is the lower-left corner.
  * Used for patterns, Form XObjects, and clipping regions.
  */
-export type BBox = [x: number, y: number, width: number, height: number];
+export interface BBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 /**
  * Matrix for transforming a pattern.

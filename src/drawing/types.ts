@@ -3,6 +3,7 @@
  */
 
 import type { PDFPattern } from "#src/drawing/resources/index";
+import type { BBox } from "#src/drawing/resources/types";
 import type { EmbeddedFont } from "#src/fonts/embedded-font";
 import type { Standard14FontName } from "#src/fonts/standard-14";
 import type { Color } from "#src/helpers/colors";
@@ -68,13 +69,10 @@ export interface Rotation {
 
 /**
  * Bounding box for calculating rotation origins.
+ *
+ * Alias for BBox - both represent { x, y, width, height }.
  */
-export interface BoundingBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+export type BoundingBox = BBox;
 
 /**
  * Resolve a rotation origin to explicit coordinates.

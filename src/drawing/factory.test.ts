@@ -123,7 +123,7 @@ describe("Factory Creation and Resource Registration", () => {
     describe("createTilingPattern", () => {
       it("should create a tiling pattern resource", () => {
         const pattern = pdf.createTilingPattern({
-          bbox: [0, 0, 10, 10],
+          bbox: { x: 0, y: 0, width: 10, height: 10 },
           xStep: 10,
           yStep: 10,
           operators: [],
@@ -137,7 +137,7 @@ describe("Factory Creation and Resource Registration", () => {
     describe("registerPattern", () => {
       it("should return a pattern resource name", () => {
         const pattern = pdf.createTilingPattern({
-          bbox: [0, 0, 10, 10],
+          bbox: { x: 0, y: 0, width: 10, height: 10 },
           xStep: 10,
           yStep: 10,
           operators: [],
@@ -149,7 +149,7 @@ describe("Factory Creation and Resource Registration", () => {
 
       it("should return same name for same pattern (deduplication)", () => {
         const pattern = pdf.createTilingPattern({
-          bbox: [0, 0, 10, 10],
+          bbox: { x: 0, y: 0, width: 10, height: 10 },
           xStep: 10,
           yStep: 10,
           operators: [],
@@ -216,19 +216,19 @@ describe("Factory Creation and Resource Registration", () => {
     describe("createFormXObject", () => {
       it("should create a Form XObject resource", () => {
         const xobject = pdf.createFormXObject({
-          bbox: [0, 0, 100, 50],
+          bbox: { x: 0, y: 0, width: 100, height: 50 },
           operators: [],
         });
 
         expect(xobject.type).toBe("formxobject");
-        expect(xobject.bbox).toEqual([0, 0, 100, 50]);
+        expect(xobject.bbox).toEqual({ x: 0, y: 0, width: 100, height: 50 });
       });
     });
 
     describe("registerXObject", () => {
       it("should return an XObject resource name", () => {
         const formXObject = pdf.createFormXObject({
-          bbox: [0, 0, 100, 50],
+          bbox: { x: 0, y: 0, width: 100, height: 50 },
           operators: [],
         });
         const name = page.registerXObject(formXObject);
@@ -238,7 +238,7 @@ describe("Factory Creation and Resource Registration", () => {
 
       it("should return same name for same XObject (deduplication)", () => {
         const formXObject = pdf.createFormXObject({
-          bbox: [0, 0, 100, 50],
+          bbox: { x: 0, y: 0, width: 100, height: 50 },
           operators: [],
         });
         const name1 = page.registerXObject(formXObject);

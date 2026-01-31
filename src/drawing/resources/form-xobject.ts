@@ -26,7 +26,7 @@ import type { BBox } from "./types";
  * ```typescript
  * // Create a "DRAFT" watermark stamp
  * const draftStamp = pdf.createFormXObject({
- *   bbox: [0, 0, 200, 50],
+ *   bbox: { x: 0, y: 0, width: 200, height: 50 },
  *   operators: [
  *     ops.setNonStrokingRGB(0.9, 0.1, 0.1),
  *     ops.beginText(),
@@ -51,10 +51,10 @@ import type { BBox } from "./types";
  */
 export interface FormXObjectOptions {
   /**
-   * Bounding box of the Form XObject: [x, y, width, height].
+   * Bounding box of the Form XObject.
    *
    * Defines the coordinate space for the form's operators.
-   * Usually starts at [0, 0, width, height].
+   * Usually starts at { x: 0, y: 0, width, height }.
    */
   bbox: BBox;
   /** Operators that draw the form content */
@@ -78,7 +78,7 @@ export interface FormXObjectOptions {
  * @example
  * ```typescript
  * const logo = pdf.createFormXObject({
- *   bbox: [0, 0, 100, 50],
+ *   bbox: { x: 0, y: 0, width: 100, height: 50 },
  *   operators: [
  *     ops.setNonStrokingRGB(0.2, 0.4, 0.8),
  *     ops.rectangle(0, 0, 100, 50),
@@ -112,17 +112,18 @@ export class PDFFormXObject {
    * Create the PDF stream for a Form XObject.
    */
   static createStream(options: FormXObjectOptions, contentBytes: Uint8Array): PdfStream {
-    const [x, y, width, height] = options.bbox;
+    const { x, y, width, height } = options.bbox;
 
     const dict = PdfDict.of({
       Type: PdfName.of("XObject"),
       Subtype: PdfName.of("Form"),
       FormType: PdfNumber.of(1),
+      // PDF spec: BBox is [llx, lly, urx, ury] (lower-left and upper-right corners)
       BBox: new PdfArray([
         PdfNumber.of(x),
         PdfNumber.of(y),
-        PdfNumber.of(width),
-        PdfNumber.of(height),
+        PdfNumber.of(x + width),
+        PdfNumber.of(y + height),
       ]),
     });
 

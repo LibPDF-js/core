@@ -213,7 +213,7 @@ describe("Low-Level Drawing: High-Level Shape Methods with Patterns", () => {
 
     // Create a tiling pattern (checkerboard)
     const checkerPattern = pdf.createTilingPattern({
-      bbox: [0, 0, 20, 20],
+      bbox: { x: 0, y: 0, width: 20, height: 20 },
       xStep: 20,
       yStep: 20,
       operators: [
@@ -232,7 +232,7 @@ describe("Low-Level Drawing: High-Level Shape Methods with Patterns", () => {
 
     // Diagonal stripes pattern
     const stripesPattern = pdf.createTilingPattern({
-      bbox: [0, 0, 10, 10],
+      bbox: { x: 0, y: 0, width: 10, height: 10 },
       xStep: 10,
       yStep: 10,
       operators: [

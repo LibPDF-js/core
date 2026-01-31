@@ -69,7 +69,7 @@ describe("Low-Level Drawing: PathBuilder Advanced", () => {
 
     // Create a tiling pattern for PathBuilder use
     const tilingPattern = pdf.createTilingPattern({
-      bbox: [0, 0, 12, 12],
+      bbox: { x: 0, y: 0, width: 12, height: 12 },
       xStep: 12,
       yStep: 12,
       operators: [

@@ -28,7 +28,7 @@ import type { BBox, PatternMatrix } from "./types";
  * ```typescript
  * // Checkerboard pattern
  * const pattern = pdf.createTilingPattern({
- *   bbox: [0, 0, 10, 10],
+ *   bbox: { x: 0, y: 0, width: 10, height: 10 },
  *   xStep: 10,
  *   yStep: 10,
  *   operators: [
@@ -41,10 +41,10 @@ import type { BBox, PatternMatrix } from "./types";
  */
 export interface TilingPatternOptions {
   /**
-   * Bounding box of the pattern cell: [x, y, width, height].
+   * Bounding box of the pattern cell.
    *
    * Defines the coordinate space for the pattern's operators.
-   * Usually starts at [0, 0, width, height].
+   * Usually starts at { x: 0, y: 0, width, height }.
    */
   bbox: BBox;
   /**
@@ -166,7 +166,7 @@ export interface ShadingPatternOptions {
  * @example
  * ```typescript
  * const dots = pdf.createTilingPattern({
- *   bbox: [0, 0, 10, 10],
+ *   bbox: { x: 0, y: 0, width: 10, height: 10 },
  *   xStep: 10,
  *   yStep: 10,
  *   operators: [
@@ -196,18 +196,19 @@ export class PDFTilingPattern {
    * Create the PDF stream for a tiling pattern.
    */
   static createStream(options: TilingPatternOptions, contentBytes: Uint8Array): PdfStream {
-    const [x, y, width, height] = options.bbox;
+    const { x, y, width, height } = options.bbox;
 
     const dict = PdfDict.of({
       Type: PdfName.of("Pattern"),
       PatternType: PdfNumber.of(1),
       PaintType: PdfNumber.of(1),
       TilingType: PdfNumber.of(1),
+      // PDF spec: BBox is [llx, lly, urx, ury] (lower-left and upper-right corners)
       BBox: new PdfArray([
         PdfNumber.of(x),
         PdfNumber.of(y),
-        PdfNumber.of(width),
-        PdfNumber.of(height),
+        PdfNumber.of(x + width),
+        PdfNumber.of(y + height),
       ]),
       XStep: PdfNumber.of(options.xStep),
       YStep: PdfNumber.of(options.yStep),

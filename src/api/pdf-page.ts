@@ -1694,7 +1694,7 @@ export class PDFPage {
    * ```typescript
    * // Create a checkerboard pattern
    * const pattern = pdf.createTilingPattern({
-   *   bbox: [0, 0, 10, 10],
+   *   bbox: { x: 0, y: 0, width: 10, height: 10 },
    *   xStep: 10,
    *   yStep: 10,
    *   operators: [
@@ -1827,7 +1827,7 @@ export class PDFPage {
    * ```typescript
    * // Create a reusable stamp
    * const stamp = pdf.createFormXObject({
-   *   bbox: [0, 0, 100, 50],
+   *   bbox: { x: 0, y: 0, width: 100, height: 50 },
    *   operators: [
    *     ops.setNonStrokingRGB(1, 0, 0),
    *     ops.rectangle(0, 0, 100, 50),
