@@ -300,15 +300,7 @@ export class PDFPage {
    * returns the height of the MediaBox instead.
    */
   get width(): number {
-    const mediaBox = this.getMediaBox();
-    const cropBox = this.getCropBox();
-
-    let box = mediaBox;
-
-    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
-      box = cropBox;
-    }
-
+    const box = this.getEffectiveBox();
     const rotation = this.rotation;
 
     if (rotation === 90 || rotation === 270) {
@@ -325,15 +317,7 @@ export class PDFPage {
    * returns the width of the MediaBox instead.
    */
   get height(): number {
-    const mediaBox = this.getMediaBox();
-    const cropBox = this.getCropBox();
-
-    let box = mediaBox;
-
-    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
-      box = cropBox;
-    }
-
+    const box = this.getEffectiveBox();
     const rotation = this.rotation;
 
     if (rotation === 90 || rotation === 270) {
@@ -341,6 +325,22 @@ export class PDFPage {
     }
 
     return Math.abs(box.height);
+  }
+
+  /**
+   * Get the effective box for dimension calculations.
+   *
+   * Returns CropBox if it's smaller than MediaBox, otherwise MediaBox.
+   */
+  private getEffectiveBox(): Rectangle {
+    const mediaBox = this.getMediaBox();
+    const cropBox = this.getCropBox();
+
+    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
+      return cropBox;
+    }
+
+    return mediaBox;
   }
 
   /**
@@ -742,19 +742,16 @@ export class PDFPage {
 
     // For radio buttons, set the appearance state
     if (field instanceof RadioField && options.option) {
-      const radioField = field;
-      const currentValue = radioField.getValue();
+      const currentValue = field.getValue();
 
-      // Set appearance state to option value if selected, otherwise "Off"
       widgetDict.set("AS", PdfName.of(currentValue === options.option ? options.option : "Off"));
     }
 
     // For checkboxes, set the appearance state
     if (field instanceof CheckboxField) {
-      const checkboxField = field;
-      const isChecked = checkboxField.isChecked();
-      const onValue = checkboxField.getOnValue();
-      widgetDict.set("AS", PdfName.of(isChecked ? onValue : "Off"));
+      const onValue = field.getOnValue();
+
+      widgetDict.set("AS", PdfName.of(field.isChecked() ? onValue : "Off"));
     }
 
     return widgetDict;
@@ -780,8 +777,7 @@ export class PDFPage {
     const generator = new AppearanceGenerator(acroForm, this.ctx.registry);
 
     if (field instanceof TextField) {
-      const textField = field;
-      const stream = generator.generateTextAppearance(textField, widget);
+      const stream = generator.generateTextAppearance(field, widget);
 
       widget.setNormalAppearance(stream);
 
@@ -789,10 +785,9 @@ export class PDFPage {
     }
 
     if (field instanceof CheckboxField) {
-      const checkboxField = field;
-      const onValue = checkboxField.getOnValue();
+      const onValue = field.getOnValue();
 
-      const { on, off } = generator.generateCheckboxAppearance(checkboxField, widget, onValue);
+      const { on, off } = generator.generateCheckboxAppearance(field, widget, onValue);
 
       widget.setNormalAppearance(on, onValue);
       widget.setNormalAppearance(off, "Off");
@@ -801,18 +796,12 @@ export class PDFPage {
     }
 
     if (field instanceof RadioField) {
-      const radioField = field;
-
       // options.option is validated in drawField() before reaching here
       if (!options.option) {
         throw new Error("Radio field requires an option value");
       }
 
-      const { selected, off } = generator.generateRadioAppearance(
-        radioField,
-        widget,
-        options.option,
-      );
+      const { selected, off } = generator.generateRadioAppearance(field, widget, options.option);
 
       widget.setNormalAppearance(selected, options.option);
       widget.setNormalAppearance(off, "Off");
@@ -821,8 +810,7 @@ export class PDFPage {
     }
 
     if (field instanceof DropdownField) {
-      const dropdownField = field;
-      const stream = generator.generateDropdownAppearance(dropdownField, widget);
+      const stream = generator.generateDropdownAppearance(field, widget);
 
       widget.setNormalAppearance(stream);
 
@@ -830,12 +818,9 @@ export class PDFPage {
     }
 
     if (field instanceof ListBoxField) {
-      const listboxField = field;
-      const stream = generator.generateListBoxAppearance(listboxField, widget);
+      const stream = generator.generateListBoxAppearance(field, widget);
 
       widget.setNormalAppearance(stream);
-
-      return;
     }
   }
 
@@ -1255,34 +1240,13 @@ export class PDFPage {
     const x = options.x ?? 0;
     const y = options.y ?? 0;
 
-    // Calculate dimensions
-    let width: number;
-    let height: number;
-
-    if (options.width !== undefined && options.height !== undefined) {
-      // Both specified - use as is (may distort)
-      width = options.width;
-      height = options.height;
-    } else if (options.width !== undefined) {
-      // Width specified - calculate height from aspect ratio
-      width = options.width;
-      height = width / image.aspectRatio;
-    } else if (options.height !== undefined) {
-      // Height specified - calculate width from aspect ratio
-      height = options.height;
-      width = height * image.aspectRatio;
-    } else {
-      // Neither specified - use natural size in points
-      width = image.widthInPoints;
-      height = image.heightInPoints;
-    }
+    const { width, height } = this.computeImageDimensions(image, options);
 
     // Add image XObject to resources
     const imageName = this.addXObjectResource(image.ref);
 
     // Build operators
-    const ops: Operator[] = [];
-    ops.push(pushGraphicsState());
+    const ops: Operator[] = [pushGraphicsState()];
 
     // Apply opacity if needed
     if (options.opacity !== undefined && options.opacity < 1) {
@@ -1296,14 +1260,13 @@ export class PDFPage {
     // Apply rotation if specified
     if (options.rotate) {
       const bounds = { x, y, width, height };
-      const defaultOrigin = { x: x + width / 2, y: y + height / 2 }; // center
+      const defaultOrigin = { x: x + width / 2, y: y + height / 2 };
       const origin = resolveRotationOrigin(options.rotate.origin, bounds, defaultOrigin);
 
       const rad = (options.rotate.angle * Math.PI) / 180;
       const cos = Math.cos(rad);
       const sin = Math.sin(rad);
 
-      // Translate to origin, rotate, translate back
       ops.push(concatMatrix(1, 0, 0, 1, origin.x, origin.y));
       ops.push(concatMatrix(cos, sin, -sin, cos, 0, 0));
       ops.push(concatMatrix(1, 0, 0, 1, -origin.x, -origin.y));
@@ -1312,13 +1275,36 @@ export class PDFPage {
     // Apply transformation matrix to scale and position
     // Image XObjects are 1x1 unit, so we scale to desired size
     ops.push(concatMatrix(width, 0, 0, height, x, y));
-
-    // Draw the image
     ops.push(operatorHelpers.paintXObject(imageName));
-
     ops.push(popGraphicsState());
 
     this.appendOperators(ops);
+  }
+
+  /**
+   * Compute image dimensions based on options, preserving aspect ratio when appropriate.
+   */
+  private computeImageDimensions(
+    image: PDFImage,
+    options: DrawImageOptions,
+  ): { width: number; height: number } {
+    // Both specified - use as is (may distort)
+    if (options.width !== undefined && options.height !== undefined) {
+      return { width: options.width, height: options.height };
+    }
+
+    // Width specified - calculate height from aspect ratio
+    if (options.width !== undefined) {
+      return { width: options.width, height: options.width / image.aspectRatio };
+    }
+
+    // Height specified - calculate width from aspect ratio
+    if (options.height !== undefined) {
+      return { width: options.height * image.aspectRatio, height: options.height };
+    }
+
+    // Neither specified - use natural size in points
+    return { width: image.widthInPoints, height: image.heightInPoints };
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1422,21 +1408,14 @@ export class PDFPage {
    * ```
    */
   drawSvgPath(pathData: string, options: DrawSvgPathOptions = {}): void {
-    const x = options.x ?? 0;
-    const y = options.y ?? 0;
-    const scale = options.scale ?? 1;
-    const flipY = options.flipY ?? true;
-
-    // Execute the SVG path with transform: scale, optionally flip Y, translate to position
     const builder = this.drawPath();
     builder.appendSvgPath(pathData, {
-      flipY,
-      scale,
-      translateX: x,
-      translateY: y,
+      flipY: options.flipY ?? true,
+      scale: options.scale ?? 1,
+      translateX: options.x ?? 0,
+      translateY: options.y ?? 0,
     });
 
-    // Determine if we should fill, stroke, or both
     const hasFill = options.color !== undefined || options.pattern !== undefined;
     const hasStroke = options.borderColor !== undefined || options.borderPattern !== undefined;
 
@@ -1453,8 +1432,7 @@ export class PDFPage {
     }
 
     // Default: fill with black if no color specified and no pattern
-    const fillOptions = hasFill ? options : { ...options, color: black };
-    builder.fill(fillOptions);
+    builder.fill(hasFill ? options : { ...options, color: black });
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2759,19 +2737,19 @@ export class PDFPage {
     const newContent = this.createContentStream(contentWithNewline);
 
     if (!existingContents) {
-      // No existing content - just set our stream
       this.dict.set("Contents", newContent);
 
       return;
     }
 
+    // Mark as modified to prevent double-wrapping in appendContent
+    this._contentWrapped = true;
+
     if (existingContents instanceof PdfRef) {
-      // Resolve the reference to check if it's an array or a stream
       const resolved = this.ctx.resolve(existingContents);
 
       if (resolved instanceof PdfArray) {
-        // Reference points to an array of streams - prepend our stream to a new array
-        // containing all items from the resolved array
+        // Reference points to an array - prepend our stream to a new array
         const newArray = new PdfArray([newContent]);
 
         for (let i = 0; i < resolved.length; i++) {
@@ -2783,35 +2761,24 @@ export class PDFPage {
         }
 
         this.dict.set("Contents", newArray);
-      } else {
-        // Reference points to a single stream - wrap in array with our content first
-        this.dict.set("Contents", new PdfArray([newContent, existingContents]));
+
+        return;
       }
 
-      // Mark as modified to prevent double-wrapping in appendContent
-      this._contentWrapped = true;
+      // Reference points to a single stream - wrap in array
+      this.dict.set("Contents", new PdfArray([newContent, existingContents]));
 
       return;
     }
 
     if (existingContents instanceof PdfStream) {
-      // Direct stream - wrap in array with our content first
       this.dict.set("Contents", new PdfArray([newContent, existingContents]));
-
-      // Mark as modified to prevent double-wrapping in appendContent
-      this._contentWrapped = true;
 
       return;
     }
 
     if (existingContents instanceof PdfArray) {
-      // Array of streams/refs - prepend our stream
       existingContents.insert(0, newContent);
-
-      // Mark as modified to prevent double-wrapping in appendContent
-      this._contentWrapped = true;
-
-      return;
     }
   }
 
