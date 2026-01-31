@@ -2322,7 +2322,7 @@ export class PDF {
    *
    * // Or use with PathBuilder
    * page.drawPath()
-   *   .rect(100, 100, 300, 200)
+   *   .rectangle(100, 100, 300, 200)
    *   .fill({ pattern });
    * ```
    *
