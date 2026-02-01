@@ -6,48 +6,87 @@
  */
 
 import type { Operator } from "#src/content/operators";
-import { clip, clipEvenOdd, closePath, curveTo, lineTo, moveTo } from "#src/helpers/operators";
+import { KAPPA } from "#src/helpers/constants";
+import {
+  clip,
+  clipEvenOdd,
+  closePath,
+  curveTo,
+  endPath,
+  lineTo,
+  moveTo,
+} from "#src/helpers/operators";
 import { executeSvgPathString, type SvgPathExecutorOptions } from "#src/svg/path-executor";
 
 import { wrapPathOps } from "./operations";
+import type { PDFPattern, PDFShading } from "./resources";
+import { serializeOperators } from "./serialize";
 import type { PathOptions } from "./types";
 
 /**
- * Magic number for circular Bezier approximation.
- */
-const KAPPA = 0.5522847498307936;
-
-/**
  * Callback type for appending content to a page.
+ * Accepts a string (for ASCII-only content) or raw bytes.
  */
-export type ContentAppender = (content: string) => void;
+type ContentAppender = (content: string | Uint8Array) => void;
 
 /**
  * Callback type for registering a graphics state and returning its name.
+ * Returns null if no graphics state is needed (both opacities undefined).
  */
-export type GraphicsStateRegistrar = (
-  fillOpacity?: number,
-  strokeOpacity?: number,
-) => string | null;
+type GraphicsStateRegistrar = (options: {
+  fillOpacity?: number;
+  strokeOpacity?: number;
+}) => string | null;
+
+/**
+ * Callback type for registering a shading and returning its name.
+ */
+type ShadingRegistrar = (shading: PDFShading) => string;
+
+/**
+ * Callback type for registering a pattern and returning its name.
+ */
+type PatternRegistrar = (pattern: PDFPattern) => string;
 
 /**
  * PathBuilder provides a fluent interface for constructing PDF paths.
  *
  * @example
  * ```typescript
- * // Triangle
+ * // Triangle with solid color
  * page.drawPath()
  *   .moveTo(300, 200)
  *   .lineTo(350, 300)
  *   .lineTo(250, 300)
  *   .close()
  *   .fill({ color: rgb(0, 0, 1) });
+ *
+ * // Rectangle with gradient fill
+ * const gradient = pdf.createAxialShading({
+ *   coords: [0, 0, 100, 0],
+ *   stops: [
+ *     { offset: 0, color: rgb(1, 0, 0) },
+ *     { offset: 1, color: rgb(0, 0, 1) },
+ *   ],
+ * });
+ * const gradientPattern = pdf.createShadingPattern({ shading: gradient });
+ * page.drawPath()
+ *   .rectangle(50, 50, 100, 100)
+ *   .fill({ pattern: gradientPattern });
+ *
+ * // Circle with tiling pattern fill
+ * const pattern = pdf.createTilingPattern({...});
+ * page.drawPath()
+ *   .circle(200, 200, 50)
+ *   .fill({ pattern });
  * ```
  */
 export class PathBuilder {
   private readonly pathOps: Operator[] = [];
   private readonly appendContent: ContentAppender;
   private readonly registerGraphicsState: GraphicsStateRegistrar;
+  private readonly registerShading?: ShadingRegistrar;
+  private readonly registerPattern?: PatternRegistrar;
 
   /** Current point for quadratic-to-cubic conversion */
   private currentX = 0;
@@ -57,9 +96,16 @@ export class PathBuilder {
   private subpathStartX = 0;
   private subpathStartY = 0;
 
-  constructor(appendContent: ContentAppender, registerGraphicsState: GraphicsStateRegistrar) {
+  constructor(
+    appendContent: ContentAppender,
+    registerGraphicsState: GraphicsStateRegistrar,
+    registerShading?: ShadingRegistrar,
+    registerPattern?: PatternRegistrar,
+  ) {
     this.appendContent = appendContent;
     this.registerGraphicsState = registerGraphicsState;
+    this.registerShading = registerShading;
+    this.registerPattern = registerPattern;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -244,21 +290,11 @@ export class PathBuilder {
     executeSvgPathString({
       pathData,
       sink: {
-        moveTo: (x: number, y: number) => {
-          this.moveTo(x, y);
-        },
-        lineTo: (x: number, y: number) => {
-          this.lineTo(x, y);
-        },
-        curveTo: (cp1x: number, cp1y: number, cp2x: number, cp2y: number, x: number, y: number) => {
-          this.curveTo(cp1x, cp1y, cp2x, cp2y, x, y);
-        },
-        quadraticCurveTo: (cpx: number, cpy: number, x: number, y: number) => {
-          this.quadraticCurveTo(cpx, cpy, x, y);
-        },
-        close: () => {
-          this.close();
-        },
+        moveTo: this.moveTo.bind(this),
+        lineTo: this.lineTo.bind(this),
+        curveTo: this.curveTo.bind(this),
+        quadraticCurveTo: this.quadraticCurveTo.bind(this),
+        close: this.close.bind(this),
       },
       initialX: this.currentX,
       initialY: this.currentY,
@@ -336,13 +372,22 @@ export class PathBuilder {
     let gsName: string | null = null;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsState(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
+
+    // Register fill and stroke patterns if provided
+    const fillPatternName = this.ensurePatternRegistered(options.pattern);
+    const strokePatternName = this.ensurePatternRegistered(options.borderPattern);
 
     // Map PathOptions to PathOpsOptions
     const ops = wrapPathOps(this.pathOps, {
-      fillColor: options.color,
-      strokeColor: options.borderColor,
+      fillColor: options.pattern ? undefined : options.color, // Pattern takes precedence
+      fillPatternName,
+      strokeColor: options.borderPattern ? undefined : options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       lineCap: options.lineCap,
       lineJoin: options.lineJoin,
@@ -357,11 +402,26 @@ export class PathBuilder {
   }
 
   /**
+   * Register a pattern and return its name, or undefined if no pattern.
+   */
+  private ensurePatternRegistered(pattern: PDFPattern | undefined): string | undefined {
+    if (!pattern) {
+      return undefined;
+    }
+
+    if (!this.registerPattern) {
+      throw new Error(
+        "Pattern fills/strokes require pattern support. Use page.drawPath() which provides this.",
+      );
+    }
+
+    return this.registerPattern(pattern);
+  }
+
+  /**
    * Emit operators to the page content.
    */
   private emitOps(ops: Operator[]): void {
-    const content = ops.map(op => op.toString()).join("\n");
-
-    this.appendContent(content);
+    this.appendContent(serializeOperators(ops));
   }
 }

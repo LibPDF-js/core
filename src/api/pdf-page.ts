@@ -66,13 +66,44 @@ import {
 } from "#src/document/forms/fields";
 import { TerminalField } from "#src/document/forms/fields/base";
 import type { WidgetAnnotation } from "#src/document/forms/widget-annotation";
+import {
+  drawCircleOps,
+  drawEllipseOps,
+  drawLineOps,
+  drawRectangleOps,
+  setFillColor,
+} from "#src/drawing/operations";
+import { PathBuilder } from "#src/drawing/path-builder";
+import type { PDFFormXObject, PDFPattern, PDFShading } from "#src/drawing/resources/index";
+import { PDFExtGState } from "#src/drawing/resources/index";
+import { serializeOperators } from "#src/drawing/serialize";
+import { layoutJustifiedLine, layoutText, measureText } from "#src/drawing/text-layout";
+import type {
+  DrawCircleOptions,
+  DrawEllipseOptions,
+  DrawImageOptions,
+  DrawLineOptions,
+  DrawRectangleOptions,
+  DrawSvgPathOptions,
+  DrawTextOptions,
+  FontInput,
+  Rotation,
+} from "#src/drawing/types";
+import { resolveRotationOrigin } from "#src/drawing/types";
 import { EmbeddedFont } from "#src/fonts/embedded-font";
 import { parseFont } from "#src/fonts/font-factory";
 import type { PdfFont } from "#src/fonts/pdf-font";
-import { getStandard14BasicMetrics, isStandard14Font } from "#src/fonts/standard-14";
+import {
+  getEncodingForStandard14,
+  getStandard14BasicMetrics,
+  isStandard14Font,
+  isWinAnsiStandard14,
+} from "#src/fonts/standard-14";
 import { parseToUnicode } from "#src/fonts/to-unicode";
 // Annotation utilities - imported here to avoid dynamic require issues
+import { concatBytes } from "#src/helpers/buffer";
 import { black } from "#src/helpers/colors";
+import { ColorSpace } from "#src/helpers/colorspace";
 import {
   beginText,
   concatMatrix,
@@ -84,6 +115,7 @@ import {
   setTextMatrix,
   showText,
 } from "#src/helpers/operators";
+import * as operatorHelpers from "#src/helpers/operators";
 import type { PDFImage } from "#src/images/pdf-image";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -97,27 +129,6 @@ import { TextExtractor } from "#src/text/text-extractor";
 import { searchPage } from "#src/text/text-search";
 import type { ExtractTextOptions, FindTextOptions, PageText, TextMatch } from "#src/text/types";
 
-import {
-  drawCircleOps,
-  drawEllipseOps,
-  drawLineOps,
-  drawRectangleOps,
-  setFillColor,
-} from "./drawing/operations";
-import { PathBuilder } from "./drawing/path-builder";
-import { layoutJustifiedLine, layoutText, measureText } from "./drawing/text-layout";
-import type {
-  DrawCircleOptions,
-  DrawEllipseOptions,
-  DrawImageOptions,
-  DrawLineOptions,
-  DrawRectangleOptions,
-  DrawSvgPathOptions,
-  DrawTextOptions,
-  FontInput,
-  Rotation,
-} from "./drawing/types";
-import { resolveRotationOrigin } from "./drawing/types";
 import type { PDFContext } from "./pdf-context";
 import type { PDFEmbeddedPage } from "./pdf-embedded-page";
 
@@ -223,6 +234,9 @@ export class PDFPage {
   /** Document context for registering objects */
   private readonly ctx: PDFContext;
 
+  /** Resource cache for deduplication - maps object refs to resource names */
+  private _resourceCache: Map<PdfRef, string> = new Map();
+
   constructor(ref: PdfRef, dict: PdfDict, index: number, ctx: PDFContext) {
     this.ref = ref;
     this.dict = dict;
@@ -287,15 +301,7 @@ export class PDFPage {
    * returns the height of the MediaBox instead.
    */
   get width(): number {
-    const mediaBox = this.getMediaBox();
-    const cropBox = this.getCropBox();
-
-    let box = mediaBox;
-
-    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
-      box = cropBox;
-    }
-
+    const box = this.getEffectiveBox();
     const rotation = this.rotation;
 
     if (rotation === 90 || rotation === 270) {
@@ -312,15 +318,7 @@ export class PDFPage {
    * returns the width of the MediaBox instead.
    */
   get height(): number {
-    const mediaBox = this.getMediaBox();
-    const cropBox = this.getCropBox();
-
-    let box = mediaBox;
-
-    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
-      box = cropBox;
-    }
-
+    const box = this.getEffectiveBox();
     const rotation = this.rotation;
 
     if (rotation === 90 || rotation === 270) {
@@ -328,6 +326,22 @@ export class PDFPage {
     }
 
     return Math.abs(box.height);
+  }
+
+  /**
+   * Get the effective box for dimension calculations.
+   *
+   * Returns CropBox if it's smaller than MediaBox, otherwise MediaBox.
+   */
+  private getEffectiveBox(): Rectangle {
+    const mediaBox = this.getMediaBox();
+    const cropBox = this.getCropBox();
+
+    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
+      return cropBox;
+    }
+
+    return mediaBox;
   }
 
   /**
@@ -481,13 +495,16 @@ export class PDFPage {
     const xobjectName = this.addXObjectResource(embedded.ref);
 
     // Build content stream operators
-    const ops: string[] = [];
-    ops.push("q"); // Save graphics state
+    const ops: Operator[] = [];
+    ops.push(pushGraphicsState());
 
     // Set opacity if needed (via ExtGState)
     if (options.opacity !== undefined && options.opacity < 1) {
-      const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
-      ops.push(`/${gsName} gs`);
+      const gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.opacity,
+      });
+      ops.push(setGraphicsState(`/${gsName}`));
     }
 
     // Parse rotation options
@@ -524,43 +541,33 @@ export class PDFPage {
       const sin = Math.sin(radians);
 
       // Translate to rotation origin
-      ops.push(
-        `1 0 0 1 ${this.formatNumber(rotateOriginX)} ${this.formatNumber(rotateOriginY)} cm`,
-      );
+      ops.push(concatMatrix(1, 0, 0, 1, rotateOriginX, rotateOriginY));
 
       // Rotate
-      ops.push(
-        `${this.formatNumber(cos)} ${this.formatNumber(sin)} ${this.formatNumber(-sin)} ${this.formatNumber(cos)} 0 0 cm`,
-      );
+      ops.push(concatMatrix(cos, sin, -sin, cos, 0, 0));
 
       // Translate back from rotation origin to position, then adjust for BBox and scale
       const offsetX = x - rotateOriginX - embedded.box.x * scaleX;
       const offsetY = y - rotateOriginY - embedded.box.y * scaleY;
 
-      ops.push(
-        `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(offsetX)} ${this.formatNumber(offsetY)} cm`,
-      );
+      ops.push(concatMatrix(scaleX, 0, 0, scaleY, offsetX, offsetY));
     } else {
       // No rotation: simple translate and scale
       const translateX = x - embedded.box.x * scaleX;
       const translateY = y - embedded.box.y * scaleY;
 
-      ops.push(
-        `${this.formatNumber(scaleX)} 0 0 ${this.formatNumber(scaleY)} ${this.formatNumber(translateX)} ${this.formatNumber(translateY)} cm`,
-      );
+      ops.push(concatMatrix(scaleX, 0, 0, scaleY, translateX, translateY));
     }
 
     // Draw the XObject
-    ops.push(`/${xobjectName} Do`);
+    ops.push(operatorHelpers.paintXObject(xobjectName));
 
-    ops.push("Q"); // Restore graphics state
-
-    const contentOps = ops.join("\n");
+    ops.push(popGraphicsState());
 
     if (options.background) {
-      this.prependContent(contentOps);
+      this.prependOperators(ops);
     } else {
-      this.appendContent(contentOps);
+      this.appendOperators(ops);
     }
   }
 
@@ -736,19 +743,16 @@ export class PDFPage {
 
     // For radio buttons, set the appearance state
     if (field instanceof RadioField && options.option) {
-      const radioField = field;
-      const currentValue = radioField.getValue();
+      const currentValue = field.getValue();
 
-      // Set appearance state to option value if selected, otherwise "Off"
       widgetDict.set("AS", PdfName.of(currentValue === options.option ? options.option : "Off"));
     }
 
     // For checkboxes, set the appearance state
     if (field instanceof CheckboxField) {
-      const checkboxField = field;
-      const isChecked = checkboxField.isChecked();
-      const onValue = checkboxField.getOnValue();
-      widgetDict.set("AS", PdfName.of(isChecked ? onValue : "Off"));
+      const onValue = field.getOnValue();
+
+      widgetDict.set("AS", PdfName.of(field.isChecked() ? onValue : "Off"));
     }
 
     return widgetDict;
@@ -774,8 +778,7 @@ export class PDFPage {
     const generator = new AppearanceGenerator(acroForm, this.ctx.registry);
 
     if (field instanceof TextField) {
-      const textField = field;
-      const stream = generator.generateTextAppearance(textField, widget);
+      const stream = generator.generateTextAppearance(field, widget);
 
       widget.setNormalAppearance(stream);
 
@@ -783,10 +786,9 @@ export class PDFPage {
     }
 
     if (field instanceof CheckboxField) {
-      const checkboxField = field;
-      const onValue = checkboxField.getOnValue();
+      const onValue = field.getOnValue();
 
-      const { on, off } = generator.generateCheckboxAppearance(checkboxField, widget, onValue);
+      const { on, off } = generator.generateCheckboxAppearance(field, widget, onValue);
 
       widget.setNormalAppearance(on, onValue);
       widget.setNormalAppearance(off, "Off");
@@ -795,18 +797,12 @@ export class PDFPage {
     }
 
     if (field instanceof RadioField) {
-      const radioField = field;
-
       // options.option is validated in drawField() before reaching here
       if (!options.option) {
         throw new Error("Radio field requires an option value");
       }
 
-      const { selected, off } = generator.generateRadioAppearance(
-        radioField,
-        widget,
-        options.option,
-      );
+      const { selected, off } = generator.generateRadioAppearance(field, widget, options.option);
 
       widget.setNormalAppearance(selected, options.option);
       widget.setNormalAppearance(off, "Off");
@@ -815,8 +811,7 @@ export class PDFPage {
     }
 
     if (field instanceof DropdownField) {
-      const dropdownField = field;
-      const stream = generator.generateDropdownAppearance(dropdownField, widget);
+      const stream = generator.generateDropdownAppearance(field, widget);
 
       widget.setNormalAppearance(stream);
 
@@ -824,12 +819,9 @@ export class PDFPage {
     }
 
     if (field instanceof ListBoxField) {
-      const listboxField = field;
-      const stream = generator.generateListBoxAppearance(listboxField, widget);
+      const stream = generator.generateListBoxAppearance(field, widget);
 
       widget.setNormalAppearance(stream);
-
-      return;
     }
   }
 
@@ -859,11 +851,20 @@ export class PDFPage {
    */
   drawRectangle(options: DrawRectangleOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
+
+    // Register patterns if provided
+    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
+    const strokePatternName = options.borderPattern
+      ? this.registerPattern(options.borderPattern)
+      : undefined;
 
     // Calculate rotation center if rotating
     let rotate: { angle: number; originX: number; originY: number } | undefined;
@@ -881,7 +882,9 @@ export class PDFPage {
       width: options.width,
       height: options.height,
       fillColor: options.color,
+      fillPatternName,
       strokeColor: options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       dashArray: options.borderDashArray,
       dashPhase: options.borderDashPhase,
@@ -916,10 +919,10 @@ export class PDFPage {
    */
   drawLine(options: DrawLineOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(undefined, options.opacity);
+      gsName = this.registerGraphicsState({ strokeOpacity: options.opacity });
     }
 
     const ops = drawLineOps({
@@ -928,7 +931,7 @@ export class PDFPage {
       endX: options.end.x,
       endY: options.end.y,
       color: options.color ?? black,
-      thickness: options.thickness,
+      strokeWidth: options.thickness,
       dashArray: options.dashArray,
       dashPhase: options.dashPhase,
       lineCap: options.lineCap,
@@ -954,18 +957,29 @@ export class PDFPage {
    */
   drawCircle(options: DrawCircleOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
+
+    // Register patterns if provided
+    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
+    const strokePatternName = options.borderPattern
+      ? this.registerPattern(options.borderPattern)
+      : undefined;
 
     const ops = drawCircleOps({
       cx: options.x,
       cy: options.y,
       radius: options.radius,
       fillColor: options.color,
+      fillPatternName,
       strokeColor: options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       graphicsStateName: gsName ? `/${gsName}` : undefined,
     });
@@ -988,10 +1002,13 @@ export class PDFPage {
    */
   drawEllipse(options: DrawEllipseOptions): void {
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, options.borderOpacity);
+      gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.borderOpacity,
+      });
     }
 
     // Calculate rotation center if rotating
@@ -1010,13 +1027,21 @@ export class PDFPage {
       rotate = { angle: options.rotate.angle, originX: origin.x, originY: origin.y };
     }
 
+    // Register patterns if provided
+    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
+    const strokePatternName = options.borderPattern
+      ? this.registerPattern(options.borderPattern)
+      : undefined;
+
     const ops = drawEllipseOps({
       cx: options.x,
       cy: options.y,
       rx: options.xRadius,
       ry: options.yRadius,
       fillColor: options.color,
+      fillPatternName,
       strokeColor: options.borderColor,
+      strokePatternName,
       strokeWidth: options.borderWidth,
       graphicsStateName: gsName ? `/${gsName}` : undefined,
       rotate,
@@ -1076,10 +1101,10 @@ export class PDFPage {
     const fontName = this.addFontResource(font);
 
     // Register graphics state for opacity if needed
-    let gsName: string | null = null;
+    let gsName: string | undefined;
 
     if (options.opacity !== undefined && options.opacity < 1) {
-      gsName = this.registerGraphicsStateForOpacity(options.opacity, undefined);
+      gsName = this.registerGraphicsState({ fillOpacity: options.opacity });
     }
 
     // Layout the text if multiline
@@ -1225,71 +1250,71 @@ export class PDFPage {
     const x = options.x ?? 0;
     const y = options.y ?? 0;
 
-    // Calculate dimensions
-    let width: number;
-    let height: number;
-
-    if (options.width !== undefined && options.height !== undefined) {
-      // Both specified - use as is (may distort)
-      width = options.width;
-      height = options.height;
-    } else if (options.width !== undefined) {
-      // Width specified - calculate height from aspect ratio
-      width = options.width;
-      height = width / image.aspectRatio;
-    } else if (options.height !== undefined) {
-      // Height specified - calculate width from aspect ratio
-      height = options.height;
-      width = height * image.aspectRatio;
-    } else {
-      // Neither specified - use natural size in points
-      width = image.widthInPoints;
-      height = image.heightInPoints;
-    }
+    const { width, height } = this.computeImageDimensions(image, options);
 
     // Add image XObject to resources
     const imageName = this.addXObjectResource(image.ref);
 
     // Build operators
-    const ops: string[] = [];
-    ops.push("q"); // Save graphics state
+    const ops: Operator[] = [pushGraphicsState()];
 
     // Apply opacity if needed
     if (options.opacity !== undefined && options.opacity < 1) {
-      const gsName = this.addGraphicsState({ ca: options.opacity, CA: options.opacity });
-      ops.push(`/${gsName} gs`);
+      const gsName = this.registerGraphicsState({
+        fillOpacity: options.opacity,
+        strokeOpacity: options.opacity,
+      });
+      ops.push(setGraphicsState(`/${gsName}`));
     }
 
     // Apply rotation if specified
     if (options.rotate) {
       const bounds = { x, y, width, height };
-      const defaultOrigin = { x: x + width / 2, y: y + height / 2 }; // center
+      const defaultOrigin = { x: x + width / 2, y: y + height / 2 };
       const origin = resolveRotationOrigin(options.rotate.origin, bounds, defaultOrigin);
 
       const rad = (options.rotate.angle * Math.PI) / 180;
       const cos = Math.cos(rad);
       const sin = Math.sin(rad);
 
-      // Translate to origin, rotate, translate back
-      ops.push(`1 0 0 1 ${this.formatNumber(origin.x)} ${this.formatNumber(origin.y)} cm`);
-      ops.push(
-        `${this.formatNumber(cos)} ${this.formatNumber(sin)} ${this.formatNumber(-sin)} ${this.formatNumber(cos)} 0 0 cm`,
-      );
-      ops.push(`1 0 0 1 ${this.formatNumber(-origin.x)} ${this.formatNumber(-origin.y)} cm`);
+      ops.push(concatMatrix(1, 0, 0, 1, origin.x, origin.y));
+      ops.push(concatMatrix(cos, sin, -sin, cos, 0, 0));
+      ops.push(concatMatrix(1, 0, 0, 1, -origin.x, -origin.y));
     }
 
     // Apply transformation matrix to scale and position
     // Image XObjects are 1x1 unit, so we scale to desired size
-    ops.push(
-      `${this.formatNumber(width)} 0 0 ${this.formatNumber(height)} ${this.formatNumber(x)} ${this.formatNumber(y)} cm`,
-    );
+    ops.push(concatMatrix(width, 0, 0, height, x, y));
+    ops.push(operatorHelpers.paintXObject(imageName));
+    ops.push(popGraphicsState());
 
-    // Draw the image
-    ops.push(`/${imageName} Do`);
+    this.appendOperators(ops);
+  }
 
-    ops.push("Q"); // Restore graphics state
+  /**
+   * Compute image dimensions based on options, preserving aspect ratio when appropriate.
+   */
+  private computeImageDimensions(
+    image: PDFImage,
+    options: DrawImageOptions,
+  ): { width: number; height: number } {
+    // Both specified - use as is (may distort)
+    if (options.width !== undefined && options.height !== undefined) {
+      return { width: options.width, height: options.height };
+    }
 
-    this.appendContent(ops.join("\n"));
+    // Width specified - calculate height from aspect ratio
+    if (options.width !== undefined) {
+      return { width: options.width, height: options.width / image.aspectRatio };
+    }
+
+    // Height specified - calculate width from aspect ratio
+    if (options.height !== undefined) {
+      return { width: options.height * image.aspectRatio, height: options.height };
+    }
+
+    // Neither specified - use natural size in points
+    return { width: image.widthInPoints, height: image.heightInPoints };
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1304,7 +1329,7 @@ export class PDFPage {
    *
    * @example
    * ```typescript
-   * // Triangle
+   * // Triangle with solid color
    * page.drawPath()
    *   .moveTo(100, 100)
    *   .lineTo(200, 100)
@@ -1312,7 +1337,7 @@ export class PDFPage {
    *   .close()
    *   .fill({ color: rgb(1, 0, 0) });
    *
-   * // Complex shape
+   * // Complex shape with fill and stroke
    * page.drawPath()
    *   .moveTo(50, 50)
    *   .curveTo(100, 100, 150, 100, 200, 50)
@@ -1322,13 +1347,36 @@ export class PDFPage {
    *     color: rgb(0.9, 0.9, 1),
    *     borderColor: rgb(0, 0, 1),
    *   });
+   *
+   * // Circle with gradient fill (using shading pattern)
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 100, 0],
+   *   stops: [{ offset: 0, color: rgb(1, 0, 0) }, { offset: 1, color: rgb(0, 0, 1) }],
+   * });
+   * const gradientPattern = pdf.createShadingPattern({ shading: gradient });
+   * page.drawPath()
+   *   .circle(200, 200, 50)
+   *   .fill({ pattern: gradientPattern });
+   *
+   * // Rectangle with tiling pattern fill
+   * const pattern = pdf.createTilingPattern({...});
+   * page.drawPath()
+   *   .rectangle(50, 300, 100, 100)
+   *   .fill({ pattern });
    * ```
    */
   drawPath(): PathBuilder {
     return new PathBuilder(
       content => this.appendContent(content),
-      (fillOpacity, strokeOpacity) =>
-        this.registerGraphicsStateForOpacity(fillOpacity, strokeOpacity),
+      options => {
+        if (options.fillOpacity === undefined && options.strokeOpacity === undefined) {
+          return null;
+        }
+
+        return this.registerGraphicsState(options);
+      },
+      shading => this.registerShading(shading),
+      pattern => this.registerPattern(pattern),
     );
   }
 
@@ -1375,23 +1423,16 @@ export class PDFPage {
    * ```
    */
   drawSvgPath(pathData: string, options: DrawSvgPathOptions = {}): void {
-    const x = options.x ?? 0;
-    const y = options.y ?? 0;
-    const scale = options.scale ?? 1;
-    const flipY = options.flipY ?? true;
-
-    // Execute the SVG path with transform: scale, optionally flip Y, translate to position
     const builder = this.drawPath();
     builder.appendSvgPath(pathData, {
-      flipY,
-      scale,
-      translateX: x,
-      translateY: y,
+      flipY: options.flipY ?? true,
+      scale: options.scale ?? 1,
+      translateX: options.x ?? 0,
+      translateY: options.y ?? 0,
     });
 
-    // Determine if we should fill, stroke, or both
-    const hasFill = options.color !== undefined;
-    const hasStroke = options.borderColor !== undefined;
+    const hasFill = options.color !== undefined || options.pattern !== undefined;
+    const hasStroke = options.borderColor !== undefined || options.borderPattern !== undefined;
 
     if (hasFill && hasStroke) {
       builder.fillAndStroke(options);
@@ -1405,9 +1446,245 @@ export class PDFPage {
       return;
     }
 
-    // Default: fill with black if no color specified
-    const fillOptions = hasFill ? options : { ...options, color: black };
-    builder.fill(fillOptions);
+    // Default: fill with black if no color specified and no pattern
+    builder.fill(hasFill ? options : { ...options, color: black });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Low-Level Drawing API
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Emit raw PDF operators to the page content stream.
+   *
+   * This is the low-level drawing API that gives you direct control over
+   * PDF content stream operators. Use this when you need advanced features
+   * like matrix transforms, graphics state stack, gradients, or patterns
+   * that aren't available through the high-level drawing methods.
+   *
+   * **Important**: The caller is responsible for valid operator sequences.
+   * Invalid sequences may produce corrupted PDFs that won't render correctly.
+   *
+   * @param operators - Array of operators to emit
+   *
+   * @example
+   * ```typescript
+   * import { PDF, ops } from "@libpdf/core";
+   *
+   * const pdf = await PDF.create();
+   * const page = pdf.addPage();
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.concatMatrix(1, 0, 0, 1, 100, 200),  // translate
+   *   ops.setNonStrokingRGB(1, 0, 0),
+   *   ops.rectangle(0, 0, 50, 50),
+   *   ops.fill(),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  drawOperators(operators: Operator[]): void {
+    this.appendOperators(operators);
+  }
+
+  /**
+   * Register a font resource and return its operator name.
+   *
+   * The same font registered multiple times returns the same name (deduplication).
+   *
+   * @param font - Font to register (EmbeddedFont or Standard 14 font name)
+   * @returns The resource name for use with operators (e.g., "F0")
+   *
+   * @example
+   * ```typescript
+   * const font = await pdf.embedFont(fontBytes);
+   * const fontName = page.registerFont(font);
+   *
+   * page.drawOperators([
+   *   ops.beginText(),
+   *   ops.setFont(fontName, 12),
+   *   ops.showText("Hello"),
+   *   ops.endText(),
+   * ]);
+   * ```
+   */
+  registerFont(font: FontInput): string {
+    if (typeof font === "string") {
+      // Standard 14 font - inline dicts, not references
+      return this.addFontResource(font);
+    }
+
+    // Embedded font - get reference
+    const fontRef = this.ctx.getFontRef(font);
+
+    if (!fontRef) {
+      throw new Error("Font must be prepared before registering");
+    }
+
+    return this.registerResource(fontRef, "Font", "F");
+  }
+
+  /**
+   * Register an image resource and return its operator name.
+   *
+   * The same image registered multiple times returns the same name (deduplication).
+   *
+   * @param image - The PDFImage to register
+   * @returns The resource name for use with paintXObject operator (e.g., "Im0")
+   *
+   * @example
+   * ```typescript
+   * const image = await pdf.embedImage(imageBytes);
+   * const imageName = page.registerImage(image);
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.concatMatrix(100, 0, 0, 100, 200, 500),
+   *   ops.paintXObject(imageName),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerImage(image: PDFImage): string {
+    return this.registerResource(image.ref, "XObject", "Im");
+  }
+
+  /**
+   * Register a shading (gradient) resource and return its operator name.
+   *
+   * The same shading registered multiple times returns the same name (deduplication).
+   *
+   * @param shading - The PDFShading to register
+   * @returns The resource name for use with paintShading operator (e.g., "Sh0")
+   *
+   * @example
+   * ```typescript
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 100, 0],
+   *   stops: [{ offset: 0, color: rgb(1, 0, 0) }, { offset: 1, color: rgb(0, 0, 1) }],
+   * });
+   * const shadingName = page.registerShading(gradient);
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.rectangle(50, 50, 100, 100),
+   *   ops.clip(),
+   *   ops.endPath(),
+   *   ops.paintShading(shadingName),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerShading(shading: PDFShading): string {
+    return this.registerResource(shading.ref, "Shading", "Sh");
+  }
+
+  /**
+   * Register a pattern resource and return its operator name.
+   *
+   * The same pattern registered multiple times returns the same name (deduplication).
+   *
+   * @param pattern - The PDFPattern to register
+   * @returns The resource name for use with setNonStrokingColorN operator (e.g., "P0")
+   *
+   * @example
+   * ```typescript
+   * // Create a checkerboard pattern
+   * const pattern = pdf.createTilingPattern({
+   *   bbox: { x: 0, y: 0, width: 10, height: 10 },
+   *   xStep: 10,
+   *   yStep: 10,
+   *   operators: [
+   *     ops.setNonStrokingGray(0.8),
+   *     ops.rectangle(0, 0, 5, 5),
+   *     ops.fill(),
+   *   ],
+   * });
+   * const patternName = page.registerPattern(pattern);
+   *
+   * // Fill a rectangle with the pattern
+   * page.drawOperators([
+   *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+   *   ops.setNonStrokingColorN(patternName),
+   *   ops.rectangle(100, 100, 200, 200),
+   *   ops.fill(),
+   * ]);
+   * ```
+   */
+  registerPattern(pattern: PDFPattern): string {
+    return this.registerResource(pattern.ref, "Pattern", "P");
+  }
+
+  /**
+   * Register an extended graphics state resource and return its operator name.
+   *
+   * The same ExtGState registered multiple times returns the same name (deduplication).
+   *
+   * @param state - The PDFExtGState to register
+   * @returns The resource name for use with setGraphicsState operator (e.g., "GS0")
+   *
+   * @example
+   * ```typescript
+   * const gs = pdf.createExtGState({
+   *   fillOpacity: 0.5,
+   *   strokeOpacity: 0.8,
+   *   blendMode: "Multiply",
+   * });
+   * const gsName = page.registerExtGState(gs);
+   *
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.setGraphicsState(gsName),
+   *   ops.setNonStrokingRGB(1, 0, 0),
+   *   ops.rectangle(100, 100, 50, 50),
+   *   ops.fill(),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerExtGState(state: PDFExtGState): string {
+    return this.registerResource(state.ref, "ExtGState", "GS");
+  }
+
+  /**
+   * Register a Form XObject resource and return its operator name.
+   *
+   * The same XObject registered multiple times returns the same name (deduplication).
+   *
+   * @param xobject - The PDFFormXObject or PDFEmbeddedPage to register
+   * @returns The resource name for use with paintXObject operator (e.g., "Fm0")
+   *
+   * @example
+   * ```typescript
+   * // Create a reusable stamp
+   * const stamp = pdf.createFormXObject({
+   *   bbox: { x: 0, y: 0, width: 100, height: 50 },
+   *   operators: [
+   *     ops.setNonStrokingRGB(1, 0, 0),
+   *     ops.rectangle(0, 0, 100, 50),
+   *     ops.fill(),
+   *     ops.beginText(),
+   *     ops.setFont(fontName, 12),
+   *     ops.setNonStrokingGray(1),
+   *     ops.moveText(10, 18),
+   *     ops.showText("STAMP"),
+   *     ops.endText(),
+   *   ],
+   * });
+   * const xobjectName = page.registerXObject(stamp);
+   *
+   * // Use the stamp at different positions
+   * page.drawOperators([
+   *   ops.pushGraphicsState(),
+   *   ops.concatMatrix(1, 0, 0, 1, 200, 700),
+   *   ops.paintXObject(xobjectName),
+   *   ops.popGraphicsState(),
+   * ]);
+   * ```
+   */
+  registerXObject(xobject: PDFFormXObject | PDFEmbeddedPage): string {
+    return this.registerResource(xobject.ref, "XObject", "Fm");
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2098,37 +2375,6 @@ export class PDFPage {
   }
 
   /**
-   * Add a graphics state to the page's resources.
-   * Returns the name assigned to the ExtGState.
-   */
-  private addGraphicsState(params: { ca?: number; CA?: number }): string {
-    const resources = this.getResources();
-    let extGState = resources.get("ExtGState");
-
-    if (!(extGState instanceof PdfDict)) {
-      extGState = new PdfDict();
-      resources.set("ExtGState", extGState);
-    }
-
-    // Create the graphics state dict
-    const gsDict = new PdfDict();
-
-    if (params.ca !== undefined) {
-      gsDict.set("ca", PdfNumber.of(params.ca)); // Non-stroking (fill) opacity
-    }
-
-    if (params.CA !== undefined) {
-      gsDict.set("CA", PdfNumber.of(params.CA)); // Stroking opacity
-    }
-
-    // Generate unique name
-    const name = this.generateUniqueName(extGState, "GS");
-    extGState.set(name, gsDict);
-
-    return name;
-  }
-
-  /**
    * Generate a unique name not already in the dictionary.
    */
   private generateUniqueName(dict: PdfDict, prefix: string): string {
@@ -2144,25 +2390,60 @@ export class PDFPage {
   }
 
   /**
-   * Format a number for PDF content stream (avoid unnecessary decimals).
+   * Register a resource reference in a resource subdictionary.
+   *
+   * Handles deduplication via cache and existing entry scanning.
+   *
+   * @param ref - The object reference to register
+   * @param resourceType - The resource subdictionary key (e.g., "Font", "XObject")
+   * @param prefix - The name prefix (e.g., "F", "Im", "Sh")
+   * @returns The resource name for use in operators
    */
-  private formatNumber(n: number): string {
-    // Round to 4 decimal places to avoid floating point noise
-    const rounded = Math.round(n * 10000) / 10000;
+  private registerResource(ref: PdfRef, resourceType: string, prefix: string): string {
+    // Check cache for deduplication
+    const cachedName = this._resourceCache.get(ref);
 
-    // Use integer if possible
-    if (Number.isInteger(rounded)) {
-      return String(rounded);
+    if (cachedName) {
+      return cachedName;
     }
 
-    return rounded.toString();
+    // Get or create the resource subdictionary
+    const resources = this.getResources();
+    let subdict = resources.get(resourceType);
+
+    if (!(subdict instanceof PdfDict)) {
+      subdict = new PdfDict();
+      resources.set(resourceType, subdict);
+    }
+
+    // Check if this exact ref is already registered
+    for (const [existingName, value] of subdict) {
+      if (
+        value instanceof PdfRef &&
+        value.objectNumber === ref.objectNumber &&
+        value.generation === ref.generation
+      ) {
+        this._resourceCache.set(ref, existingName.value);
+        return existingName.value;
+      }
+    }
+
+    // Generate unique name and register
+    const name = this.generateUniqueName(subdict, prefix);
+    subdict.set(name, ref);
+    this._resourceCache.set(ref, name);
+
+    return name;
   }
 
   /**
    * Create and register a content stream.
+   *
+   * Accepts either a string (for ASCII-only content like operator names and numbers)
+   * or raw bytes (for content that may contain non-ASCII data).
    */
-  private createContentStream(content: string): PdfRef | PdfStream {
-    const bytes = new TextEncoder().encode(content);
+  private createContentStream(content: string | Uint8Array): PdfRef | PdfStream {
+    const bytes = typeof content === "string" ? new TextEncoder().encode(content) : content;
     const stream = new PdfStream([], bytes);
 
     // If we have a context, register the stream and return a ref
@@ -2177,45 +2458,55 @@ export class PDFPage {
   /**
    * Prepend content to the page's content stream (for background drawing).
    */
-  private prependContent(content: string): void {
+  private prependContent(content: string | Uint8Array): void {
     const existingContents = this.dict.get("Contents");
-    const newContent = this.createContentStream(`${content}\n`);
+    const contentWithNewline =
+      typeof content === "string" ? `${content}\n` : concatBytes([content, new Uint8Array([0x0a])]);
+    const newContent = this.createContentStream(contentWithNewline);
 
     if (!existingContents) {
-      // No existing content - just set our stream
       this.dict.set("Contents", newContent);
 
       return;
     }
 
-    if (existingContents instanceof PdfRef) {
-      // Reference to a stream - wrap in array with our content first
-      this.dict.set("Contents", new PdfArray([newContent, existingContents]));
+    // Mark as modified to prevent double-wrapping in appendContent
+    this._contentWrapped = true;
 
-      // Mark as modified to prevent double-wrapping in appendContent
-      this._contentWrapped = true;
+    if (existingContents instanceof PdfRef) {
+      const resolved = this.ctx.resolve(existingContents);
+
+      if (resolved instanceof PdfArray) {
+        // Reference points to an array - prepend our stream to a new array
+        const newArray = new PdfArray([newContent]);
+
+        for (let i = 0; i < resolved.length; i++) {
+          const item = resolved.at(i);
+
+          if (item) {
+            newArray.push(item);
+          }
+        }
+
+        this.dict.set("Contents", newArray);
+
+        return;
+      }
+
+      // Reference points to a single stream - wrap in array
+      this.dict.set("Contents", new PdfArray([newContent, existingContents]));
 
       return;
     }
 
     if (existingContents instanceof PdfStream) {
-      // Direct stream - wrap in array with our content first
       this.dict.set("Contents", new PdfArray([newContent, existingContents]));
-
-      // Mark as modified to prevent double-wrapping in appendContent
-      this._contentWrapped = true;
 
       return;
     }
 
     if (existingContents instanceof PdfArray) {
-      // Array of streams/refs - prepend our stream
       existingContents.insert(0, newContent);
-
-      // Mark as modified to prevent double-wrapping in appendContent
-      this._contentWrapped = true;
-
-      return;
     }
   }
 
@@ -2229,9 +2520,11 @@ export class PDFPage {
    * we wrap the existing content in q/Q so any CTM changes are isolated,
    * then append our content which runs with the default CTM.
    */
-  private appendContent(content: string): void {
+  private appendContent(content: string | Uint8Array): void {
     const existingContents = this.dict.get("Contents");
-    const newContent = this.createContentStream(`\n${content}`);
+    const contentWithNewline =
+      typeof content === "string" ? `\n${content}` : concatBytes([new Uint8Array([0x0a]), content]);
+    const newContent = this.createContentStream(contentWithNewline);
 
     if (!existingContents) {
       // No existing content - just set our stream
@@ -2247,7 +2540,29 @@ export class PDFPage {
       const QStream = this.createContentStream("\nQ");
 
       if (existingContents instanceof PdfRef) {
-        this.dict.set("Contents", new PdfArray([qStream, existingContents, QStream, newContent]));
+        // Resolve the reference to check if it's an array or a stream
+        const resolved = this.ctx.resolve(existingContents);
+
+        if (resolved instanceof PdfArray) {
+          // Reference points to an array of streams - expand it
+          const newArray = new PdfArray([qStream]);
+
+          for (let i = 0; i < resolved.length; i++) {
+            const item = resolved.at(i);
+
+            if (item) {
+              newArray.push(item);
+            }
+          }
+
+          newArray.push(QStream);
+          newArray.push(newContent);
+
+          this.dict.set("Contents", newArray);
+        } else {
+          // Reference points to a single stream
+          this.dict.set("Contents", new PdfArray([qStream, existingContents, QStream, newContent]));
+        }
 
         return;
       }
@@ -2326,37 +2641,30 @@ export class PDFPage {
   }
 
   /**
-   * Register a graphics state for opacity and return its name.
-   * Returns null if no opacity is needed.
+   * Create and register a graphics state, returning its resource name.
+   *
+   * This is an internal helper for high-level drawing methods.
+   * For the public low-level API, use `pdf.createExtGState()` + `page.registerExtGState()`.
    */
-  private registerGraphicsStateForOpacity(
-    fillOpacity?: number,
-    strokeOpacity?: number,
-  ): string | null {
-    if (fillOpacity === undefined && strokeOpacity === undefined) {
-      return null;
-    }
+  private registerGraphicsState(options: { fillOpacity?: number; strokeOpacity?: number }): string {
+    const dict = PDFExtGState.createDict(options);
+    const ref = this.ctx.register(dict);
 
-    const params: { ca?: number; CA?: number } = {};
-
-    if (fillOpacity !== undefined) {
-      params.ca = Math.max(0, Math.min(1, fillOpacity)); // Non-stroking (fill) opacity
-    }
-
-    if (strokeOpacity !== undefined) {
-      params.CA = Math.max(0, Math.min(1, strokeOpacity)); // Stroking opacity
-    }
-
-    return this.addGraphicsState(params);
+    return this.registerExtGState({ type: "extgstate", ref });
   }
 
   /**
-   * Append operators to the page content stream.
+   * Append operators to the page content stream (foreground).
    */
   private appendOperators(ops: Operator[]): void {
-    const content = ops.map(op => op.toString()).join("\n");
+    this.appendContent(serializeOperators(ops));
+  }
 
-    this.appendContent(content);
+  /**
+   * Prepend operators to the page content stream (background).
+   */
+  private prependOperators(ops: Operator[]): void {
+    this.prependContent(serializeOperators(ops));
   }
 
   /**
@@ -2390,11 +2698,20 @@ export class PDFPage {
       }
 
       // Create new font dict
-      const fontDict = PdfDict.of({
-        Type: PdfName.of("Font"),
-        Subtype: PdfName.of("Type1"),
-        BaseFont: PdfName.of(font),
-      });
+      // Add /Encoding WinAnsiEncoding for non-Symbol/ZapfDingbats fonts.
+      // Symbol and ZapfDingbats use their built-in encoding (no /Encoding entry).
+      const fontDict = isWinAnsiStandard14(font)
+        ? PdfDict.of({
+            Type: PdfName.of("Font"),
+            Subtype: PdfName.of("Type1"),
+            BaseFont: PdfName.of(font),
+            Encoding: PdfName.of("WinAnsiEncoding"),
+          })
+        : PdfDict.of({
+            Type: PdfName.of("Font"),
+            Subtype: PdfName.of("Type1"),
+            BaseFont: PdfName.of(font),
+          });
 
       const fontName = this.generateUniqueName(fonts, "F");
       fonts.set(fontName, fontDict);
@@ -2429,11 +2746,32 @@ export class PDFPage {
 
   /**
    * Encode text to a PDF string for the given font.
+   *
+   * Standard 14 fonts use WinAnsiEncoding (or SymbolEncoding/ZapfDingbatsEncoding).
+   * Unencodable characters are substituted with .notdef (byte 0x00).
+   * Embedded fonts use Identity-H encoding with glyph IDs.
    */
   private encodeTextForFont(text: string, font: FontInput): PdfString {
     if (typeof font === "string") {
-      // Standard 14 font - use WinAnsi encoding (Latin-1 subset)
-      return PdfString.fromString(text);
+      // Standard 14 font - use the appropriate encoding
+      const encoding = getEncodingForStandard14(font);
+      const codes: number[] = [];
+
+      for (const char of text) {
+        if (encoding.canEncode(char)) {
+          // biome-ignore lint/style/noNonNullAssertion: canEncode guarantees getCode succeeds
+          codes.push(encoding.getCode(char.codePointAt(0)!)!);
+        } else {
+          // Substitute unencodable characters with .notdef (byte 0x00)
+          codes.push(0x00);
+        }
+      }
+
+      const bytes = new Uint8Array(codes);
+
+      // Use hex format for defense-in-depth: hex strings are pure ASCII
+      // and immune to any string encoding transformation
+      return PdfString.fromBytes(bytes);
     }
 
     // Embedded font - use Identity-H encoding with GIDs

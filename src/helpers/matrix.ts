@@ -107,6 +107,23 @@ export class Matrix {
   }
 
   /**
+   * Apply rotation to this matrix (angle in radians).
+   */
+  rotate(angle: number): Matrix {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    return new Matrix(
+      this.a * cos + this.b * -sin,
+      this.a * sin + this.b * cos,
+      this.c * cos + this.d * -sin,
+      this.c * sin + this.d * cos,
+      this.e,
+      this.f,
+    );
+  }
+
+  /**
    * Transform a point using this matrix.
    *
    * x' = a*x + c*y + e

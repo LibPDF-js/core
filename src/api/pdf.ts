@@ -13,6 +13,22 @@ import type { FlattenOptions } from "#src/document/forms/form-flattener";
 import { isLinearizationDict } from "#src/document/linearization";
 import { ObjectCopier } from "#src/document/object-copier";
 import { ObjectRegistry } from "#src/document/object-registry";
+import {
+  PDFExtGState,
+  PDFFormXObject,
+  PDFShading,
+  PDFShadingPattern,
+  PDFTilingPattern,
+  type AxialShadingOptions,
+  type ExtGStateOptions,
+  type FormXObjectOptions,
+  type ImagePatternOptions,
+  type LinearGradientOptions,
+  type RadialShadingOptions,
+  type ShadingPatternOptions,
+  type TilingPatternOptions,
+} from "#src/drawing/resources/index";
+import { serializeOperators } from "#src/drawing/serialize";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format";
 import { resolvePageSize } from "#src/helpers/page-size";
@@ -46,7 +62,7 @@ import { deflate } from "pako";
 
 import { PDFAttachments } from "./pdf-attachments";
 import { PDFCatalog } from "./pdf-catalog";
-import { type DocumentInfo, PDFContext } from "./pdf-context";
+import { PDFContext, type DocumentInfo } from "./pdf-context";
 import { PDFEmbeddedPage } from "./pdf-embedded-page";
 import { PDFFonts } from "./pdf-fonts";
 import { PDFForm } from "./pdf-form";
@@ -2160,6 +2176,288 @@ export class PDF {
     const ref = this.register(stream);
 
     return new PDFImage(ref, info.width, info.height);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Low-Level Drawing API - Shadings
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Create an axial (linear) shading with explicit coordinates.
+   *
+   * @param options - Shading options including coords and color stops
+   * @returns PDFShading resource for use with page.registerShading()
+   *
+   * @example
+   * ```typescript
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 100, 0], // x0, y0, x1, y1
+   *   stops: [
+   *     { offset: 0, color: rgb(1, 0, 0) },
+   *     { offset: 0.5, color: rgb(0, 1, 0) },
+   *     { offset: 1, color: rgb(0, 0, 1) },
+   *   ],
+   * });
+   * const shadingName = page.registerShading(gradient);
+   * ```
+   */
+  createAxialShading(options: AxialShadingOptions): PDFShading {
+    const dict = PDFShading.createAxialDict(options);
+    const ref = this.register(dict);
+
+    return new PDFShading(ref, "axial");
+  }
+
+  /**
+   * Create a radial shading with explicit coordinates.
+   *
+   * @param options - Shading options including coords and color stops
+   * @returns PDFShading resource for use with page.registerShading()
+   *
+   * @example
+   * ```typescript
+   * const radial = pdf.createRadialShading({
+   *   coords: [50, 50, 0, 50, 50, 50], // x0, y0, r0, x1, y1, r1
+   *   stops: [
+   *     { offset: 0, color: rgb(1, 1, 1) },
+   *     { offset: 1, color: rgb(0, 0, 0) },
+   *   ],
+   * });
+   * const shadingName = page.registerShading(radial);
+   * ```
+   */
+  createRadialShading(options: RadialShadingOptions): PDFShading {
+    const dict = PDFShading.createRadialDict(options);
+    const ref = this.register(dict);
+
+    return new PDFShading(ref, "radial");
+  }
+
+  /**
+   * Create a linear gradient using angle and length (CSS-style).
+   *
+   * @param options - Gradient options including angle, length, and color stops
+   * @returns PDFShading resource for use with page.registerShading()
+   *
+   * @example
+   * ```typescript
+   * const gradient = pdf.createLinearGradient({
+   *   angle: 90, // CSS convention: 0 = up, 90 = right, 180 = down, 270 = left
+   *   length: 100,
+   *   stops: [
+   *     { offset: 0, color: rgb(1, 0, 0) },
+   *     { offset: 1, color: rgb(0, 0, 1) },
+   *   ],
+   * });
+   * const shadingName = page.registerShading(gradient);
+   * ```
+   */
+  createLinearGradient(options: LinearGradientOptions): PDFShading {
+    const coords = PDFShading.calculateAxialCoords(options.angle, options.length);
+    const dict = PDFShading.createAxialDict({ coords, stops: options.stops });
+    const ref = this.register(dict);
+
+    return new PDFShading(ref, "axial");
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Low-Level Drawing API - Patterns
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Create a tiling pattern.
+   *
+   * @param options - Pattern options including bbox, step sizes, and operators
+   * @returns PDFPattern resource for use with page.registerPattern()
+   *
+   * @example
+   * ```typescript
+   * const pattern = pdf.createTilingPattern({
+   *   bbox: { x: 0, y: 0, width: 10, height: 10 },
+   *   xStep: 10,
+   *   yStep: 10,
+   *   operators: [
+   *     ops.setNonStrokingRGB(0.8, 0.8, 0.8),
+   *     ops.rectangle(0, 0, 5, 5),
+   *     ops.fill(),
+   *   ],
+   * });
+   * const patternName = page.registerPattern(pattern);
+   * ```
+   */
+  createTilingPattern(options: TilingPatternOptions): PDFTilingPattern {
+    const contentBytes = serializeOperators(options.operators);
+    const stream = PDFTilingPattern.createStream(options, contentBytes);
+    const ref = this.register(stream);
+
+    return new PDFTilingPattern(ref);
+  }
+
+  /**
+   * Create an image pattern for filling shapes with a tiled image.
+   *
+   * This is a convenience method that creates a tiling pattern containing
+   * an embedded image. Similar to CSS `background-image` with `background-repeat`.
+   *
+   * @param options - Image pattern options including the image and tile dimensions
+   * @returns PDFTilingPattern resource for use with page.registerPattern()
+   *
+   * @example
+   * ```typescript
+   * // Create a repeating texture pattern
+   * const texture = pdf.embedImage(textureBytes);
+   * const pattern = pdf.createImagePattern({
+   *   image: texture,
+   *   width: 50,   // Each tile is 50x50 points
+   *   height: 50,
+   * });
+   *
+   * const patternName = page.registerPattern(pattern);
+   * page.drawOperators([
+   *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+   *   ops.setNonStrokingColorN(patternName),
+   *   ops.rectangle(100, 100, 300, 200),
+   *   ops.fill(),
+   * ]);
+   *
+   * // Or use with PathBuilder
+   * page.drawPath()
+   *   .rectangle(100, 100, 300, 200)
+   *   .fill({ pattern });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Horizontal stripes using repeat-x
+   * const stripe = pdf.embedImage(stripeBytes);
+   * const pattern = pdf.createImagePattern({
+   *   image: stripe,
+   *   width: 100,
+   *   height: 20,
+   *   repeat: "repeat-x",
+   * });
+   * ```
+   */
+  createImagePattern(options: ImagePatternOptions): PDFTilingPattern {
+    const stream = PDFTilingPattern.createImageStream(options);
+    const ref = this.register(stream);
+
+    return new PDFTilingPattern(ref);
+  }
+
+  /**
+   * Create a shading pattern from a shading (gradient).
+   *
+   * Shading patterns wrap a gradient so it can be used as a fill or stroke color,
+   * just like tiling patterns. This is the recommended way to use gradients with
+   * PathBuilder and high-level drawing methods.
+   *
+   * @param options - Shading pattern options (shading and optional matrix)
+   * @returns PDFShadingPattern resource for use with page.registerPattern()
+   *
+   * @example
+   * ```typescript
+   * // Create a gradient
+   * const gradient = pdf.createAxialShading({
+   *   coords: [0, 0, 100, 0],
+   *   stops: [
+   *     { offset: 0, color: rgb(1, 0, 0) },
+   *     { offset: 1, color: rgb(0, 0, 1) },
+   *   ],
+   * });
+   *
+   * // Wrap in a pattern
+   * const gradientPattern = pdf.createShadingPattern({ shading: gradient });
+   *
+   * // Use with PathBuilder
+   * page.drawPath()
+   *   .circle(200, 200, 50)
+   *   .fill({ pattern: gradientPattern });
+   *
+   * // Or register and use directly
+   * const patternName = page.registerPattern(gradientPattern);
+   * page.drawOperators([
+   *   ops.setNonStrokingColorSpace(ColorSpace.Pattern),
+   *   ops.setNonStrokingColorN(patternName),
+   *   ops.rectangle(100, 100, 200, 200),
+   *   ops.fill(),
+   * ]);
+   * ```
+   */
+  createShadingPattern(options: ShadingPatternOptions): PDFShadingPattern {
+    const dict = PDFShadingPattern.createDict(options);
+    const ref = this.register(dict);
+
+    return new PDFShadingPattern(ref, options.shading);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Low-Level Drawing API - Extended Graphics State
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Create an extended graphics state (ExtGState) for advanced graphics options.
+   *
+   * @param options - ExtGState options including opacity and blend mode
+   * @returns PDFExtGState resource for use with page.registerExtGState()
+   *
+   * @example
+   * ```typescript
+   * const gs = pdf.createExtGState({
+   *   fillOpacity: 0.5,
+   *   strokeOpacity: 0.8,
+   *   blendMode: "Multiply",
+   * });
+   * const gsName = page.registerExtGState(gs);
+   * ```
+   */
+  createExtGState(options: ExtGStateOptions): PDFExtGState {
+    const dict = PDFExtGState.createDict(options);
+    const ref = this.register(dict);
+
+    return new PDFExtGState(ref);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Low-Level Drawing API - Form XObjects
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Create a Form XObject (reusable content).
+   *
+   * @param options - Form XObject options including bbox and operators
+   * @returns PDFFormXObject resource for use with page.registerXObject()
+   *
+   * @example
+   * ```typescript
+   * const stamp = pdf.createFormXObject({
+   *   bbox: { x: 0, y: 0, width: 100, height: 50 },
+   *   operators: [
+   *     ops.setNonStrokingRGB(1, 0, 0),
+   *     ops.rectangle(0, 0, 100, 50),
+   *     ops.fill(),
+   *   ],
+   * });
+   * const xobjectName = page.registerXObject(stamp);
+   *
+   * // Use on multiple pages
+   * for (const page of pdf.getPages()) {
+   *   page.drawOperators([
+   *     ops.pushGraphicsState(),
+   *     ops.concatMatrix(1, 0, 0, 1, 200, 700),
+   *     ops.paintXObject(xobjectName),
+   *     ops.popGraphicsState(),
+   *   ]);
+   * }
+   * ```
+   */
+  createFormXObject(options: FormXObjectOptions): PDFFormXObject {
+    const contentBytes = serializeOperators(options.operators);
+    const stream = PDFFormXObject.createStream(options, contentBytes);
+
+    const ref = this.register(stream);
+
+    return new PDFFormXObject(ref, options.bbox);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

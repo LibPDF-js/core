@@ -5,12 +5,13 @@
  * in the test-output directory.
  */
 
+import { PDF } from "#src/api/pdf";
 import { Standard14Font } from "#src/fonts/standard-14-font";
 import { black, blue, cmyk, grayscale, green, red, rgb, white } from "#src/helpers/colors";
+import { PdfDict } from "#src/objects/pdf-dict";
+import { PdfRef } from "#src/objects/pdf-ref";
 import { isPdfHeader, loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
-
-import { PDF } from "../pdf";
 
 describe("Drawing API Integration", () => {
   describe("shapes", () => {
@@ -329,10 +330,14 @@ describe("Drawing API Integration", () => {
       expect(extGState).toBeDefined();
 
       // Find the graphics state with ca = 0.5 (non-stroking alpha for text)
+      // ExtGState entries may be inline dicts or refs to dicts
       let foundCa = false;
 
-      for (const [, gsDict] of extGState!) {
-        if (gsDict.type === "dict") {
+      for (const [, entry] of extGState!) {
+        // Resolve refs to get the actual dict
+        const gsDict = entry instanceof PdfRef ? parsed.getObject(entry) : entry;
+
+        if (gsDict instanceof PdfDict) {
           const caValue = gsDict.getNumber("ca");
 
           if (caValue && caValue.value === 0.5) {

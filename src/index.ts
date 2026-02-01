@@ -192,7 +192,39 @@ export {
   type RotationOrigin,
   type RotationOriginName,
   type TextLine,
-} from "./api/drawing";
+} from "#src/drawing";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Low-Level Drawing API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { Matrix } from "./helpers/matrix";
+export * as ops from "./helpers/operators";
+export { ColorSpace } from "./helpers/colorspace";
+
+// Low-level types and resource interfaces
+export type {
+  AxialCoords,
+  AxialShadingOptions,
+  BBox,
+  BlendMode,
+  ColorStop,
+  ExtGStateOptions,
+  FormXObjectOptions,
+  ImagePatternOptions,
+  LinearGradientOptions,
+  PatternMatrix,
+  PDFExtGState,
+  PDFFormXObject,
+  PDFPattern,
+  PDFShading,
+  PDFShadingPattern,
+  PDFTilingPattern,
+  RadialCoords,
+  RadialShadingOptions,
+  ShadingPatternOptions,
+  TilingPatternOptions,
+} from "./drawing/resources/index";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

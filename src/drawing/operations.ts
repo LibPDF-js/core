@@ -7,6 +7,8 @@
 
 import type { Operator } from "#src/content/operators";
 import type { Color } from "#src/helpers/colors";
+import { ColorSpace } from "#src/helpers/colorspace";
+import { KAPPA } from "#src/helpers/constants";
 import {
   closePath,
   concatMatrix,
@@ -26,9 +28,13 @@ import {
   setLineWidth,
   setMiterLimit,
   setNonStrokingCMYK,
+  setNonStrokingColorN,
+  setNonStrokingColorSpace,
   setNonStrokingGray,
   setNonStrokingRGB,
   setStrokingCMYK,
+  setStrokingColorN,
+  setStrokingColorSpace,
   setStrokingGray,
   setStrokingRGB,
   stroke,
@@ -37,16 +43,6 @@ import { PdfArray } from "#src/objects/pdf-array";
 import { PdfNumber } from "#src/objects/pdf-number";
 
 import { type LineCap, type LineJoin, lineCapToNumber, lineJoinToNumber } from "./types";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Magic number for circular Bezier approximation.
- * 4 * (sqrt(2) - 1) / 3
- */
-const KAPPA = 0.5522847498307936;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Color Operators
@@ -106,7 +102,11 @@ export interface RectangleOpsOptions {
   width: number;
   height: number;
   fillColor?: Color;
+  /** Fill pattern name (already registered, e.g., "P0") */
+  fillPatternName?: string;
   strokeColor?: Color;
+  /** Stroke pattern name (already registered, e.g., "P0") */
+  strokePatternName?: string;
   strokeWidth?: number;
   dashArray?: number[];
   dashPhase?: number;
@@ -142,15 +142,22 @@ export function drawRectangleOps(options: RectangleOpsOptions): Operator[] {
   if (options.strokeColor) {
     ops.push(setStrokeColor(options.strokeColor));
     ops.push(setLineWidth(options.strokeWidth ?? 1));
-
-    if (options.dashArray && options.dashArray.length > 0) {
-      ops.push(setDash(options.dashArray, options.dashPhase ?? 0));
-    }
+  } else if (options.strokePatternName) {
+    ops.push(setStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setStrokingColorN(options.strokePatternName));
+    ops.push(setLineWidth(options.strokeWidth ?? 1));
   }
 
-  // Set fill color
+  if (options.dashArray && options.dashArray.length > 0) {
+    ops.push(setDash(options.dashArray, options.dashPhase ?? 0));
+  }
+
+  // Set fill color or pattern
   if (options.fillColor) {
     ops.push(setFillColor(options.fillColor));
+  } else if (options.fillPatternName) {
+    ops.push(setNonStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setNonStrokingColorN(options.fillPatternName));
   }
 
   // Draw the path
@@ -169,7 +176,9 @@ export function drawRectangleOps(options: RectangleOpsOptions): Operator[] {
   }
 
   // Paint the path
-  ops.push(getPaintOp(!!options.fillColor, !!options.strokeColor));
+  const hasFill = !!options.fillColor || !!options.fillPatternName;
+  const hasStroke = !!options.strokeColor || !!options.strokePatternName;
+  ops.push(getPaintOp(hasFill, hasStroke));
 
   ops.push(popGraphicsState());
 
@@ -214,7 +223,7 @@ export interface LineOpsOptions {
   endX: number;
   endY: number;
   color?: Color;
-  thickness?: number;
+  strokeWidth?: number;
   dashArray?: number[];
   dashPhase?: number;
   lineCap?: LineCap;
@@ -237,7 +246,7 @@ export function drawLineOps(options: LineOpsOptions): Operator[] {
     ops.push(setStrokeColor(options.color));
   }
 
-  ops.push(setLineWidth(options.thickness ?? 1));
+  ops.push(setLineWidth(options.strokeWidth ?? 1));
 
   if (options.lineCap) {
     ops.push(setLineCap(lineCapToNumber(options.lineCap)));
@@ -266,7 +275,11 @@ export interface EllipseOpsOptions {
   rx: number;
   ry: number;
   fillColor?: Color;
+  /** Fill pattern name (already registered, e.g., "P0") */
+  fillPatternName?: string;
   strokeColor?: Color;
+  /** Stroke pattern name (already registered, e.g., "P0") */
+  strokePatternName?: string;
   strokeWidth?: number;
   graphicsStateName?: string;
   rotate?: { angle: number; originX: number; originY: number };
@@ -298,18 +311,27 @@ export function drawEllipseOps(options: EllipseOpsOptions): Operator[] {
   if (options.strokeColor) {
     ops.push(setStrokeColor(options.strokeColor));
     ops.push(setLineWidth(options.strokeWidth ?? 1));
+  } else if (options.strokePatternName) {
+    ops.push(setStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setStrokingColorN(options.strokePatternName));
+    ops.push(setLineWidth(options.strokeWidth ?? 1));
   }
 
-  // Set fill color
+  // Set fill color or pattern
   if (options.fillColor) {
     ops.push(setFillColor(options.fillColor));
+  } else if (options.fillPatternName) {
+    ops.push(setNonStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setNonStrokingColorN(options.fillPatternName));
   }
 
   // Draw the ellipse path using 4 Bezier curves
   ops.push(...ellipsePathOps(options.cx, options.cy, options.rx, options.ry));
 
   // Paint the path
-  ops.push(getPaintOp(!!options.fillColor, !!options.strokeColor));
+  const hasFill = !!options.fillColor || !!options.fillPatternName;
+  const hasStroke = !!options.strokeColor || !!options.strokePatternName;
+  ops.push(getPaintOp(hasFill, hasStroke));
 
   ops.push(popGraphicsState());
 
@@ -355,7 +377,11 @@ export function drawCircleOps(
  */
 export interface PathOpsOptions {
   fillColor?: Color;
+  /** Fill pattern name (already registered, e.g., "P0") */
+  fillPatternName?: string;
   strokeColor?: Color;
+  /** Stroke pattern name (already registered, e.g., "P0") */
+  strokePatternName?: string;
   strokeWidth?: number;
   lineCap?: LineCap;
   lineJoin?: LineJoin;
@@ -381,6 +407,11 @@ export function wrapPathOps(pathOps: Operator[], options: PathOpsOptions): Opera
   if (options.strokeColor) {
     ops.push(setStrokeColor(options.strokeColor));
     ops.push(setLineWidth(options.strokeWidth ?? 1));
+  } else if (options.strokePatternName) {
+    // Stroke with pattern
+    ops.push(setStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setStrokingColorN(options.strokePatternName));
+    ops.push(setLineWidth(options.strokeWidth ?? 1));
   }
 
   if (options.lineCap) {
@@ -399,26 +430,23 @@ export function wrapPathOps(pathOps: Operator[], options: PathOpsOptions): Opera
     ops.push(setDash(options.dashArray, options.dashPhase ?? 0));
   }
 
-  // Set fill color
+  // Set fill color or pattern
   if (options.fillColor) {
     ops.push(setFillColor(options.fillColor));
+  } else if (options.fillPatternName) {
+    // Fill with pattern
+    ops.push(setNonStrokingColorSpace(ColorSpace.Pattern));
+    ops.push(setNonStrokingColorN(options.fillPatternName));
   }
 
   // Add path construction operators
   ops.push(...pathOps);
 
   // Paint the path
-  const hasFill = !!options.fillColor;
-  const hasStroke = !!options.strokeColor;
+  const hasFill = !!options.fillColor || !!options.fillPatternName;
+  const hasStroke = !!options.strokeColor || !!options.strokePatternName;
   const evenOdd = options.windingRule === "evenodd";
-
-  if (hasFill && hasStroke) {
-    ops.push(evenOdd ? fillAndStrokeEvenOdd() : fillAndStroke());
-  } else if (hasFill) {
-    ops.push(evenOdd ? fillEvenOdd() : fill());
-  } else if (hasStroke) {
-    ops.push(stroke());
-  }
+  ops.push(getPaintOpWithWinding(hasFill, hasStroke, evenOdd));
 
   ops.push(popGraphicsState());
 
@@ -439,6 +467,21 @@ function getPaintOp(hasFill: boolean, hasStroke: boolean): Operator {
 
   if (hasFill) {
     return fill();
+  }
+
+  return stroke();
+}
+
+/**
+ * Get the appropriate paint operator with winding rule support.
+ */
+function getPaintOpWithWinding(hasFill: boolean, hasStroke: boolean, evenOdd: boolean): Operator {
+  if (hasFill && hasStroke) {
+    return evenOdd ? fillAndStrokeEvenOdd() : fillAndStroke();
+  }
+
+  if (hasFill) {
+    return evenOdd ? fillEvenOdd() : fill();
   }
 
   return stroke();

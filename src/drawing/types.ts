@@ -2,6 +2,8 @@
  * Drawing API types and option interfaces.
  */
 
+import type { PDFPattern } from "#src/drawing/resources/index";
+import type { BBox } from "#src/drawing/resources/types";
 import type { EmbeddedFont } from "#src/fonts/embedded-font";
 import type { Standard14FontName } from "#src/fonts/standard-14";
 import type { Color } from "#src/helpers/colors";
@@ -67,13 +69,10 @@ export interface Rotation {
 
 /**
  * Bounding box for calculating rotation origins.
+ *
+ * Alias for BBox - both represent { x, y, width, height }.
  */
-export interface BoundingBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+export type BoundingBox = BBox;
 
 /**
  * Resolve a rotation origin to explicit coordinates.
@@ -199,11 +198,23 @@ export interface DrawRectangleOptions {
   width: number;
   /** Height in points */
   height: number;
-  /** Fill color (omit for no fill) */
+  /** Fill color (omit for no fill, mutually exclusive with pattern) */
   color?: Color;
-  /** Border/stroke color (omit for no stroke) */
+  /**
+   * Fill pattern (tiling or shading pattern).
+   * Use instead of color to fill with a gradient or repeating pattern.
+   * Mutually exclusive with color.
+   */
+  pattern?: PDFPattern;
+  /** Border/stroke color (omit for no stroke, mutually exclusive with borderPattern) */
   borderColor?: Color;
-  /** Border width in points (default: 1 if borderColor set) */
+  /**
+   * Stroke pattern (tiling or shading pattern).
+   * Use instead of borderColor to stroke with a gradient or repeating pattern.
+   * Mutually exclusive with borderColor.
+   */
+  borderPattern?: PDFPattern;
+  /** Border width in points (default: 1 if borderColor/borderPattern set) */
   borderWidth?: number;
   /** Dash pattern array (e.g., [5, 3] for 5pt dash, 3pt gap) */
   borderDashArray?: number[];
@@ -251,11 +262,23 @@ export interface DrawCircleOptions {
   y: number;
   /** Circle radius in points */
   radius: number;
-  /** Fill color (omit for no fill) */
+  /** Fill color (omit for no fill, mutually exclusive with pattern) */
   color?: Color;
-  /** Border/stroke color (omit for no stroke) */
+  /**
+   * Fill pattern (tiling or shading pattern).
+   * Use instead of color to fill with a gradient or repeating pattern.
+   * Mutually exclusive with color.
+   */
+  pattern?: PDFPattern;
+  /** Border/stroke color (omit for no stroke, mutually exclusive with borderPattern) */
   borderColor?: Color;
-  /** Border width in points (default: 1 if borderColor set) */
+  /**
+   * Stroke pattern (tiling or shading pattern).
+   * Use instead of borderColor to stroke with a gradient or repeating pattern.
+   * Mutually exclusive with borderColor.
+   */
+  borderPattern?: PDFPattern;
+  /** Border width in points (default: 1 if borderColor/borderPattern set) */
   borderWidth?: number;
   /** Fill opacity 0-1 (default: 1) */
   opacity?: number;
@@ -275,11 +298,23 @@ export interface DrawEllipseOptions {
   xRadius: number;
   /** Vertical radius in points */
   yRadius: number;
-  /** Fill color (omit for no fill) */
+  /** Fill color (omit for no fill, mutually exclusive with pattern) */
   color?: Color;
-  /** Border/stroke color (omit for no stroke) */
+  /**
+   * Fill pattern (tiling or shading pattern).
+   * Use instead of color to fill with a gradient or repeating pattern.
+   * Mutually exclusive with color.
+   */
+  pattern?: PDFPattern;
+  /** Border/stroke color (omit for no stroke, mutually exclusive with borderPattern) */
   borderColor?: Color;
-  /** Border width in points (default: 1 if borderColor set) */
+  /**
+   * Stroke pattern (tiling or shading pattern).
+   * Use instead of borderColor to stroke with a gradient or repeating pattern.
+   * Mutually exclusive with borderColor.
+   */
+  borderPattern?: PDFPattern;
+  /** Border width in points (default: 1 if borderColor/borderPattern set) */
   borderWidth?: number;
   /** Fill opacity 0-1 (default: 1) */
   opacity?: number;
@@ -333,11 +368,23 @@ export interface DrawSvgPathOptions {
    */
   flipY?: boolean;
 
-  /** Fill color (default: black; omit to stroke only if borderColor set) */
+  /** Fill color (default: black; omit to stroke only if borderColor set, mutually exclusive with pattern) */
   color?: Color;
-  /** Stroke color (omit for no stroke) */
+  /**
+   * Fill pattern (tiling or shading pattern).
+   * Use instead of color to fill with a gradient or repeating pattern.
+   * Mutually exclusive with color.
+   */
+  pattern?: PDFPattern;
+  /** Stroke color (omit for no stroke, mutually exclusive with borderPattern) */
   borderColor?: Color;
-  /** Stroke width in points (default: 1 if borderColor set) */
+  /**
+   * Stroke pattern (tiling or shading pattern).
+   * Use instead of borderColor to stroke with a gradient or repeating pattern.
+   * Mutually exclusive with borderColor.
+   */
+  borderPattern?: PDFPattern;
+  /** Stroke width in points (default: 1 if borderColor/borderPattern set) */
   borderWidth?: number;
   /** Line cap style */
   lineCap?: LineCap;
@@ -363,13 +410,44 @@ export interface DrawSvgPathOptions {
 
 /**
  * Options for path painting.
+ *
+ * @example
+ * ```typescript
+ * // Solid color fill
+ * page.drawPath().rectangle(0, 0, 100, 100).fill({ color: rgb(1, 0, 0) });
+ *
+ * // Pattern fill (tiling or shading pattern)
+ * const gradient = pdf.createAxialShading({...});
+ * const pattern = pdf.createShadingPattern({ shading: gradient });
+ * page.drawPath().circle(50, 50, 30).fill({ pattern });
+ *
+ * // Stroke with pattern
+ * page.drawPath().rectangle(0, 0, 100, 100).stroke({
+ *   borderPattern: pattern,
+ *   borderWidth: 5,
+ * });
+ * ```
  */
 export interface PathOptions {
-  /** Fill color (omit for no fill) */
+  /** Fill color (omit for no fill, mutually exclusive with pattern) */
   color?: Color;
-  /** Stroke color (omit for no stroke) */
+  /**
+   * Fill pattern (tiling or shading pattern).
+   *
+   * Use instead of color to fill with a gradient or repeating pattern.
+   * Mutually exclusive with color.
+   */
+  pattern?: PDFPattern;
+  /** Stroke color (omit for no stroke, mutually exclusive with borderPattern) */
   borderColor?: Color;
-  /** Stroke width in points (default: 1 if borderColor set) */
+  /**
+   * Stroke pattern (tiling or shading pattern).
+   *
+   * Use instead of borderColor to stroke with a gradient or repeating pattern.
+   * Mutually exclusive with borderColor.
+   */
+  borderPattern?: PDFPattern;
+  /** Stroke width in points (default: 1 if borderColor/borderPattern set) */
   borderWidth?: number;
   /** Line cap style */
   lineCap?: LineCap;

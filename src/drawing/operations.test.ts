@@ -1,8 +1,12 @@
 import type { Operator } from "#src/content/operators";
+import {
+  drawCircleOps,
+  drawEllipseOps,
+  drawLineOps,
+  drawRectangleOps,
+} from "#src/drawing/operations";
 import { grayscale, rgb } from "#src/helpers/colors";
 import { describe, expect, it } from "vitest";
-
-import { drawCircleOps, drawEllipseOps, drawLineOps, drawRectangleOps } from "./operations";
 
 // Helper to check if operator matches
 function findOp(ops: Operator[], opName: string): Operator | undefined {
@@ -117,13 +121,13 @@ describe("drawLineOps", () => {
     expect(sOp).toBeDefined();
   });
 
-  it("respects line thickness", () => {
+  it("respects line strokeWidth", () => {
     const ops = drawLineOps({
       startX: 0,
       startY: 0,
       endX: 100,
       endY: 100,
-      thickness: 3,
+      strokeWidth: 3,
     });
 
     const wOp = findOp(ops, "w");

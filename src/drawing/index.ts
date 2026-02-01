@@ -9,6 +9,8 @@
 export { drawCircleOps, drawEllipseOps, drawLineOps, drawRectangleOps } from "./operations";
 // Path builder
 export { PathBuilder } from "./path-builder";
+// Serialization
+export { serializeOperators } from "./serialize";
 export type { LayoutResult, PositionedWord, TextLine } from "./text-layout";
 
 // Text layout utilities
