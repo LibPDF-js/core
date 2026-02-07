@@ -54,13 +54,13 @@ await writeFile("signed.pdf", bytes);
 
 `AzureKeyVaultSigner` uses [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/javascript/api/@azure/identity/defaultazurecredential) by default when no `credential` option is provided. This tries multiple authentication methods in order:
 
-| Method              | Environment       | Setup                                                |
-| ------------------- | ----------------- | ---------------------------------------------------- |
-| Environment vars    | Any               | Set `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and secret |
-| Managed Identity    | Azure VMs/App Svc | Automatic (uses instance metadata)                   |
-| Azure CLI           | Local development | Run `az login`                                       |
-| Workload Identity   | AKS               | Configure workload identity for your pod             |
-| Azure PowerShell    | Local development | Run `Connect-AzAccount`                              |
+| Method            | Environment       | Setup                                                |
+| ----------------- | ----------------- | ---------------------------------------------------- |
+| Environment vars  | Any               | Set `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and secret |
+| Managed Identity  | Azure VMs/App Svc | Automatic (uses instance metadata)                   |
+| Azure CLI         | Local development | Run `az login`                                       |
+| Workload Identity | AKS               | Configure workload identity for your pod             |
+| Azure PowerShell  | Local development | Run `Connect-AzAccount`                              |
 
 You can also provide an explicit credential:
 
@@ -98,18 +98,18 @@ Create a new Azure Key Vault signer instance.
 
 ### Full Key ID URL
 
-| Param                           | Type               | Default    | Description                                     |
-| ------------------------------- | ------------------ | ---------- | ----------------------------------------------- |
-| `options`                       | `object`           | required   |                                                 |
-| `options.keyId`                 | `string`           | required   | Full key identifier URL                         |
-| `options.certificate`           | `Uint8Array`       | required   | DER-encoded X.509 certificate for this key      |
-| `[options.credential]`          | `TokenCredential`  |            | Azure credential (default: DefaultAzureCredential) |
-| `[options.certificateChain]`    | `Uint8Array[]`     |            | Intermediate and root certificates              |
-| `[options.buildChain]`          | `boolean`          | `false`    | Fetch chain via AIA extensions                  |
-| `[options.chainTimeout]`        | `number`           | `15000`    | Timeout for AIA fetching (ms)                   |
-| `[options.rsaScheme]`           | `"PKCS1" \| "PSS"` | `"PKCS1"` | RSA signature scheme (RSA keys only)            |
-| `[options.keyClient]`           | `KeyClient`        |            | Pre-configured Key Vault client                 |
-| `[options.cryptographyClient]`  | `CryptographyClient` |         | Pre-configured Cryptography client              |
+| Param                          | Type                 | Default   | Description                                        |
+| ------------------------------ | -------------------- | --------- | -------------------------------------------------- |
+| `options`                      | `object`             | required  |                                                    |
+| `options.keyId`                | `string`             | required  | Full key identifier URL                            |
+| `options.certificate`          | `Uint8Array`         | required  | DER-encoded X.509 certificate for this key         |
+| `[options.credential]`         | `TokenCredential`    |           | Azure credential (default: DefaultAzureCredential) |
+| `[options.certificateChain]`   | `Uint8Array[]`       |           | Intermediate and root certificates                 |
+| `[options.buildChain]`         | `boolean`            | `false`   | Fetch chain via AIA extensions                     |
+| `[options.chainTimeout]`       | `number`             | `15000`   | Timeout for AIA fetching (ms)                      |
+| `[options.rsaScheme]`          | `"PKCS1" \| "PSS"`   | `"PKCS1"` | RSA signature scheme (RSA keys only)               |
+| `[options.keyClient]`          | `KeyClient`          |           | Pre-configured Key Vault client                    |
+| `[options.cryptographyClient]` | `CryptographyClient` |           | Pre-configured Cryptography client                 |
 
 ```typescript
 const signer = await AzureKeyVaultSigner.create({
@@ -123,12 +123,12 @@ const signer = await AzureKeyVaultSigner.create({
 
 Instead of a full key ID URL, you can use shorthand properties:
 
-| Param                    | Type     | Default              | Description                  |
-| ------------------------ | -------- | -------------------- | ---------------------------- |
-| `options.vaultName`      | `string` | required             | Vault name                   |
-| `options.keyName`        | `string` | required             | Key name in the vault        |
-| `[options.keyVersion]`   | `string` |                      | Key version (default: latest) |
-| `[options.vaultSuffix]`  | `string` | `"vault.azure.net"`  | Vault domain suffix          |
+| Param                   | Type     | Default             | Description                   |
+| ----------------------- | -------- | ------------------- | ----------------------------- |
+| `options.vaultName`     | `string` | required            | Vault name                    |
+| `options.keyName`       | `string` | required            | Key name in the vault         |
+| `[options.keyVersion]`  | `string` |                     | Key version (default: latest) |
+| `[options.vaultSuffix]` | `string` | `"vault.azure.net"` | Vault domain suffix           |
 
 ```typescript
 const signer = await AzureKeyVaultSigner.create({
@@ -178,22 +178,22 @@ Azure Key Vault supports RSA and EC keys. Unlike Google Cloud KMS where the algo
 
 ### RSA Keys
 
-| RSA Scheme | Digest   | Azure Algorithm | Signature Algorithm |
-| ---------- | -------- | --------------- | ------------------- |
-| PKCS1      | SHA-256  | RS256           | RSASSA-PKCS1-v1_5   |
-| PKCS1      | SHA-384  | RS384           | RSASSA-PKCS1-v1_5   |
-| PKCS1      | SHA-512  | RS512           | RSASSA-PKCS1-v1_5   |
-| PSS        | SHA-256  | PS256           | RSA-PSS             |
-| PSS        | SHA-384  | PS384           | RSA-PSS             |
-| PSS        | SHA-512  | PS512           | RSA-PSS             |
+| RSA Scheme | Digest  | Azure Algorithm | Signature Algorithm |
+| ---------- | ------- | --------------- | ------------------- |
+| PKCS1      | SHA-256 | RS256           | RSASSA-PKCS1-v1_5   |
+| PKCS1      | SHA-384 | RS384           | RSASSA-PKCS1-v1_5   |
+| PKCS1      | SHA-512 | RS512           | RSASSA-PKCS1-v1_5   |
+| PSS        | SHA-256 | PS256           | RSA-PSS             |
+| PSS        | SHA-384 | PS384           | RSA-PSS             |
+| PSS        | SHA-512 | PS512           | RSA-PSS             |
 
 ### EC Keys
 
-| Curve | Digest   | Azure Algorithm | Signature Algorithm |
-| ----- | -------- | --------------- | ------------------- |
-| P-256 | SHA-256  | ES256           | ECDSA               |
-| P-384 | SHA-384  | ES384           | ECDSA               |
-| P-521 | SHA-512  | ES512           | ECDSA               |
+| Curve | Digest  | Azure Algorithm | Signature Algorithm |
+| ----- | ------- | --------------- | ------------------- |
+| P-256 | SHA-256 | ES256           | ECDSA               |
+| P-384 | SHA-384 | ES384           | ECDSA               |
+| P-521 | SHA-512 | ES512           | ECDSA               |
 
 <Callout type="warn">
   **RSA-PSS compatibility**: RSA-PSS signatures may not verify correctly in older PDF readers (Adobe
@@ -250,14 +250,14 @@ In Azure Key Vault, a "certificate" is a bundle containing both the certificate 
 
 ### getCertificateFromKeyVault(options)
 
-| Param                           | Type               | Default  | Description                                        |
-| ------------------------------- | ------------------ | -------- | -------------------------------------------------- |
-| `options`                       | `object`           | required |                                                    |
-| `options.vaultUrl`              | `string`           | required | Full vault URL                                     |
-| `options.certificateName`       | `string`           | required | Certificate name in the vault                      |
-| `[options.certificateVersion]`  | `string`           |          | Certificate version (default: latest)              |
-| `[options.credential]`          | `TokenCredential`  |          | Azure credential (default: DefaultAzureCredential) |
-| `[options.certificateClient]`   | `CertificateClient` |        | Pre-configured Certificate client                  |
+| Param                          | Type                | Default  | Description                                        |
+| ------------------------------ | ------------------- | -------- | -------------------------------------------------- |
+| `options`                      | `object`            | required |                                                    |
+| `options.vaultUrl`             | `string`            | required | Full vault URL                                     |
+| `options.certificateName`      | `string`            | required | Certificate name in the vault                      |
+| `[options.certificateVersion]` | `string`            |          | Certificate version (default: latest)              |
+| `[options.credential]`         | `TokenCredential`   |          | Azure credential (default: DefaultAzureCredential) |
+| `[options.certificateClient]`  | `CertificateClient` |          | Pre-configured Certificate client                  |
 
 **Returns**: `Promise<{ cert: Uint8Array; chain?: Uint8Array[] }>`
 
@@ -376,13 +376,13 @@ try {
 
 Common errors:
 
-| Error                | Cause                                    | Solution                                     |
-| -------------------- | ---------------------------------------- | -------------------------------------------- |
-| Key not found        | Invalid key name, version, or vault URL  | Verify the key reference and vault URL        |
-| Permission denied    | Missing Key Vault permissions            | Grant Key Sign and Key Get permissions        |
-| Key is not enabled   | Key disabled in the vault                | Enable the key in Azure Portal                |
-| Certificate mismatch | Certificate wasn't issued for this key   | Regenerate certificate from the vault's key   |
-| Unsupported key type | Symmetric key or unsupported curve       | Use RSA or EC (P-256, P-384, P-521) keys      |
+| Error                | Cause                                   | Solution                                    |
+| -------------------- | --------------------------------------- | ------------------------------------------- |
+| Key not found        | Invalid key name, version, or vault URL | Verify the key reference and vault URL      |
+| Permission denied    | Missing Key Vault permissions           | Grant Key Sign and Key Get permissions      |
+| Key is not enabled   | Key disabled in the vault               | Enable the key in Azure Portal              |
+| Certificate mismatch | Certificate wasn't issued for this key  | Regenerate certificate from the vault's key |
+| Unsupported key type | Symmetric key or unsupported curve      | Use RSA or EC (P-256, P-384, P-521) keys    |
 
 ---
 

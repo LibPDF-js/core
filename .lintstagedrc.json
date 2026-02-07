@@ -1,5 +1,5 @@
 {
   "*.{ts,tsx,js,jsx}": ["oxlint --fix", "oxfmt"],
   "*.json": ["oxfmt"],
-  "*.md": ["oxfmt"]
+  "*.{md,mdx}": ["oxfmt"]
 }
