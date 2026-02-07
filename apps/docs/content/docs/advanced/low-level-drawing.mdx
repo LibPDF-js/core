@@ -25,9 +25,8 @@ page.drawOperators([
 ```
 
 <Callout type="warn">
-  The low-level API requires understanding of PDF content stream structure.
-  Invalid operator sequences may produce corrupted PDFs. Use the high-level
-  methods when they're sufficient.
+  The low-level API requires understanding of PDF content stream structure. Invalid operator
+  sequences may produce corrupted PDFs. Use the high-level methods when they're sufficient.
 </Callout>
 
 ---
@@ -36,15 +35,15 @@ page.drawOperators([
 
 The high-level methods (`drawRectangle`, `drawText`, etc.) cover most needs. Reach for the low-level API when you need:
 
-| Feature | Low-Level Approach |
-| --- | --- |
-| Matrix transforms | `ops.concatMatrix()` for arbitrary rotation/scale/skew |
-| Gradients | `createAxialShading()` or `createRadialShading()` |
-| Repeating patterns | `createTilingPattern()` or `createImagePattern()` |
-| Blend modes | `createExtGState({ blendMode: "Multiply" })` |
-| Clipping regions | `ops.clip()` with `ops.endPath()` |
-| Reusable graphics | `createFormXObject()` for stamps/watermarks |
-| Fine-grained control | Direct operator sequences |
+| Feature              | Low-Level Approach                                     |
+| -------------------- | ------------------------------------------------------ |
+| Matrix transforms    | `ops.concatMatrix()` for arbitrary rotation/scale/skew |
+| Gradients            | `createAxialShading()` or `createRadialShading()`      |
+| Repeating patterns   | `createTilingPattern()` or `createImagePattern()`      |
+| Blend modes          | `createExtGState({ blendMode: "Multiply" })`           |
+| Clipping regions     | `ops.clip()` with `ops.endPath()`                      |
+| Reusable graphics    | `createFormXObject()` for stamps/watermarks            |
+| Fine-grained control | Direct operator sequences                              |
 
 ---
 
@@ -59,80 +58,80 @@ import { ops } from "@libpdf/core";
 ### Graphics State
 
 ```typescript
-ops.pushGraphicsState()     // Save current state (q)
-ops.popGraphicsState()      // Restore saved state (Q)
-ops.setGraphicsState(name)  // Apply ExtGState resource (gs)
-ops.concatMatrix(a, b, c, d, e, f)  // Transform CTM (cm)
+ops.pushGraphicsState(); // Save current state (q)
+ops.popGraphicsState(); // Restore saved state (Q)
+ops.setGraphicsState(name); // Apply ExtGState resource (gs)
+ops.concatMatrix(a, b, c, d, e, f); // Transform CTM (cm)
 ```
 
 ### Path Construction
 
 ```typescript
-ops.moveTo(x, y)            // Begin subpath (m)
-ops.lineTo(x, y)            // Line to point (l)
-ops.curveTo(x1, y1, x2, y2, x3, y3)  // Cubic bezier (c)
-ops.rectangle(x, y, w, h)   // Rectangle shorthand (re)
-ops.closePath()             // Close subpath (h)
+ops.moveTo(x, y); // Begin subpath (m)
+ops.lineTo(x, y); // Line to point (l)
+ops.curveTo(x1, y1, x2, y2, x3, y3); // Cubic bezier (c)
+ops.rectangle(x, y, w, h); // Rectangle shorthand (re)
+ops.closePath(); // Close subpath (h)
 ```
 
 ### Path Painting
 
 ```typescript
-ops.stroke()                // Stroke path (S)
-ops.fill()                  // Fill path, non-zero winding (f)
-ops.fillEvenOdd()           // Fill path, even-odd rule (f*)
-ops.fillAndStroke()         // Fill then stroke (B)
-ops.endPath()               // Discard path without painting (n)
+ops.stroke(); // Stroke path (S)
+ops.fill(); // Fill path, non-zero winding (f)
+ops.fillEvenOdd(); // Fill path, even-odd rule (f*)
+ops.fillAndStroke(); // Fill then stroke (B)
+ops.endPath(); // Discard path without painting (n)
 ```
 
 ### Clipping
 
 ```typescript
-ops.clip()                  // Set clip region, non-zero (W)
-ops.clipEvenOdd()           // Set clip region, even-odd (W*)
+ops.clip(); // Set clip region, non-zero (W)
+ops.clipEvenOdd(); // Set clip region, even-odd (W*)
 ```
 
 ### Color
 
 ```typescript
-ops.setStrokingGray(g)      // Stroke grayscale (G)
-ops.setNonStrokingGray(g)   // Fill grayscale (g)
-ops.setStrokingRGB(r, g, b) // Stroke RGB (RG)
-ops.setNonStrokingRGB(r, g, b)  // Fill RGB (rg)
-ops.setStrokingCMYK(c, m, y, k)  // Stroke CMYK (K)
-ops.setNonStrokingCMYK(c, m, y, k)  // Fill CMYK (k)
-ops.setStrokingColorSpace(cs)    // Set stroke color space (CS)
-ops.setNonStrokingColorSpace(cs) // Set fill color space (cs)
-ops.setStrokingColorN(name)      // Set stroke pattern (SCN)
-ops.setNonStrokingColorN(name)   // Set fill pattern (scn)
+ops.setStrokingGray(g); // Stroke grayscale (G)
+ops.setNonStrokingGray(g); // Fill grayscale (g)
+ops.setStrokingRGB(r, g, b); // Stroke RGB (RG)
+ops.setNonStrokingRGB(r, g, b); // Fill RGB (rg)
+ops.setStrokingCMYK(c, m, y, k); // Stroke CMYK (K)
+ops.setNonStrokingCMYK(c, m, y, k); // Fill CMYK (k)
+ops.setStrokingColorSpace(cs); // Set stroke color space (CS)
+ops.setNonStrokingColorSpace(cs); // Set fill color space (cs)
+ops.setStrokingColorN(name); // Set stroke pattern (SCN)
+ops.setNonStrokingColorN(name); // Set fill pattern (scn)
 ```
 
 ### Line Style
 
 ```typescript
-ops.setLineWidth(w)         // Line width (w)
-ops.setLineCap(cap)         // 0=butt, 1=round, 2=square (J)
-ops.setLineJoin(join)       // 0=miter, 1=round, 2=bevel (j)
-ops.setMiterLimit(limit)    // Miter limit ratio (M)
-ops.setDashPattern(array, phase)  // Dash pattern (d)
+ops.setLineWidth(w); // Line width (w)
+ops.setLineCap(cap); // 0=butt, 1=round, 2=square (J)
+ops.setLineJoin(join); // 0=miter, 1=round, 2=bevel (j)
+ops.setMiterLimit(limit); // Miter limit ratio (M)
+ops.setDashPattern(array, phase); // Dash pattern (d)
 ```
 
 ### Text
 
 ```typescript
-ops.beginText()             // Begin text object (BT)
-ops.endText()               // End text object (ET)
-ops.setFont(name, size)     // Set font (Tf)
-ops.moveText(tx, ty)        // Position text (Td)
-ops.setTextMatrix(a, b, c, d, e, f)  // Text matrix (Tm)
-ops.showText(string)        // Show text (Tj)
+ops.beginText(); // Begin text object (BT)
+ops.endText(); // End text object (ET)
+ops.setFont(name, size); // Set font (Tf)
+ops.moveText(tx, ty); // Position text (Td)
+ops.setTextMatrix(a, b, c, d, e, f); // Text matrix (Tm)
+ops.showText(string); // Show text (Tj)
 ```
 
 ### XObjects and Shading
 
 ```typescript
-ops.paintXObject(name)      // Draw XObject (Do)
-ops.paintShading(name)      // Paint shading (sh)
+ops.paintXObject(name); // Draw XObject (Do)
+ops.paintShading(name); // Paint shading (sh)
 ```
 
 ---
@@ -146,7 +145,7 @@ import { Matrix, ops } from "@libpdf/core";
 
 const matrix = Matrix.identity()
   .translate(200, 300)
-  .rotate(45)  // degrees
+  .rotate(45) // degrees
   .scale(2, 1.5);
 
 page.drawOperators([
@@ -162,14 +161,14 @@ Or use raw matrix components:
 
 ```typescript
 // Translation: move 100 points right, 200 points up
-ops.concatMatrix(1, 0, 0, 1, 100, 200)
+ops.concatMatrix(1, 0, 0, 1, 100, 200);
 
 // Scale: 2x horizontal, 0.5x vertical
-ops.concatMatrix(2, 0, 0, 0.5, 0, 0)
+ops.concatMatrix(2, 0, 0, 0.5, 0, 0);
 
 // Rotation: 45 degrees around origin
-const angle = 45 * Math.PI / 180;
-ops.concatMatrix(Math.cos(angle), Math.sin(angle), -Math.sin(angle), Math.cos(angle), 0, 0)
+const angle = (45 * Math.PI) / 180;
+ops.concatMatrix(Math.cos(angle), Math.sin(angle), -Math.sin(angle), Math.cos(angle), 0, 0);
 ```
 
 ---
@@ -183,7 +182,7 @@ Create linear or radial gradients with color stops:
 ```typescript
 // CSS-style: angle + length
 const gradient = pdf.createLinearGradient({
-  angle: 90,  // 0=up, 90=right, 180=down, 270=left
+  angle: 90, // 0=up, 90=right, 180=down, 270=left
   length: 200,
   stops: [
     { offset: 0, color: rgb(1, 0, 0) },
@@ -194,7 +193,7 @@ const gradient = pdf.createLinearGradient({
 
 // Or explicit coordinates
 const axial = pdf.createAxialShading({
-  coords: [0, 0, 200, 0],  // x0, y0, x1, y1
+  coords: [0, 0, 200, 0], // x0, y0, x1, y1
   stops: [
     { offset: 0, color: rgb(0, 0, 1) },
     { offset: 1, color: rgb(1, 0, 1) },
@@ -206,7 +205,7 @@ const axial = pdf.createAxialShading({
 
 ```typescript
 const radial = pdf.createRadialShading({
-  coords: [100, 100, 0, 100, 100, 80],  // x0, y0, r0, x1, y1, r1
+  coords: [100, 100, 0, 100, 100, 80], // x0, y0, r0, x1, y1, r1
   stops: [
     { offset: 0, color: rgb(1, 1, 1) },
     { offset: 1, color: rgb(0, 0, 0) },
@@ -234,9 +233,7 @@ page.drawOperators([
 // Or wrap in a pattern for PathBuilder
 const pattern = pdf.createShadingPattern({ shading: gradient });
 
-page.drawPath()
-  .rectangle(50, 200, 200, 100)
-  .fill({ pattern });
+page.drawPath().rectangle(50, 200, 200, 100).fill({ pattern });
 ```
 
 ---
@@ -282,9 +279,7 @@ const pattern = pdf.createImagePattern({
   height: 50,
 });
 
-page.drawPath()
-  .circle(200, 400, 80)
-  .fill({ pattern });
+page.drawPath().circle(200, 400, 80).fill({ pattern });
 ```
 
 ### Gradient Pattern
@@ -387,23 +382,23 @@ Restrict drawing to a region:
 ```typescript
 page.drawOperators([
   ops.pushGraphicsState(),
-  
+
   // Define clip region (circle)
   ops.moveTo(200, 300),
   // ... circle path using bezier curves
   ops.clip(),
-  ops.endPath(),  // Required after clip
-  
+  ops.endPath(), // Required after clip
+
   // Everything here is clipped to the circle
   ops.paintShading(gradientName),
-  
-  ops.popGraphicsState(),  // Clipping is restored
+
+  ops.popGraphicsState(), // Clipping is restored
 ]);
 ```
 
 <Callout type="info">
-  Always follow `ops.clip()` with a path-painting operator. Use `ops.endPath()` 
-  to discard the path, or `ops.fill()` to both clip and fill.
+  Always follow `ops.clip()` with a path-painting operator. Use `ops.endPath()` to discard the path,
+  or `ops.fill()` to both clip and fill.
 </Callout>
 
 ---
@@ -444,7 +439,7 @@ const page = pdf.addPage();
 
 // Create button gradient
 const gradient = pdf.createLinearGradient({
-  angle: 180,  // top to bottom
+  angle: 180, // top to bottom
   length: 40,
   stops: [
     { offset: 0, color: rgb(0.4, 0.6, 1) },
@@ -475,7 +470,8 @@ page.drawOperators([
 ]);
 
 // Rounded rectangle path
-page.drawPath()
+page
+  .drawPath()
   .moveTo(110, 700)
   .lineTo(250, 700)
   .curveTo(255, 700, 260, 705, 260, 710)
