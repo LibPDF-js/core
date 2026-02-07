@@ -1,4 +1,4 @@
 {
   "title": "Digital Signatures",
-  "pages": ["index", "google-kms"]
+  "pages": ["index", "google-kms", "azure-key-vault"]
 }
