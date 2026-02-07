@@ -412,3 +412,13 @@ export class KmsSignerError extends SignerError {
     this.cause = cause;
   }
 }
+
+/**
+ * Error with Azure Key Vault signer (e.g., key issues, permission denied, unsupported algorithm).
+ */
+export class AzureKeyVaultSignerError extends KmsSignerError {
+  constructor(message: string, cause?: Error) {
+    super(`Azure Key Vault: ${message}`, cause);
+    this.name = "AzureKeyVaultSignerError";
+  }
+}

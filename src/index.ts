@@ -118,6 +118,8 @@ export type {
   TimestampAuthority,
 } from "./signatures";
 export {
+  AzureKeyVaultSigner,
+  AzureKeyVaultSignerError,
   CertificateChainError,
   CryptoKeySigner,
   GoogleKmsSigner,

@@ -1,0 +1,450 @@
+---
+title: Azure Key Vault
+description: Sign PDFs with keys stored in Azure Key Vault or Managed HSM, including HSM-backed keys.
+---
+
+# Azure Key Vault
+
+Sign PDFs using keys stored in Azure Key Vault or Azure Managed HSM. This is ideal for enterprise environments where private keys must never leave a hardware security module (HSM) for compliance and security reasons.
+
+<Callout type="info">
+  The private key never leaves the vault — only the digest is sent for signing.
+</Callout>
+
+## Installation
+
+The Azure Key Vault client is an optional peer dependency:
+
+```bash
+npm install @azure/keyvault-keys @azure/identity
+```
+
+For loading certificates from Key Vault:
+
+```bash
+npm install @azure/keyvault-certificates
+```
+
+## Quick Start
+
+```typescript
+import { PDF, AzureKeyVaultSigner } from "@libpdf/core";
+import { readFile, writeFile } from "fs/promises";
+
+// Load your DER-encoded certificate (issued by your CA for the vault key)
+const certificate = await readFile("certificate.der");
+
+// Create signer — uses DefaultAzureCredential automatically
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-signing-key",
+  certificate,
+});
+
+// Sign the PDF
+const pdf = await PDF.load(await readFile("document.pdf"));
+const { bytes } = await pdf.sign({ signer });
+
+await writeFile("signed.pdf", bytes);
+```
+
+---
+
+## Authentication
+
+`AzureKeyVaultSigner` uses [`DefaultAzureCredential`](https://learn.microsoft.com/en-us/javascript/api/@azure/identity/defaultazurecredential) by default when no `credential` option is provided. This tries multiple authentication methods in order:
+
+| Method            | Environment       | Setup                                                |
+| ----------------- | ----------------- | ---------------------------------------------------- |
+| Environment vars  | Any               | Set `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and secret |
+| Managed Identity  | Azure VMs/App Svc | Automatic (uses instance metadata)                   |
+| Azure CLI         | Local development | Run `az login`                                       |
+| Workload Identity | AKS               | Configure workload identity for your pod             |
+| Azure PowerShell  | Local development | Run `Connect-AzAccount`                              |
+
+You can also provide an explicit credential:
+
+```typescript
+import { ClientSecretCredential } from "@azure/identity";
+
+const credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-key",
+  certificate: certificateDer,
+  credential,
+});
+```
+
+### Required Permissions
+
+The authenticating identity needs these Key Vault permissions:
+
+- **Key Get** — Read key metadata and public key
+- **Key Sign** — Sign digests with the key
+
+If using Key Vault access policies, assign the **Key Sign** and **Key Get** permissions. If using Azure RBAC, assign the **Key Vault Crypto User** role.
+
+For loading certificates, you also need:
+
+- **Certificate Get** — Read the certificate
+
+---
+
+## AzureKeyVaultSigner.create(options)
+
+Create a new Azure Key Vault signer instance.
+
+### Full Key ID URL
+
+| Param                          | Type                 | Default   | Description                                        |
+| ------------------------------ | -------------------- | --------- | -------------------------------------------------- |
+| `options`                      | `object`             | required  |                                                    |
+| `options.keyId`                | `string`             | required  | Full key identifier URL                            |
+| `options.certificate`          | `Uint8Array`         | required  | DER-encoded X.509 certificate for this key         |
+| `[options.credential]`         | `TokenCredential`    |           | Azure credential (default: DefaultAzureCredential) |
+| `[options.certificateChain]`   | `Uint8Array[]`       |           | Intermediate and root certificates                 |
+| `[options.buildChain]`         | `boolean`            | `false`   | Fetch chain via AIA extensions                     |
+| `[options.chainTimeout]`       | `number`             | `15000`   | Timeout for AIA fetching (ms)                      |
+| `[options.rsaScheme]`          | `"PKCS1" \| "PSS"`   | `"PKCS1"` | RSA signature scheme (RSA keys only)               |
+| `[options.keyClient]`          | `KeyClient`          |           | Pre-configured Key Vault client                    |
+| `[options.cryptographyClient]` | `CryptographyClient` |           | Pre-configured Cryptography client                 |
+
+```typescript
+const signer = await AzureKeyVaultSigner.create({
+  keyId: "https://my-vault.vault.azure.net/keys/my-key/abc123",
+  certificate: certificateDer,
+  buildChain: true, // Automatically fetch intermediate certificates
+});
+```
+
+### Shorthand Options
+
+Instead of a full key ID URL, you can use shorthand properties:
+
+| Param                   | Type     | Default             | Description                   |
+| ----------------------- | -------- | ------------------- | ----------------------------- |
+| `options.vaultName`     | `string` | required            | Vault name                    |
+| `options.keyName`       | `string` | required            | Key name in the vault         |
+| `[options.keyVersion]`  | `string` |                     | Key version (default: latest) |
+| `[options.vaultSuffix]` | `string` | `"vault.azure.net"` | Vault domain suffix           |
+
+```typescript
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-key",
+  keyVersion: "abc123",
+  certificate: certificateDer,
+});
+```
+
+**Returns**: `Promise<AzureKeyVaultSigner>`
+
+**Throws**: `AzureKeyVaultSignerError` if:
+
+- Key is not found or not accessible
+- Key is not enabled
+- Key type is unsupported (only RSA and EC keys are supported)
+- Key doesn't have the "sign" operation
+- Certificate public key doesn't match the vault key
+
+---
+
+## Signer Properties
+
+After creation, inspect the signer's detected configuration:
+
+```typescript
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-key",
+  certificate: certificateDer,
+});
+
+signer.keyType; // "RSA" or "EC"
+signer.signatureAlgorithm; // "RSASSA-PKCS1-v1_5", "RSA-PSS", or "ECDSA"
+signer.rsaScheme; // "PKCS1" or "PSS"
+signer.keyId; // Full key URL (includes version resolved by Azure)
+signer.certificate; // DER-encoded certificate
+signer.certificateChain; // Chain certificates (if provided/built)
+```
+
+---
+
+## Supported Algorithms
+
+Azure Key Vault supports RSA and EC keys. Unlike Google Cloud KMS where the algorithm is locked at key creation, Azure RSA keys can be used with multiple algorithms. The signer resolves the algorithm at sign-time based on the key type and RSA scheme preference.
+
+### RSA Keys
+
+| RSA Scheme | Digest  | Azure Algorithm | Signature Algorithm |
+| ---------- | ------- | --------------- | ------------------- |
+| PKCS1      | SHA-256 | RS256           | RSASSA-PKCS1-v1_5   |
+| PKCS1      | SHA-384 | RS384           | RSASSA-PKCS1-v1_5   |
+| PKCS1      | SHA-512 | RS512           | RSASSA-PKCS1-v1_5   |
+| PSS        | SHA-256 | PS256           | RSA-PSS             |
+| PSS        | SHA-384 | PS384           | RSA-PSS             |
+| PSS        | SHA-512 | PS512           | RSA-PSS             |
+
+### EC Keys
+
+| Curve | Digest  | Azure Algorithm | Signature Algorithm |
+| ----- | ------- | --------------- | ------------------- |
+| P-256 | SHA-256 | ES256           | ECDSA               |
+| P-384 | SHA-384 | ES384           | ECDSA               |
+| P-521 | SHA-512 | ES512           | ECDSA               |
+
+<Callout type="warn">
+  **RSA-PSS compatibility**: RSA-PSS signatures may not verify correctly in older PDF readers (Adobe
+  Acrobat before 2020). Use `rsaScheme: "PKCS1"` (the default) for maximum compatibility.
+</Callout>
+
+**Unsupported**: Symmetric keys (`oct`, `oct-HSM`) cannot be used for PDF signing.
+
+---
+
+## Managed HSM
+
+Azure Managed HSM uses the same API as standard Key Vault, just with a different domain. Use the `vaultSuffix` option:
+
+```typescript
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-hsm",
+  keyName: "my-key",
+  vaultSuffix: "managedhsm.azure.net",
+  certificate: certificateDer,
+});
+```
+
+Or provide the full URL directly:
+
+```typescript
+const signer = await AzureKeyVaultSigner.create({
+  keyId: "https://my-hsm.managedhsm.azure.net/keys/my-key/abc123",
+  certificate: certificateDer,
+});
+```
+
+---
+
+## Certificate from Key Vault
+
+If your certificate is stored in Azure Key Vault (alongside the key), load it directly:
+
+```typescript
+const { cert } = await AzureKeyVaultSigner.getCertificateFromKeyVault({
+  vaultUrl: "https://my-vault.vault.azure.net",
+  certificateName: "my-signing-cert",
+});
+
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-signing-cert", // Same name as the certificate
+  certificate: cert,
+  buildChain: true,
+});
+```
+
+In Azure Key Vault, a "certificate" is a bundle containing both the certificate and the private key, sharing the same name. This means you can use the same name for both the certificate retrieval and the key reference.
+
+### getCertificateFromKeyVault(options)
+
+| Param                          | Type                | Default  | Description                                        |
+| ------------------------------ | ------------------- | -------- | -------------------------------------------------- |
+| `options`                      | `object`            | required |                                                    |
+| `options.vaultUrl`             | `string`            | required | Full vault URL                                     |
+| `options.certificateName`      | `string`            | required | Certificate name in the vault                      |
+| `[options.certificateVersion]` | `string`            |          | Certificate version (default: latest)              |
+| `[options.credential]`         | `TokenCredential`   |          | Azure credential (default: DefaultAzureCredential) |
+| `[options.certificateClient]`  | `CertificateClient` |          | Pre-configured Certificate client                  |
+
+**Returns**: `Promise<{ cert: Uint8Array; chain?: Uint8Array[] }>`
+
+---
+
+## Certificate Chain
+
+For trusted signatures, include the full certificate chain (intermediates and root).
+
+### Automatic Chain Building (AIA)
+
+If your certificate has Authority Information Access (AIA) extensions (most CA-issued certificates do), the chain can be built automatically:
+
+```typescript
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-key",
+  certificate: certificateDer,
+  buildChain: true, // Fetch intermediates via AIA
+  chainTimeout: 20000, // Optional: extend timeout (default 15s)
+});
+
+console.log(`Chain has ${signer.certificateChain.length} certificates`);
+```
+
+### Manual Chain
+
+Provide the chain explicitly if AIA isn't available or you want to avoid network calls:
+
+```typescript
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-key",
+  certificate: certificateDer,
+  certificateChain: [intermediateDer, rootDer],
+});
+```
+
+---
+
+## Complete Example
+
+```typescript
+import { readFile, writeFile } from "fs/promises";
+import { PDF, AzureKeyVaultSigner, HttpTimestampAuthority } from "@libpdf/core";
+
+async function signWithAzure() {
+  // Load certificate from Key Vault
+  const { cert } = await AzureKeyVaultSigner.getCertificateFromKeyVault({
+    vaultUrl: "https://my-vault.vault.azure.net",
+    certificateName: "document-signing-cert",
+  });
+
+  // Create signer with automatic chain building
+  const signer = await AzureKeyVaultSigner.create({
+    vaultName: "my-vault",
+    keyName: "document-signing-cert",
+    certificate: cert,
+    buildChain: true,
+  });
+
+  // Load document
+  const pdf = await PDF.load(await readFile("contract.pdf"));
+
+  // Create timestamp authority for long-term validation
+  const tsa = new HttpTimestampAuthority("http://timestamp.digicert.com");
+
+  // Sign with timestamp
+  const { bytes } = await pdf.sign({
+    signer,
+    level: "B-LT",
+    timestampAuthority: tsa,
+    reason: "Contract approval",
+    location: "Cloud signing service",
+  });
+
+  await writeFile("contract-signed.pdf", bytes);
+  console.log("Document signed with Azure Key Vault");
+}
+
+signWithAzure().catch(console.error);
+```
+
+---
+
+## Performance Considerations
+
+Each `sign()` call makes a network request to Azure Key Vault, typically adding 50-200ms latency. For bulk signing operations, consider:
+
+- **Batch processing**: Sign documents in parallel where possible
+- **Regional vaults**: Use a vault in a region close to your application
+- **Connection reuse**: Reuse the same `AzureKeyVaultSigner` instance for multiple documents
+
+---
+
+## Error Handling
+
+`AzureKeyVaultSigner` throws `AzureKeyVaultSignerError` for Azure-specific issues:
+
+```typescript
+import { AzureKeyVaultSigner, AzureKeyVaultSignerError } from "@libpdf/core";
+
+try {
+  const signer = await AzureKeyVaultSigner.create({
+    vaultName: "my-vault",
+    keyName: "my-key",
+    certificate: certificateDer,
+  });
+} catch (error) {
+  if (error instanceof AzureKeyVaultSignerError) {
+    console.error("Azure Key Vault error:", error.message);
+    // error.cause contains the original Azure SDK error if available
+  }
+}
+```
+
+Common errors:
+
+| Error                | Cause                                   | Solution                                    |
+| -------------------- | --------------------------------------- | ------------------------------------------- |
+| Key not found        | Invalid key name, version, or vault URL | Verify the key reference and vault URL      |
+| Permission denied    | Missing Key Vault permissions           | Grant Key Sign and Key Get permissions      |
+| Key is not enabled   | Key disabled in the vault               | Enable the key in Azure Portal              |
+| Certificate mismatch | Certificate wasn't issued for this key  | Regenerate certificate from the vault's key |
+| Unsupported key type | Symmetric key or unsupported curve      | Use RSA or EC (P-256, P-384, P-521) keys    |
+
+---
+
+## Key Vault Setup
+
+### Create a Key Vault and Key
+
+```bash
+# Create a resource group (if needed)
+az group create --name my-rg --location eastus
+
+# Create a key vault
+az keyvault create --name my-vault --resource-group my-rg --location eastus
+
+# Create an RSA signing key (HSM-backed)
+az keyvault key create \
+  --vault-name my-vault \
+  --name my-signing-key \
+  --kty RSA-HSM \
+  --size 2048 \
+  --ops sign verify
+
+# Or create an EC signing key
+az keyvault key create \
+  --vault-name my-vault \
+  --name my-signing-key-ec \
+  --kty EC-HSM \
+  --curve P-256 \
+  --ops sign verify
+```
+
+### Grant Permissions
+
+```bash
+# Using Azure RBAC (recommended)
+az role assignment create \
+  --role "Key Vault Crypto User" \
+  --assignee <your-identity> \
+  --scope /subscriptions/<sub>/resourceGroups/my-rg/providers/Microsoft.KeyVault/vaults/my-vault
+```
+
+### Import or Create a Certificate
+
+```bash
+# Create a self-signed certificate (for testing)
+az keyvault certificate create \
+  --vault-name my-vault \
+  --name my-signing-cert \
+  --policy @cert-policy.json
+
+# Or import a CA-issued certificate
+az keyvault certificate import \
+  --vault-name my-vault \
+  --name my-signing-cert \
+  --file certificate.pfx \
+  --password pfx-password
+```
+
+---
+
+## See Also
+
+- [Digital Signatures](/docs/guides/signatures) — Overview of PDF signing
+- [Google Cloud KMS](/docs/guides/signatures/google-kms) — Sign with Google Cloud KMS
+- [Encryption](/docs/guides/encryption) — Password-protect signed documents

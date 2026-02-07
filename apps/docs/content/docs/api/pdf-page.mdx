@@ -570,9 +570,9 @@ For advanced graphics operations, PDFPage provides methods to emit raw operators
 
 Emit raw PDF operators to the page content stream.
 
-| Param       | Type         | Description                 |
-| ----------- | ------------ | --------------------------- |
-| `operators` | `Operator[]` | Array of operators to emit  |
+| Param       | Type         | Description                |
+| ----------- | ------------ | -------------------------- |
+| `operators` | `Operator[]` | Array of operators to emit |
 
 ```typescript
 import { ops } from "@libpdf/core";
@@ -588,8 +588,8 @@ page.drawOperators([
 ```
 
 <Callout type="warn">
-  The caller is responsible for valid operator sequences. Invalid sequences
-  may produce corrupted PDFs.
+  The caller is responsible for valid operator sequences. Invalid sequences may produce corrupted
+  PDFs.
 </Callout>
 
 ---
@@ -598,8 +598,8 @@ page.drawOperators([
 
 Register a font resource and return its operator name.
 
-| Param  | Type                           | Description        |
-| ------ | ------------------------------ | ------------------ |
+| Param  | Type                                 | Description      |
+| ------ | ------------------------------------ | ---------------- |
 | `font` | `EmbeddedFont \| Standard14FontName` | Font to register |
 
 **Returns**: `string` - Resource name (e.g., `"F0"`)
@@ -623,9 +623,9 @@ page.drawOperators([
 
 Register an image resource and return its operator name.
 
-| Param   | Type       | Description        |
-| ------- | ---------- | ------------------ |
-| `image` | `PDFImage` | Embedded image     |
+| Param   | Type       | Description    |
+| ------- | ---------- | -------------- |
+| `image` | `PDFImage` | Embedded image |
 
 **Returns**: `string` - Resource name (e.g., `"Im0"`)
 
@@ -647,8 +647,8 @@ page.drawOperators([
 
 Register a shading (gradient) resource and return its operator name.
 
-| Param     | Type         | Description  |
-| --------- | ------------ | ------------ |
+| Param     | Type         | Description      |
+| --------- | ------------ | ---------------- |
 | `shading` | `PDFShading` | Shading resource |
 
 **Returns**: `string` - Resource name (e.g., `"Sh0"`)
@@ -699,8 +699,8 @@ page.drawOperators([
 
 Register an extended graphics state and return its operator name.
 
-| Param   | Type          | Description    |
-| ------- | ------------- | -------------- |
+| Param   | Type           | Description    |
+| ------- | -------------- | -------------- |
 | `state` | `PDFExtGState` | Graphics state |
 
 **Returns**: `string` - Resource name (e.g., `"GS0"`)
@@ -728,8 +728,8 @@ page.drawOperators([
 
 Register a Form XObject or embedded page and return its operator name.
 
-| Param     | Type                              | Description      |
-| --------- | --------------------------------- | ---------------- |
+| Param     | Type                                | Description         |
+| --------- | ----------------------------------- | ------------------- |
 | `xobject` | `PDFFormXObject \| PDFEmbeddedPage` | XObject to register |
 
 **Returns**: `string` - Resource name (e.g., `"Fm0"`)

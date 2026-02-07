@@ -106,9 +106,11 @@ await pdf.sign({
 
 Adds a document timestamp that covers the embedded validation data, enabling indefinite verification.
 
-## Sign with Cloud KMS
+## Sign with Cloud KMS / HSM
 
-For enterprise environments requiring HSM-backed keys, use `GoogleKmsSigner`:
+For enterprise environments requiring HSM-backed keys, use the cloud KMS signer for your provider.
+
+### Google Cloud KMS
 
 ```ts
 import { PDF, GoogleKmsSigner } from "@libpdf/core";
@@ -124,6 +126,23 @@ const signed = await pdf.sign({ signer });
 ```
 
 See the [Google Cloud KMS guide](/docs/guides/signatures/google-kms) for complete setup instructions.
+
+### Azure Key Vault
+
+```ts
+import { PDF, AzureKeyVaultSigner } from "@libpdf/core";
+
+const signer = await AzureKeyVaultSigner.create({
+  vaultName: "my-vault",
+  keyName: "my-signing-key",
+  certificate: certificateDer, // DER-encoded certificate for this key
+  buildChain: true, // Auto-fetch intermediate certificates
+});
+
+const signed = await pdf.sign({ signer });
+```
+
+See the [Azure Key Vault guide](/docs/guides/signatures/azure-key-vault) for complete setup instructions.
 
 ## Sign with Web Crypto API
 
