@@ -653,11 +653,11 @@ These methods create PDF resources for advanced drawing operations. See [Low-Lev
 
 Create a linear gradient using CSS-style angle and length.
 
-| Param            | Type          | Default  | Description                               |
-| ---------------- | ------------- | -------- | ----------------------------------------- |
-| `options.angle`  | `number`      | required | Angle in degrees (0=up, 90=right)         |
-| `options.length` | `number`      | required | Gradient length in points                 |
-| `options.stops`  | `ColorStop[]` | required | Color stops with offset (0-1) and color   |
+| Param            | Type          | Default  | Description                             |
+| ---------------- | ------------- | -------- | --------------------------------------- |
+| `options.angle`  | `number`      | required | Angle in degrees (0=up, 90=right)       |
+| `options.length` | `number`      | required | Gradient length in points               |
+| `options.stops`  | `ColorStop[]` | required | Color stops with offset (0-1) and color |
 
 **Returns**: `PDFShading`
 
@@ -681,10 +681,10 @@ page.drawRectangle({ x: 50, y: 50, width: 200, height: 100, pattern });
 
 Create an axial (linear) shading with explicit coordinates.
 
-| Param           | Type                                 | Default  | Description                   |
-| --------------- | ------------------------------------ | -------- | ----------------------------- |
-| `options.coords` | `[x0, y0, x1, y1]`                  | required | Start and end points          |
-| `options.stops` | `ColorStop[]`                        | required | Color stops                   |
+| Param            | Type               | Default  | Description          |
+| ---------------- | ------------------ | -------- | -------------------- |
+| `options.coords` | `[x0, y0, x1, y1]` | required | Start and end points |
+| `options.stops`  | `ColorStop[]`      | required | Color stops          |
 
 **Returns**: `PDFShading`
 
@@ -705,10 +705,10 @@ const gradient = pdf.createAxialShading({
 
 Create a radial shading with explicit coordinates.
 
-| Param            | Type                                | Default  | Description                          |
-| ---------------- | ----------------------------------- | -------- | ------------------------------------ |
-| `options.coords` | `[x0, y0, r0, x1, y1, r1]`          | required | Center and radius for both circles   |
-| `options.stops`  | `ColorStop[]`                       | required | Color stops                          |
+| Param            | Type                       | Default  | Description                        |
+| ---------------- | -------------------------- | -------- | ---------------------------------- |
+| `options.coords` | `[x0, y0, r0, x1, y1, r1]` | required | Center and radius for both circles |
+| `options.stops`  | `ColorStop[]`              | required | Color stops                        |
 
 **Returns**: `PDFShading`
 
@@ -728,11 +728,11 @@ const radial = pdf.createRadialShading({
 
 Create a repeating tiling pattern.
 
-| Param              | Type         | Default  | Description                      |
-| ------------------ | ------------ | -------- | -------------------------------- |
-| `options.bbox`     | `BBox`       | required | Pattern cell bounding box        |
-| `options.xStep`    | `number`     | required | Horizontal spacing between tiles |
-| `options.yStep`    | `number`     | required | Vertical spacing between tiles   |
+| Param               | Type         | Default  | Description                       |
+| ------------------- | ------------ | -------- | --------------------------------- |
+| `options.bbox`      | `BBox`       | required | Pattern cell bounding box         |
+| `options.xStep`     | `number`     | required | Horizontal spacing between tiles  |
+| `options.yStep`     | `number`     | required | Vertical spacing between tiles    |
 | `options.operators` | `Operator[]` | required | Content operators for the pattern |
 
 **Returns**: `PDFTilingPattern`
@@ -742,11 +742,7 @@ const pattern = pdf.createTilingPattern({
   bbox: { x: 0, y: 0, width: 10, height: 10 },
   xStep: 10,
   yStep: 10,
-  operators: [
-    ops.setNonStrokingGray(0.8),
-    ops.rectangle(0, 0, 5, 5),
-    ops.fill(),
-  ],
+  operators: [ops.setNonStrokingGray(0.8), ops.rectangle(0, 0, 5, 5), ops.fill()],
 });
 ```
 
@@ -781,10 +777,10 @@ page.drawCircle({ x: 200, y: 400, radius: 80, pattern });
 
 Wrap a shading (gradient) as a pattern for use with drawing methods.
 
-| Param             | Type         | Default  | Description           |
-| ----------------- | ------------ | -------- | --------------------- |
-| `options.shading` | `PDFShading` | required | Shading to wrap       |
-| `[options.matrix]` | `PatternMatrix` |       | Transform matrix      |
+| Param              | Type            | Default  | Description      |
+| ------------------ | --------------- | -------- | ---------------- |
+| `options.shading`  | `PDFShading`    | required | Shading to wrap  |
+| `[options.matrix]` | `PatternMatrix` |          | Transform matrix |
 
 **Returns**: `PDFShadingPattern`
 
@@ -803,11 +799,11 @@ page.drawPath()
 
 Create an extended graphics state for opacity and blend modes.
 
-| Param                    | Type        | Default | Description      |
-| ------------------------ | ----------- | ------- | ---------------- |
-| `[options.fillOpacity]`   | `number`    |         | Fill opacity 0-1 |
+| Param                     | Type        | Default | Description        |
+| ------------------------- | ----------- | ------- | ------------------ |
+| `[options.fillOpacity]`   | `number`    |         | Fill opacity 0-1   |
 | `[options.strokeOpacity]` | `number`    |         | Stroke opacity 0-1 |
-| `[options.blendMode]`     | `BlendMode` |         | Blend mode       |
+| `[options.blendMode]`     | `BlendMode` |         | Blend mode         |
 
 **Returns**: `PDFExtGState`
 
@@ -827,9 +823,9 @@ const gsName = page.registerExtGState(gs);
 
 Create a reusable Form XObject (content block).
 
-| Param              | Type         | Default  | Description       |
-| ------------------ | ------------ | -------- | ----------------- |
-| `options.bbox`     | `BBox`       | required | Bounding box      |
+| Param               | Type         | Default  | Description       |
+| ------------------- | ------------ | -------- | ----------------- |
+| `options.bbox`      | `BBox`       | required | Bounding box      |
 | `options.operators` | `Operator[]` | required | Content operators |
 
 **Returns**: `PDFFormXObject`
@@ -837,18 +833,11 @@ Create a reusable Form XObject (content block).
 ```typescript
 const stamp = pdf.createFormXObject({
   bbox: { x: 0, y: 0, width: 100, height: 50 },
-  operators: [
-    ops.setNonStrokingRGB(1, 0, 0),
-    ops.rectangle(0, 0, 100, 50),
-    ops.fill(),
-  ],
+  operators: [ops.setNonStrokingRGB(1, 0, 0), ops.rectangle(0, 0, 100, 50), ops.fill()],
 });
 
 const xobjectName = page.registerXObject(stamp);
-page.drawOperators([
-  ops.concatMatrix(1, 0, 0, 1, 200, 700),
-  ops.paintXObject(xobjectName),
-]);
+page.drawOperators([ops.concatMatrix(1, 0, 0, 1, 200, 700), ops.paintXObject(xobjectName)]);
 ```
 
 ---
