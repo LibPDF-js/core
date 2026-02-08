@@ -50,6 +50,7 @@ debug/
 
 # Benchmark fixtures (downloaded at runtime)
 fixtures/benchmarks/
+fixtures/private/
 
 # Temporary files
 tmp/
