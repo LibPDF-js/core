@@ -124,7 +124,7 @@ describe("signing integration", () => {
 
   describe("B-T signing (with timestamp)", () => {
     // FreeTSA is a free public timestamp authority
-    const tsa = new HttpTimestampAuthority("http://timestamp.sectigo.com");
+    const tsa = new HttpTimestampAuthority("https://freetsa.org/tsr");
 
     it("signs with timestamp (B-T level)", async () => {
       const pdfBytes = await loadFixture("basic", "rot0.pdf");
@@ -168,7 +168,7 @@ describe("signing integration", () => {
 
   describe("B-LT signing (long-term validation)", () => {
     // FreeTSA is a free public timestamp authority
-    const tsa = new HttpTimestampAuthority("http://timestamp.sectigo.com");
+    const tsa = new HttpTimestampAuthority("https://freetsa.org/tsr");
 
     it("signs with timestamp and LTV data (B-LT level)", async () => {
       const pdfBytes = await loadFixture("basic", "rot0.pdf");
