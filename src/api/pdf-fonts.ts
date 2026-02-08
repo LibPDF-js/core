@@ -84,6 +84,7 @@ export class PDFFonts {
     const ref = this.ctx.registry.allocateRef();
 
     this.embeddedFonts.set(font, ref);
+    font.setRef(ref);
 
     return font;
   }

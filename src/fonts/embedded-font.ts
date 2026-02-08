@@ -9,6 +9,7 @@
  */
 
 import type { TrueTypeFont } from "#src/fontbox/ttf/truetype-font.ts";
+import type { PdfRef } from "#src/objects/pdf-ref.ts";
 
 import { parseFontProgram } from "./embedded-parser.ts";
 import { FontDescriptor } from "./font-descriptor.ts";
@@ -68,6 +69,9 @@ export class EmbeddedFont extends PdfFont {
 
   /** Whether this font is used in a form field (prevents subsetting) */
   private _usedInForm = false;
+
+  /** Pre-allocated PDF reference (set by PDFFonts.embed()) */
+  private _ref: PdfRef | null = null;
 
   /** Cached descriptor */
   private _descriptor: FontDescriptor | null = null;
@@ -331,6 +335,32 @@ export class EmbeddedFont extends PdfFont {
     this.usedCodePoints.clear();
 
     this._subsetTag = null;
+  }
+
+  /**
+   * Get the pre-allocated PDF reference for this font.
+   *
+   * Set by `PDFFonts.embed()`. At save time, the actual font objects
+   * (Type0 dict, CIDFont, FontDescriptor, font program, ToUnicode)
+   * are created and registered at this ref.
+   *
+   * @throws {Error} if the font was not embedded via `pdf.embedFont()`
+   */
+  get ref(): PdfRef {
+    if (!this._ref) {
+      throw new Error("Font has no PDF reference. Use pdf.embedFont() to embed fonts.");
+    }
+
+    return this._ref;
+  }
+
+  /**
+   * Set the pre-allocated PDF reference.
+   *
+   * @internal Called by PDFFonts.embed()
+   */
+  setRef(ref: PdfRef): void {
+    this._ref = ref;
   }
 
   /**

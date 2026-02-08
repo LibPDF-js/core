@@ -1148,21 +1148,7 @@ export class PDFForm {
    * Register an embedded font in the form's default resources.
    */
   private registerFontInFormResources(font: EmbeddedFont): void {
-    // Prepare the font if not already done
-    const ctx = this._ctx;
-
-    // Get or create font reference from PDFFonts
-    const fontRef = ctx.registry.register(
-      PdfDict.of({
-        Type: PdfName.of("Font"),
-        Subtype: PdfName.of("Type0"),
-        BaseFont: PdfName.of(font.baseFontName),
-        Encoding: PdfName.of("Identity-H"),
-      }),
-    );
-
-    // Add to AcroForm resources
-    this._acroForm.addFontToResources(fontRef);
+    this._acroForm.addFontToResources(font.ref);
   }
 
   /**

@@ -685,8 +685,7 @@ function buildResources(ctx: TextAppearanceContext, font: FormFont, fontName: st
   const cleanName = fontName.startsWith("/") ? fontName.slice(1) : fontName;
 
   if (isEmbeddedFont(font)) {
-    const fontRef = ctx.registry.register(buildEmbeddedFontDict(font));
-    fonts.set(cleanName, fontRef);
+    fonts.set(cleanName, font.ref);
   } else if (isExistingFont(font) && font.ref) {
     fonts.set(cleanName, font.ref);
   } else {
@@ -702,17 +701,6 @@ function buildResources(ctx: TextAppearanceContext, font: FormFont, fontName: st
   resources.set("Font", fonts);
 
   return resources;
-}
-
-function buildEmbeddedFontDict(font: EmbeddedFont): PdfDict {
-  const dict = new PdfDict();
-
-  dict.set("Type", PdfName.of("Font"));
-  dict.set("Subtype", PdfName.of("Type0"));
-  dict.set("BaseFont", PdfName.of(font.baseFontName));
-  dict.set("Encoding", PdfName.of("Identity-H"));
-
-  return dict;
 }
 
 function calculateAppearanceMatrix(
