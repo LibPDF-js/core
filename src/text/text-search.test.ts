@@ -20,6 +20,7 @@ function createPageText(text: string, pageIndex = 0): PageText {
       fontSize: 12,
       fontName: "Helvetica",
       baseline: 10,
+      sequenceIndex: chars.length,
     });
     x += 10;
   }

@@ -278,6 +278,7 @@ export class TextExtractor {
         fontSize: this.state.effectiveFontSize,
         fontName: font.baseFontName,
         baseline: bbox.baseline,
+        sequenceIndex: this.chars.length,
       });
 
       // Advance text position

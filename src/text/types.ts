@@ -33,6 +33,8 @@ export interface ExtractedChar {
   fontName: string;
   /** Y coordinate of the text baseline */
   baseline: number;
+  /** Index in the content stream extraction order (0-based) */
+  sequenceIndex?: number;
 }
 
 /**
