@@ -52,5 +52,8 @@ debug/
 fixtures/benchmarks/
 fixtures/private/
 
+# Benchmark JSON results (machine-specific)
+reports/bench-results.json
+
 # Temporary files
 tmp/
