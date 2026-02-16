@@ -46,6 +46,7 @@
   },
   "scripts": {
     "bench": "vitest bench",
+    "bench:report": "bun run scripts/bench-report.ts",
     "build": "tsdown",
     "docs:build": "bun run --cwd apps/docs build",
     "docs:dev": "bun run --cwd apps/docs dev",
