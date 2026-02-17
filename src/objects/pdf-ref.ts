@@ -23,7 +23,7 @@ export class PdfRef implements PdfPrimitive {
     return "ref";
   }
 
-  private static cache = new LRUCache<string, PdfRef>(DEFAULT_REF_CACHE_SIZE);
+  private static cache = new LRUCache<string, PdfRef>({ max: DEFAULT_REF_CACHE_SIZE });
 
   private constructor(
     readonly objectNumber: number,

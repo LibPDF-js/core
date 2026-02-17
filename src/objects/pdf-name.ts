@@ -57,7 +57,7 @@ export class PdfName implements PdfPrimitive {
     return "name";
   }
 
-  private static cache = new LRUCache<string, PdfName>(DEFAULT_NAME_CACHE_SIZE);
+  private static cache = new LRUCache<string, PdfName>({ max: DEFAULT_NAME_CACHE_SIZE });
 
   /**
    * Pre-cached common names that should never be evicted.

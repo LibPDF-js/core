@@ -67,6 +67,7 @@
     "@noble/ciphers": "^2.1.1",
     "@noble/hashes": "^2.0.1",
     "@scure/base": "^2.0.0",
+    "lru-cache": "^11.2.6",
     "pako": "^2.1.0",
     "pkijs": "^3.3.3"
   },

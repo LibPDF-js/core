@@ -4,7 +4,7 @@ import { LRUCache } from "./lru-cache";
 
 describe("LRUCache", () => {
   it("stores and retrieves values", () => {
-    const cache = new LRUCache<string, number>(10);
+    const cache = new LRUCache<string, number>({ max: 10 });
 
     cache.set("a", 1);
     cache.set("b", 2);
@@ -15,7 +15,7 @@ describe("LRUCache", () => {
   });
 
   it("updates existing values", () => {
-    const cache = new LRUCache<string, number>(10);
+    const cache = new LRUCache<string, number>({ max: 10 });
 
     cache.set("a", 1);
     cache.set("a", 2);
@@ -25,7 +25,7 @@ describe("LRUCache", () => {
   });
 
   it("evicts least recently used when at capacity", () => {
-    const cache = new LRUCache<string, number>(3);
+    const cache = new LRUCache<string, number>({ max: 3 });
 
     cache.set("a", 1);
     cache.set("b", 2);
@@ -45,7 +45,7 @@ describe("LRUCache", () => {
   });
 
   it("get updates recency", () => {
-    const cache = new LRUCache<string, number>(3);
+    const cache = new LRUCache<string, number>({ max: 3 });
 
     cache.set("a", 1);
     cache.set("b", 2);
@@ -64,7 +64,7 @@ describe("LRUCache", () => {
   });
 
   it("has checks existence without updating recency", () => {
-    const cache = new LRUCache<string, number>(3);
+    const cache = new LRUCache<string, number>({ max: 3 });
 
     cache.set("a", 1);
     cache.set("b", 2);
@@ -81,7 +81,7 @@ describe("LRUCache", () => {
   });
 
   it("delete removes entries", () => {
-    const cache = new LRUCache<string, number>(10);
+    const cache = new LRUCache<string, number>({ max: 10 });
 
     cache.set("a", 1);
     cache.set("b", 2);
@@ -93,7 +93,7 @@ describe("LRUCache", () => {
   });
 
   it("clear removes all entries", () => {
-    const cache = new LRUCache<string, number>(10);
+    const cache = new LRUCache<string, number>({ max: 10 });
 
     cache.set("a", 1);
     cache.set("b", 2);
@@ -105,8 +105,8 @@ describe("LRUCache", () => {
     expect(cache.get("a")).toBeUndefined();
   });
 
-  it("works with default size", () => {
-    const cache = new LRUCache<string, number>();
+  it("works with large capacity", () => {
+    const cache = new LRUCache<string, number>({ max: 10000 });
 
     // Should be able to add many items
     for (let i = 0; i < 1000; i++) {
