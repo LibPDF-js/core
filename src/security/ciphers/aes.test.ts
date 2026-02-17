@@ -168,11 +168,27 @@ describe("AES-CBC encryption", () => {
       expect(() => aesEncryptWithIv(key128, iv, new Uint8Array(16))).toThrow(/IV must be 16/);
     });
 
-    it("should reject non-block-aligned ciphertext", () => {
-      // IV (16) + non-aligned ciphertext (10)
-      const invalidData = new Uint8Array(26);
+    it("should truncate non-block-aligned ciphertext to nearest boundary", () => {
+      // Encrypt known plaintext, then append extra bytes to misalign
+      const plaintext = new TextEncoder().encode("aligned block!??"); // 16 bytes = 1 block
+      const encrypted = aesEncrypt(key128, plaintext);
 
-      expect(() => aesDecrypt(key128, invalidData)).toThrow(/must be multiple of 16/);
+      // Append 5 garbage bytes to make ciphertext non-block-aligned
+      const misaligned = new Uint8Array(encrypted.length + 5);
+      misaligned.set(encrypted);
+      misaligned.set([0xde, 0xad, 0xbe, 0xef, 0x42], encrypted.length);
+
+      // Should not throw — truncates trailing bytes and decrypts what fits
+      const decrypted = aesDecrypt(key128, misaligned);
+      expect(decrypted).toEqual(plaintext);
+    });
+
+    it("should return empty for non-block-aligned ciphertext shorter than one block", () => {
+      // IV (16) + 10 bytes (less than one block)
+      const data = new Uint8Array(26);
+
+      const result = aesDecrypt(key128, data);
+      expect(result).toEqual(new Uint8Array(0));
     });
   });
 
