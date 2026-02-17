@@ -1698,6 +1698,7 @@ export class PDF {
    * const [duplicate] = await pdf.copyPagesFrom(pdf, [0], { insertAt: 1 });
    * ```
    */
+  // oxlint-disable-next-line typescript/require-await -- Public async API kept for backward compat; ObjectCopier is sync.
   async copyPagesFrom(
     source: PDF,
     indices: number[],
@@ -1729,7 +1730,7 @@ export class PDF {
         throw new Error(`Source page ${index} not found`);
       }
 
-      const copiedPageRef = await copier.copyPage(srcPage.ref);
+      const copiedPageRef = copier.copyPage(srcPage.ref);
       copiedRefs.push(copiedPageRef);
     }
 
@@ -1824,6 +1825,7 @@ export class PDF {
    * }
    * ```
    */
+  // oxlint-disable-next-line typescript/require-await -- Public async API kept for backward compat; ObjectCopier is sync.
   async embedPage(source: PDF, pageIndex: number): Promise<PDFEmbeddedPage> {
     const srcPage = source.getPage(pageIndex);
 
@@ -1842,7 +1844,7 @@ export class PDF {
     let resources: PdfDict;
 
     if (srcResources) {
-      const copied = await copier.copyObject(srcResources);
+      const copied = copier.copyObject(srcResources);
 
       // This is guaranteed by our checks above
       resources = copied instanceof PdfDict ? copied : new PdfDict();

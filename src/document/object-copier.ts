@@ -10,6 +10,8 @@
  * - Flattens inherited page attributes during page copy
  * - Smart stream handling: raw bytes if unencrypted, re-encode if encrypted
  * - Circular reference detection
+ *
+ * All operations are synchronous — there is no I/O involved in object copying.
  */
 
 import type { PDF } from "#src/api/pdf";
@@ -46,7 +48,7 @@ const INHERITABLE_PAGE_ATTRS = ["Resources", "MediaBox", "CropBox", "Rotate"] as
  * @example
  * ```typescript
  * const copier = new ObjectCopier(sourcePdf, destPdf);
- * const copiedPageRef = await copier.copyPage(sourcePageRef);
+ * const copiedPageRef = copier.copyPage(sourcePageRef);
  * destPdf.insertPage(0, copiedPageRef);
  * ```
  */
@@ -79,7 +81,7 @@ export class ObjectCopier {
    * @param srcPageRef Reference to the page in source document
    * @returns Reference to the copied page in destination document
    */
-  async copyPage(srcPageRef: PdfRef): Promise<PdfRef> {
+  copyPage(srcPageRef: PdfRef): PdfRef {
     const srcPage = this.source.getObject(srcPageRef);
 
     if (!(srcPage instanceof PdfDict)) {
@@ -98,7 +100,7 @@ export class ObjectCopier {
 
         if (inherited) {
           // Deep copy the inherited value
-          const copied = await this.copyObject(inherited);
+          const copied = this.copyObject(inherited);
           cloned.set(key, copied);
         }
       }
@@ -125,7 +127,7 @@ export class ObjectCopier {
     cloned.delete("Parent");
 
     // Deep copy all values in the cloned dict, remapping refs
-    const copiedPage = await this.copyDictValues(cloned);
+    const copiedPage = this.copyDictValues(cloned);
 
     // Register in destination and return ref
     return this.dest.register(copiedPage);
@@ -134,25 +136,25 @@ export class ObjectCopier {
   /**
    * Deep copy any PDF object, remapping references to destination.
    */
-  async copyObject<T extends PdfObject>(obj: T): Promise<T> {
+  copyObject<T extends PdfObject>(obj: T): T {
     if (obj instanceof PdfRef) {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      return (await this.copyRef(obj)) as unknown as T;
+      return this.copyRef(obj) as unknown as T;
     }
 
     if (obj instanceof PdfStream) {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      return (await this.copyStream(obj)) as unknown as T;
+      return this.copyStream(obj) as unknown as T;
     }
 
     if (obj instanceof PdfDict) {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      return (await this.copyDict(obj)) as unknown as T;
+      return this.copyDict(obj) as unknown as T;
     }
 
     if (obj instanceof PdfArray) {
       // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      return (await this.copyArray(obj)) as unknown as T;
+      return this.copyArray(obj) as unknown as T;
     }
 
     // Primitives (PdfName, PdfNumber, PdfString, PdfBool, PdfNull)
@@ -166,7 +168,7 @@ export class ObjectCopier {
    * Handles circular references by registering a placeholder before
    * recursively copying the referenced object's contents.
    */
-  private async copyRef(ref: PdfRef): Promise<PdfRef> {
+  private copyRef(ref: PdfRef): PdfRef {
     const key = `${ref.objectNumber}:${ref.generation}`;
 
     // Already copied (or being copied)?
@@ -206,7 +208,7 @@ export class ObjectCopier {
       const items: PdfObject[] = [];
 
       for (const item of srcObj) {
-        items.push(await this.copyObject(item));
+        items.push(this.copyObject(item));
       }
 
       const copiedArr = new PdfArray(items);
@@ -226,7 +228,7 @@ export class ObjectCopier {
   /**
    * Copy a dict reference, handling circular references.
    */
-  private async copyDictRef(key: string, srcDict: PdfDict): Promise<PdfRef> {
+  private copyDictRef(key: string, srcDict: PdfDict): PdfRef {
     // Clone the dict shell first
     const cloned = srcDict.clone();
 
@@ -235,7 +237,7 @@ export class ObjectCopier {
     this.refMap.set(key, destRef);
 
     // Now copy all values (which may reference back to us)
-    await this.copyDictValues(cloned);
+    this.copyDictValues(cloned);
 
     return destRef;
   }
@@ -243,7 +245,7 @@ export class ObjectCopier {
   /**
    * Copy a stream reference, handling circular references and encryption.
    */
-  private async copyStreamRef(key: string, srcStream: PdfStream): Promise<PdfRef> {
+  private copyStreamRef(key: string, srcStream: PdfStream): PdfRef {
     const sourceWasEncrypted = this.source.isEncrypted;
 
     // Clone the stream's dictionary
@@ -310,7 +312,7 @@ export class ObjectCopier {
     // Now copy dict values (which may reference back to us)
     // Note: we modify the already-registered stream's dict entries
     for (const [entryKey, value] of clonedDict) {
-      const copied = await this.copyObject(value);
+      const copied = this.copyObject(value);
 
       copiedStream.set(entryKey.value, copied);
     }
@@ -321,7 +323,7 @@ export class ObjectCopier {
   /**
    * Copy a dictionary, remapping all reference values.
    */
-  private async copyDict(dict: PdfDict): Promise<PdfDict> {
+  private copyDict(dict: PdfDict): PdfDict {
     const cloned = dict.clone();
 
     return this.copyDictValues(cloned);
@@ -331,9 +333,9 @@ export class ObjectCopier {
    * Copy all values in a dictionary, remapping references.
    * Modifies the dict in place and returns it.
    */
-  private async copyDictValues(dict: PdfDict): Promise<PdfDict> {
+  private copyDictValues(dict: PdfDict): PdfDict {
     for (const [key, value] of dict) {
-      const copied = await this.copyObject(value);
+      const copied = this.copyObject(value);
 
       dict.set(key.value, copied);
     }
@@ -344,11 +346,11 @@ export class ObjectCopier {
   /**
    * Copy an array, remapping all reference elements.
    */
-  private async copyArray(arr: PdfArray): Promise<PdfArray> {
+  private copyArray(arr: PdfArray): PdfArray {
     const items: PdfObject[] = [];
 
     for (const item of arr) {
-      items.push(await this.copyObject(item));
+      items.push(this.copyObject(item));
     }
 
     return new PdfArray(items);
@@ -360,14 +362,14 @@ export class ObjectCopier {
    * If source wasn't encrypted, copies raw encoded bytes (fastest).
    * If source was encrypted, decodes and re-encodes with same filters.
    */
-  private async copyStream(stream: PdfStream): Promise<PdfStream> {
+  private copyStream(stream: PdfStream): PdfStream {
     const sourceWasEncrypted = this.source.isEncrypted;
 
     // Clone the stream's dictionary
     const clonedDict = stream.clone();
 
     // Copy dict values (remapping refs, but not stream data yet)
-    await this.copyDictValues(clonedDict);
+    this.copyDictValues(clonedDict);
 
     if (!sourceWasEncrypted) {
       // Source wasn't encrypted - copy raw encoded bytes directly

@@ -23,7 +23,7 @@ describe("ObjectCopier", () => {
 
       const copier = new ObjectCopier(source, dest);
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       // The copied page should be registered in dest
       expect(copiedPageRef).toBeInstanceOf(PdfRef);
@@ -47,7 +47,7 @@ describe("ObjectCopier", () => {
 
       const copier = new ObjectCopier(source, dest);
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       const copiedPage = dest.getObject(copiedPageRef) as PdfDict;
 
@@ -73,7 +73,7 @@ describe("ObjectCopier", () => {
       expect(srcPage.has("Parent")).toBe(true);
 
       const copier = new ObjectCopier(source, dest);
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       const copiedPage = dest.getObject(copiedPageRef) as PdfDict;
       expect(copiedPage.has("Parent")).toBe(false);
@@ -92,7 +92,7 @@ describe("ObjectCopier", () => {
       expect(srcPage.has("Annots")).toBe(true);
 
       const copier = new ObjectCopier(source, dest, { includeAnnotations: false });
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       const copiedPage = dest.getObject(copiedPageRef) as PdfDict;
       expect(copiedPage.has("Annots")).toBe(false);
@@ -111,7 +111,7 @@ describe("ObjectCopier", () => {
       expect(srcPage.has("Annots")).toBe(true);
 
       const copier = new ObjectCopier(source, dest);
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       const copiedPage = dest.getObject(copiedPageRef) as PdfDict;
       expect(copiedPage.has("Annots")).toBe(true);
@@ -138,7 +138,7 @@ describe("ObjectCopier", () => {
       const copier = new ObjectCopier(source, dest);
       const fakeRef = PdfRef.of(99999, 0);
 
-      await expect(copier.copyPage(fakeRef)).rejects.toThrow(/not found/);
+      expect(() => copier.copyPage(fakeRef)).toThrow(/not found/);
     });
 
     it("copies page Resources", async () => {
@@ -150,7 +150,7 @@ describe("ObjectCopier", () => {
 
       const copier = new ObjectCopier(source, dest);
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       const copiedPage = dest.getObject(copiedPageRef) as PdfDict;
 
@@ -181,9 +181,9 @@ describe("ObjectCopier", () => {
       const str = PdfString.fromString("hello");
 
       // Primitives should be returned as-is (they're immutable)
-      expect(await copier.copyObject(name)).toBe(name);
-      expect(await copier.copyObject(num)).toBe(num);
-      expect(await copier.copyObject(str)).toBe(str);
+      expect(copier.copyObject(name)).toBe(name);
+      expect(copier.copyObject(num)).toBe(num);
+      expect(copier.copyObject(str)).toBe(str);
     });
 
     it("creates new instance for arrays", async () => {
@@ -195,7 +195,7 @@ describe("ObjectCopier", () => {
 
       const arr = new PdfArray([PdfNumber.of(1), PdfNumber.of(2), PdfName.of("Test")]);
 
-      const copied = await copier.copyObject(arr);
+      const copied = copier.copyObject(arr);
       expect(copied).toBeInstanceOf(PdfArray);
       expect(copied).not.toBe(arr);
       expect(copied.length).toBe(3);
@@ -218,7 +218,7 @@ describe("ObjectCopier", () => {
         Key2: PdfString.fromString("value"),
       });
 
-      const copied = await copier.copyObject(dict);
+      const copied = copier.copyObject(dict);
       expect(copied).toBeInstanceOf(PdfDict);
       expect(copied).not.toBe(dict);
 
@@ -241,7 +241,7 @@ describe("ObjectCopier", () => {
         Array: innerArr,
       });
 
-      const copied = await copier.copyObject(outerDict);
+      const copied = copier.copyObject(outerDict);
 
       // Outer should be new
       expect(copied).not.toBe(outerDict);
@@ -269,7 +269,7 @@ describe("ObjectCopier", () => {
       const copier = new ObjectCopier(source, dest);
 
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       // Refs should be different
       expect(copiedPageRef.objectNumber).not.toBe(srcPageRef.objectNumber);
@@ -290,8 +290,8 @@ describe("ObjectCopier", () => {
 
       // Copy same page twice - internal resources should be deduplicated
       const srcPageRef = source.getPage(0)!.ref;
-      const copied1 = await copier.copyPage(srcPageRef);
-      const copied2 = await copier.copyPage(srcPageRef);
+      const copied1 = copier.copyPage(srcPageRef);
+      const copied2 = copier.copyPage(srcPageRef);
 
       // Page refs are different (each copyPage registers a new page)
       expect(copied1.objectNumber).not.toBe(copied2.objectNumber);
@@ -321,7 +321,7 @@ describe("ObjectCopier", () => {
       const srcPageRef = source.getPage(0)!.ref;
 
       // This should not throw due to circular references
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
       expect(copiedPageRef).toBeInstanceOf(PdfRef);
 
       // Page should be valid
@@ -342,7 +342,7 @@ describe("ObjectCopier", () => {
 
       const copier = new ObjectCopier(source, dest);
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
 
       const copiedPage = dest.getObject(copiedPageRef) as PdfDict;
 
@@ -365,7 +365,7 @@ describe("ObjectCopier", () => {
       const srcPageRef = source.getPage(0)!.ref;
 
       // Should not throw - streams are decoded and re-encoded
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
       const copiedPage = dest.getObject(copiedPageRef) as PdfDict;
 
       expect(copiedPage.getName("Type")?.value).toBe("Page");
@@ -381,7 +381,7 @@ describe("ObjectCopier", () => {
       const originalPageRef = pdf.getPage(0)!.ref;
 
       const copier = new ObjectCopier(pdf, pdf);
-      const duplicatedRef = await copier.copyPage(originalPageRef);
+      const duplicatedRef = copier.copyPage(originalPageRef);
 
       // Refs should be different
       expect(duplicatedRef.objectNumber).not.toBe(originalPageRef.objectNumber);
@@ -411,7 +411,7 @@ describe("ObjectCopier", () => {
       // Copy a page
       const copier = new ObjectCopier(source, dest);
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
       dest.insertPage(destOriginalCount, copiedPageRef);
 
       // Save
@@ -444,7 +444,7 @@ describe("ObjectCopier", () => {
       for (let i = 0; i < source.getPageCount(); i++) {
         const copier = new ObjectCopier(source, dest);
         const srcPageRef = source.getPage(i)!.ref;
-        const copiedPageRef = await copier.copyPage(srcPageRef);
+        const copiedPageRef = copier.copyPage(srcPageRef);
         dest.insertPage(dest.getPageCount(), copiedPageRef);
       }
 
@@ -468,7 +468,7 @@ describe("ObjectCopier", () => {
       for (let i = 0; i < originalCount; i++) {
         const copier = new ObjectCopier(pdf, pdf);
         const srcPageRef = pdf.getPage(i)!.ref;
-        const copiedPageRef = await copier.copyPage(srcPageRef);
+        const copiedPageRef = copier.copyPage(srcPageRef);
         // Insert duplicate after the original
         pdf.insertPage(i * 2 + 1, copiedPageRef);
       }
@@ -493,7 +493,7 @@ describe("ObjectCopier", () => {
       // Copy form page with annotations
       const copier = new ObjectCopier(source, dest, { includeAnnotations: true });
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
       dest.insertPage(dest.getPageCount(), copiedPageRef);
 
       const savedBytes = await dest.save();
@@ -516,7 +516,7 @@ describe("ObjectCopier", () => {
       // Copy from encrypted source
       const copier = new ObjectCopier(source, dest);
       const srcPageRef = source.getPage(0)!.ref;
-      const copiedPageRef = await copier.copyPage(srcPageRef);
+      const copiedPageRef = copier.copyPage(srcPageRef);
       dest.insertPage(dest.getPageCount(), copiedPageRef);
 
       const savedBytes = await dest.save();
