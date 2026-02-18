@@ -1,0 +1,62 @@
+name: PR Benchmarks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**/*.ts"
+      - "benchmarks/**/*.ts"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bench:
+    name: Benchmark Comparison
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Checkout base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies (base)
+        run: bun install --frozen-lockfile
+        working-directory: base
+
+      - name: Install dependencies (PR)
+        run: bun install --frozen-lockfile
+        working-directory: pr
+
+      - name: Run benchmarks (base)
+        run: bun run bench -- --outputJson ../base-results.json benchmarks/splitting.bench.ts
+        working-directory: base
+        continue-on-error: true
+
+      - name: Run benchmarks (PR)
+        run: bun run bench -- --outputJson ../pr-results.json benchmarks/splitting.bench.ts
+        working-directory: pr
+
+      - name: Generate comparison
+        run: bun run pr/scripts/bench-compare.ts ../base-results.json ../pr-results.json bench-comment.md
+        working-directory: pr
+
+      - name: Post or update PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: benchmark-results
+          path: pr/bench-comment.md
