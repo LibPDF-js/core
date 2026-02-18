@@ -1,6 +1,8 @@
 /**
  * Format benchmark JSON results as a markdown comment for PRs.
  *
+ * Each benchmark file gets its own collapsible section.
+ *
  * Usage:
  *   bun run scripts/bench-comment.ts <results.json> <output.md>
  */
@@ -46,6 +48,18 @@ function formatRme(rme: number): string {
   return `±${rme.toFixed(1)}%`;
 }
 
+function fileLabel(filepath: string): string {
+  const match = filepath.match(/([^/]+)\.bench\.ts$/);
+
+  if (!match) {
+    return filepath;
+  }
+
+  const name = match[1];
+
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const [inputPath, outputPath] = process.argv.slice(2);
@@ -62,6 +76,12 @@ lines.push("## Benchmark Results");
 lines.push("");
 
 for (const file of data.files) {
+  const label = fileLabel(file.filepath);
+
+  lines.push(`<details>`);
+  lines.push(`<summary><strong>${label}</strong></summary>`);
+  lines.push("");
+
   for (const group of file.groups) {
     const groupName = group.fullName.includes(" > ")
       ? group.fullName.split(" > ").slice(1).join(" > ")
@@ -80,6 +100,9 @@ for (const file of data.files) {
 
     lines.push("");
   }
+
+  lines.push(`</details>`);
+  lines.push("");
 }
 
 lines.push(
