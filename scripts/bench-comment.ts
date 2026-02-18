@@ -105,9 +105,11 @@ for (const file of data.files) {
   lines.push("");
 }
 
+const runner = process.env.BENCH_RUNNER ?? "local";
+
 lines.push(
   `<details><summary>Environment</summary>\n\n` +
-    `- Runner: \`ubuntu-latest\`\n` +
+    `- Runner: \`${runner}\`\n` +
     `- Runtime: Bun ${process.versions.bun}\n\n` +
     `*Results are machine-dependent.*\n` +
     `</details>`,

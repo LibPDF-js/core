@@ -34,6 +34,8 @@ jobs:
 
       - name: Generate comment
         run: bun run scripts/bench-comment.ts bench-results.json bench-comment.md
+        env:
+          BENCH_RUNNER: ${{ runner.os }} (${{ runner.arch }})
 
       - name: Post or update PR comment
         uses: marocchino/sticky-pull-request-comment@v2
