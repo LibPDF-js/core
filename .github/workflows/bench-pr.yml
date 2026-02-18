@@ -17,46 +17,26 @@ permissions:
 
 jobs:
   bench:
-    name: Benchmark Comparison
+    name: Run Benchmarks
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: pr
-
-      - name: Checkout base
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install dependencies (base)
+      - name: Install dependencies
         run: bun install --frozen-lockfile
-        working-directory: base
 
-      - name: Install dependencies (PR)
-        run: bun install --frozen-lockfile
-        working-directory: pr
+      - name: Run benchmarks
+        run: bun run bench -- --outputJson bench-results.json benchmarks/splitting.bench.ts
 
-      - name: Run benchmarks (base)
-        run: bun run bench -- --outputJson ../base-results.json benchmarks/splitting.bench.ts
-        working-directory: base
-        continue-on-error: true
-
-      - name: Run benchmarks (PR)
-        run: bun run bench -- --outputJson ../pr-results.json benchmarks/splitting.bench.ts
-        working-directory: pr
-
-      - name: Generate comparison
-        run: bun run pr/scripts/bench-compare.ts ../base-results.json ../pr-results.json bench-comment.md
-        working-directory: pr
+      - name: Generate comment
+        run: bun run scripts/bench-comment.ts bench-results.json bench-comment.md
 
       - name: Post or update PR comment
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: benchmark-results
-          path: pr/bench-comment.md
+          path: bench-comment.md
