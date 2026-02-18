@@ -1,3 +1,4 @@
+import { HEX_TABLE } from "#src/helpers/buffer";
 import { CHAR_HASH, DELIMITERS, WHITESPACE } from "#src/helpers/chars";
 import { LRUCache } from "#src/helpers/lru-cache";
 import type { ByteWriter } from "#src/io/byte-writer";
@@ -9,11 +10,25 @@ import type { PdfPrimitive } from "./pdf-primitive";
 // Plus anything outside printable ASCII (33-126)
 const NAME_NEEDS_ESCAPE = new Set([...WHITESPACE, ...DELIMITERS, CHAR_HASH]);
 
+/** Module-level encoder — avoids constructing one per escapeName call. */
+const textEncoder = new TextEncoder();
+
 /**
- * Default cache size for PdfName interning.
- * Can be overridden via PdfName.setCacheSize().
+ * Check whether a name is pure "safe" ASCII — every char is printable ASCII
+ * (33–126) and not in the escape set. If so, no escaping is needed and we
+ * can skip the TextEncoder entirely.
  */
-const DEFAULT_NAME_CACHE_SIZE = 10000;
+function isSimpleAsciiName(name: string): boolean {
+  for (let i = 0; i < name.length; i++) {
+    const c = name.charCodeAt(i);
+
+    if (c < 33 || c > 126 || NAME_NEEDS_ESCAPE.has(c)) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 /**
  * Escape a PDF name for serialization.
@@ -24,15 +39,18 @@ const DEFAULT_NAME_CACHE_SIZE = 10000;
  * - The # character itself
  */
 function escapeName(name: string): string {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(name);
+  // Fast path: pure safe ASCII — no encoding or escaping needed
+  if (isSimpleAsciiName(name)) {
+    return name;
+  }
+
+  const bytes = textEncoder.encode(name);
 
   let result = "";
 
   for (const byte of bytes) {
     if (byte < 33 || byte > 126 || NAME_NEEDS_ESCAPE.has(byte)) {
-      // Use hex escape
-      result += `#${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+      result += `#${HEX_TABLE[byte]}`;
     } else {
       result += String.fromCharCode(byte);
     }
@@ -40,6 +58,12 @@ function escapeName(name: string): string {
 
   return result;
 }
+
+/**
+ * Default cache size for PdfName interning.
+ * Can be overridden via PdfName.setCacheSize().
+ */
+const DEFAULT_NAME_CACHE_SIZE = 10000;
 
 /**
  * PDF name object (interned).
@@ -79,6 +103,9 @@ export class PdfName implements PdfPrimitive {
   static readonly Length = PdfName.createPermanent("Length");
   static readonly Filter = PdfName.createPermanent("Filter");
   static readonly FlateDecode = PdfName.createPermanent("FlateDecode");
+
+  /** Cached serialized form (e.g. "/Type"). Computed lazily on first toBytes(). */
+  private cachedBytes: Uint8Array | null = null;
 
   private constructor(readonly value: string) {}
 
@@ -124,7 +151,17 @@ export class PdfName implements PdfPrimitive {
   }
 
   toBytes(writer: ByteWriter): void {
-    writer.writeAscii(`/${escapeName(this.value)}`);
+    let bytes = this.cachedBytes;
+
+    if (bytes === null) {
+      const escaped = escapeName(this.value);
+
+      bytes = textEncoder.encode(`/${escaped}`);
+
+      this.cachedBytes = bytes;
+    }
+
+    writer.writeBytes(bytes);
   }
 
   /**

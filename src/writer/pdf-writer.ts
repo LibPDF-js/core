@@ -55,6 +55,18 @@ export interface WriteOptions {
   compressStreams?: boolean;
 
   /**
+   * Minimum stream size in bytes to attempt compression (default: 512).
+   *
+   * Streams smaller than this threshold are written uncompressed.
+   * Deflate initialization has a fixed cost (~0.023ms for pako's 64KB
+   * hash table) that dominates for small payloads, and tiny streams
+   * rarely achieve meaningful compression.
+   *
+   * Set to 0 to compress all streams regardless of size.
+   */
+  compressionThreshold?: number;
+
+  /**
    * Security handler for encrypting content.
    *
    * When provided, strings and streams will be encrypted before writing.
@@ -106,7 +118,13 @@ function writeIndirectObject(writer: ByteWriter, ref: PdfRef, obj: PdfObject): v
  * Streams that already have filters are returned unchanged - this includes
  * image formats (DCTDecode, JPXDecode, etc.) that are already compressed.
  */
-function prepareObjectForWrite(obj: PdfObject, compress: boolean): PdfObject {
+const DEFAULT_COMPRESSION_THRESHOLD = 512;
+
+function prepareObjectForWrite(
+  obj: PdfObject,
+  compress: boolean,
+  compressionThreshold: number,
+): PdfObject {
   // Only process streams
   if (!(obj instanceof PdfStream)) {
     return obj;
@@ -122,8 +140,11 @@ function prepareObjectForWrite(obj: PdfObject, compress: boolean): PdfObject {
     return obj;
   }
 
-  // Empty streams don't need compression
-  if (obj.data.length === 0) {
+  // Pako's deflate initialization zeros a 64KB hash table on every call
+  // (~0.023ms). For streams below the threshold the compression savings
+  // are negligible relative to the init cost, especially when writing
+  // many PDFs (e.g. splitting 2000 pages).
+  if (obj.data.length < compressionThreshold) {
     return obj;
   }
 
@@ -322,6 +343,7 @@ function collectReachableRefs(
 export function writeComplete(registry: ObjectRegistry, options: WriteOptions): WriteResult {
   const writer = new ByteWriter();
   const compress = options.compressStreams ?? true;
+  const threshold = options.compressionThreshold ?? DEFAULT_COMPRESSION_THRESHOLD;
 
   // Version
   const version = options.version ?? "1.7";
@@ -346,7 +368,7 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       continue; // Skip orphan objects
     }
     // Prepare object (compress streams if needed)
-    let prepared = prepareObjectForWrite(obj, compress);
+    let prepared = prepareObjectForWrite(obj, compress, threshold);
 
     // Apply encryption if security handler is provided
     // Skip encrypting the /Encrypt dictionary itself
@@ -467,6 +489,7 @@ export function writeIncremental(
   }
 
   const compress = options.compressStreams ?? true;
+  const threshold = options.compressionThreshold ?? DEFAULT_COMPRESSION_THRESHOLD;
 
   // Initialize ByteWriter with original bytes
   const writer = new ByteWriter(options.originalBytes);
@@ -483,7 +506,7 @@ export function writeIncremental(
 
   // Write modified objects
   for (const [ref, obj] of changes.modified) {
-    let prepared = prepareObjectForWrite(obj, compress);
+    let prepared = prepareObjectForWrite(obj, compress, threshold);
 
     // Apply encryption if security handler is provided
     // Skip encrypting the /Encrypt dictionary itself
@@ -505,7 +528,7 @@ export function writeIncremental(
 
   // Write new objects
   for (const [ref, obj] of changes.created) {
-    let prepared = prepareObjectForWrite(obj, compress);
+    let prepared = prepareObjectForWrite(obj, compress, threshold);
 
     // Apply encryption if security handler is provided
     // Skip encrypting the /Encrypt dictionary itself

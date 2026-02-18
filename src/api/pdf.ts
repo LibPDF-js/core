@@ -125,6 +125,26 @@ export interface SaveOptions {
    * @default false
    */
   subsetFonts?: boolean;
+
+  /**
+   * Compress uncompressed streams with FlateDecode (default: true).
+   *
+   * When enabled, streams without a /Filter entry will be compressed
+   * before writing. Streams that already have filters (including image
+   * formats like DCTDecode/JPXDecode) are left unchanged.
+   */
+  compressStreams?: boolean;
+
+  /**
+   * Minimum stream size in bytes to attempt compression (default: 512).
+   *
+   * Streams smaller than this threshold are written uncompressed.
+   * Deflate initialization has a fixed overhead that dominates for small
+   * payloads, and tiny streams rarely achieve meaningful compression.
+   *
+   * Set to 0 to compress all streams regardless of size.
+   */
+  compressionThreshold?: number;
 }
 
 /**
@@ -3141,6 +3161,8 @@ export class PDF {
         id: fileId,
         useXRefStream,
         securityHandler,
+        compressStreams: options.compressStreams,
+        compressionThreshold: options.compressionThreshold,
       });
 
       // Reset pending security state after successful save
@@ -3158,6 +3180,8 @@ export class PDF {
       id: fileId,
       useXRefStream,
       securityHandler,
+      compressStreams: options.compressStreams,
+      compressionThreshold: options.compressionThreshold,
     });
 
     // Reset pending security state after successful save

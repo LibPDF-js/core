@@ -43,6 +43,13 @@ export function concatBytes(arrays: Uint8Array[]): Uint8Array {
   return result;
 }
 
+/** Pre-computed hex lookup: byte value → "XX" uppercase string. */
+export const HEX_TABLE: string[] = new Array(256);
+
+for (let i = 0; i < 256; i++) {
+  HEX_TABLE[i] = i.toString(16).toUpperCase().padStart(2, "0");
+}
+
 /**
  * Convert bytes to uppercase hex string.
  *
@@ -58,7 +65,7 @@ export function bytesToHex(bytes: Uint8Array): string {
   let hex = "";
 
   for (const byte of bytes) {
-    hex += byte.toString(16).toUpperCase().padStart(2, "0");
+    hex += HEX_TABLE[byte];
   }
 
   return hex;
