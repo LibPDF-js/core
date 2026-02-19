@@ -15,7 +15,6 @@
  * This module provides type-safe creation and serialization of operators.
  */
 
-import { concatBytes } from "#src/helpers/buffer";
 import { formatPdfNumber } from "#src/helpers/format";
 import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfArray } from "#src/objects/pdf-array";
@@ -26,7 +25,6 @@ import type { PdfString } from "#src/objects/pdf-string";
 /** Valid operand types */
 export type Operand = number | string | PdfName | PdfString | PdfArray | PdfDict;
 
-const encoder = new TextEncoder();
 const SPACE = 0x20;
 
 /** All PDF content stream operator names */
@@ -145,24 +143,26 @@ export class Operator {
   }
 
   /**
+   * Write operator bytes directly into a shared ByteWriter.
+   * Avoids intermediate allocations compared to toBytes().
+   */
+  writeTo(writer: ByteWriter): void {
+    for (const operand of this.operands) {
+      writeOperand(writer, operand);
+      writer.writeByte(SPACE);
+    }
+
+    writer.writeAscii(this.op);
+  }
+
+  /**
    * Serialize to bytes for content stream output.
    * Format: "operand1 operand2 ... operator"
    */
   toBytes(): Uint8Array {
-    if (this.operands.length === 0) {
-      return encoder.encode(this.op);
-    }
-
-    const parts: Uint8Array[] = [];
-
-    for (const operand of this.operands) {
-      parts.push(serializeOperand(operand));
-      parts.push(new Uint8Array([SPACE]));
-    }
-
-    parts.push(encoder.encode(this.op));
-
-    return concatBytes(parts);
+    const writer = new ByteWriter(undefined, { initialSize: 64 });
+    this.writeTo(writer);
+    return writer.toBytes();
   }
 
   /**
@@ -172,31 +172,21 @@ export class Operator {
   toString(): string {
     return new TextDecoder().decode(this.toBytes());
   }
-
-  /**
-   * Get byte length when serialized (for pre-allocation).
-   */
-  byteLength(): number {
-    return this.toBytes().length;
-  }
 }
 
-/**
- * Serialize an operand to bytes.
- */
-function serializeOperand(operand: Operand): Uint8Array {
+/** Write an operand directly into a ByteWriter. */
+function writeOperand(writer: ByteWriter, operand: Operand): void {
   if (typeof operand === "number") {
-    return encoder.encode(formatPdfNumber(operand));
+    writer.writeAscii(formatPdfNumber(operand));
+    return;
   }
 
   if (typeof operand === "string") {
     // Assume already formatted (e.g., "/FontName")
-    return encoder.encode(operand);
+    writer.writeAscii(operand);
+    return;
   }
 
-  // PdfName, PdfString, PdfArray, PdfDict all have toBytes()
-  const writer = new ByteWriter();
+  // PdfName, PdfString, PdfArray, PdfDict all have toBytes(writer)
   operand.toBytes(writer);
-
-  return writer.toBytes();
 }
