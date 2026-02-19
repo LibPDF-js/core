@@ -52,7 +52,7 @@ export function aesEncrypt(key: Uint8Array, plaintext: Uint8Array): Uint8Array {
  * @param key - 16 bytes (AES-128) or 32 bytes (AES-256)
  * @param data - IV (16 bytes) + ciphertext
  * @returns Decrypted plaintext
- * @throws {Error} if data is too short or padding is invalid
+ * @throws {Error} if data is too short to contain an IV
  */
 export function aesDecrypt(key: Uint8Array, data: Uint8Array): Uint8Array {
   validateAesKey(key);
@@ -68,13 +68,24 @@ export function aesDecrypt(key: Uint8Array, data: Uint8Array): Uint8Array {
 
   // Extract IV and ciphertext
   const iv = data.subarray(0, AES_BLOCK_SIZE);
-  const ciphertext = data.subarray(AES_BLOCK_SIZE);
+  let ciphertext = data.subarray(AES_BLOCK_SIZE);
 
-  // Ciphertext must be multiple of block size
+  // Truncate to nearest block boundary for misaligned ciphertext.
+  // This recovers as much data as possible from corrupted encrypted PDFs
+  // (e.g., buggy generators that didn't properly pad before encryption).
   if (ciphertext.length % AES_BLOCK_SIZE !== 0) {
-    throw new Error(
-      `AES ciphertext length must be multiple of ${AES_BLOCK_SIZE}, got ${ciphertext.length}`,
+    const remainder = ciphertext.length % AES_BLOCK_SIZE;
+    const aligned = ciphertext.length - remainder;
+
+    console.warn(
+      `AES ciphertext length (${ciphertext.length}) is not a multiple of ${AES_BLOCK_SIZE}, truncating ${remainder} trailing bytes`,
     );
+
+    if (aligned === 0) {
+      return new Uint8Array(0);
+    }
+
+    ciphertext = ciphertext.subarray(0, aligned);
   }
 
   // Decrypt with CBC mode (PKCS#7 padding removed automatically)

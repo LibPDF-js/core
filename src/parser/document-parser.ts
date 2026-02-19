@@ -534,65 +534,71 @@ export class DocumentParser {
      * Decrypt an object's strings and stream data.
      */
     const decryptObject = (obj: PdfObject, objNum: number, genNum: number): PdfObject => {
-      if (!securityHandler?.isAuthenticated) {
-        return obj;
-      }
-
-      if (obj instanceof PdfString) {
-        const decrypted = securityHandler.decryptString(obj.bytes, objNum, genNum);
-
-        return new PdfString(decrypted, obj.format);
-      }
-
-      if (obj instanceof PdfArray) {
-        const decryptedItems: PdfObject[] = [];
-
-        for (const item of obj) {
-          decryptedItems.push(decryptObject(item, objNum, genNum));
-        }
-
-        return new PdfArray(decryptedItems);
-      }
-
-      // Check PdfStream BEFORE PdfDict (PdfStream extends PdfDict)
-      if (obj instanceof PdfStream) {
-        // Check if this stream should be encrypted
-        const streamType = obj.getName("Type")?.value;
-
-        if (!securityHandler.shouldEncryptStream(streamType)) {
+      try {
+        if (!securityHandler?.isAuthenticated) {
           return obj;
         }
 
-        // Decrypt stream data
-        const decryptedData = securityHandler.decryptStream(obj.data, objNum, genNum);
+        if (obj instanceof PdfString) {
+          const decrypted = securityHandler.decryptString(obj.bytes, objNum, genNum);
 
-        // Create new stream with decrypted data
-        // Copy dictionary entries (strings in dict will be decrypted when accessed)
-        const newStream = new PdfStream(obj, decryptedData);
+          return new PdfString(decrypted, obj.format);
+        }
 
-        // Decrypt strings in the dictionary entries
-        for (const [key, value] of obj) {
-          const decryptedValue = decryptObject(value, objNum, genNum);
+        if (obj instanceof PdfArray) {
+          const decryptedItems: PdfObject[] = [];
 
-          if (decryptedValue !== value) {
-            newStream.set(key.value, decryptedValue);
+          for (const item of obj) {
+            decryptedItems.push(decryptObject(item, objNum, genNum));
           }
+
+          return new PdfArray(decryptedItems);
         }
 
-        return newStream;
-      }
+        // Check PdfStream BEFORE PdfDict (PdfStream extends PdfDict)
+        if (obj instanceof PdfStream) {
+          // Check if this stream should be encrypted
+          const streamType = obj.getName("Type")?.value;
 
-      if (obj instanceof PdfDict) {
-        const decryptedDict = new PdfDict();
+          if (!securityHandler.shouldEncryptStream(streamType)) {
+            return obj;
+          }
 
-        for (const [key, value] of obj) {
-          decryptedDict.set(key.value, decryptObject(value, objNum, genNum));
+          // Decrypt stream data
+          const decryptedData = securityHandler.decryptStream(obj.data, objNum, genNum);
+
+          // Create new stream with decrypted data
+          // Copy dictionary entries (strings in dict will be decrypted when accessed)
+          const newStream = new PdfStream(obj, decryptedData);
+
+          // Decrypt strings in the dictionary entries
+          for (const [key, value] of obj) {
+            const decryptedValue = decryptObject(value, objNum, genNum);
+
+            if (decryptedValue !== value) {
+              newStream.set(key.value, decryptedValue);
+            }
+          }
+
+          return newStream;
         }
 
-        return decryptedDict;
-      }
+        if (obj instanceof PdfDict) {
+          const decryptedDict = new PdfDict();
 
-      return obj;
+          for (const [key, value] of obj) {
+            decryptedDict.set(key.value, decryptObject(value, objNum, genNum));
+          }
+
+          return decryptedDict;
+        }
+
+        return obj;
+      } catch (error) {
+        console.warn(`Failed to decrypt object ${objNum} ${genNum}:`, error);
+
+        return obj;
+      }
     };
 
     const getObject = (ref: PdfRef): PdfObject | null => {
