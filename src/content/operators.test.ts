@@ -367,4 +367,16 @@ describe("Operator", () => {
       expect(op.toString()).toBe("/Helvetica 12 Tf");
     });
   });
+
+  describe("byteLength", () => {
+    it("returns correct length for operator", () => {
+      const op = pushGraphicsState();
+      expect(op.byteLength()).toBe(1); // "q"
+    });
+
+    it("returns correct length for operator with operands", () => {
+      const op = moveTo(100, 200);
+      expect(op.byteLength()).toBe(9); // "100 200 m" (3 + 1 + 3 + 1 + 1 = 9)
+    });
+  });
 });
