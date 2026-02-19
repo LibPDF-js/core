@@ -1,6 +1,8 @@
 import { Matrix, ops, PdfString } from "#src/index";
 import { describe, expect, it } from "vitest";
 
+import { moveTo, pushGraphicsState } from "./operators";
+
 describe("Operator Improvements", () => {
   describe("concatMatrix", () => {
     it("should accept 6 individual numbers", () => {
@@ -63,6 +65,18 @@ describe("Operator Improvements", () => {
     it("should normalize shading names", () => {
       const operator = ops.paintShading("Sh0");
       expect(operator.toString()).toBe("/Sh0 sh");
+    });
+  });
+
+  describe("byteLength", () => {
+    it("returns correct length for operator", () => {
+      const op = pushGraphicsState();
+      expect(op.byteLength()).toBe(1); // "q"
+    });
+
+    it("returns correct length for operator with operands", () => {
+      const op = moveTo(100, 200);
+      expect(op.byteLength()).toBe(9); // "100 200 m" (3 + 1 + 3 + 1 + 1 = 9)
     });
   });
 });

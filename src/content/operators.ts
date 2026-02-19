@@ -162,6 +162,7 @@ export class Operator {
   toBytes(): Uint8Array {
     const writer = new ByteWriter(undefined, { initialSize: 64 });
     this.writeTo(writer);
+
     return writer.toBytes();
   }
 
@@ -171,6 +172,15 @@ export class Operator {
    */
   toString(): string {
     return new TextDecoder().decode(this.toBytes());
+  }
+
+  /**
+   * Get byte length when serialized.
+   *
+   * Should be avoided in performance-critical paths, use {@link writeTo} instead.
+   */
+  byteLength(): number {
+    return this.toBytes().length;
   }
 }
 
