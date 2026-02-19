@@ -74,7 +74,12 @@ export function aesDecrypt(key: Uint8Array, data: Uint8Array): Uint8Array {
   // This recovers as much data as possible from corrupted encrypted PDFs
   // (e.g., buggy generators that didn't properly pad before encryption).
   if (ciphertext.length % AES_BLOCK_SIZE !== 0) {
-    const aligned = ciphertext.length - (ciphertext.length % AES_BLOCK_SIZE);
+    const remainder = ciphertext.length % AES_BLOCK_SIZE;
+    const aligned = ciphertext.length - remainder;
+
+    console.warn(
+      `AES ciphertext length (${ciphertext.length}) is not a multiple of ${AES_BLOCK_SIZE}, truncating ${remainder} trailing bytes`,
+    );
 
     if (aligned === 0) {
       return new Uint8Array(0);
