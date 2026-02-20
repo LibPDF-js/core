@@ -2360,7 +2360,7 @@ export class PDFPage {
    */
   private addXObjectResource(ref: PdfRef): string {
     const resources = this.getResources();
-    let xobjects = resources.get("XObject");
+    let xobjects = resources.get("XObject", this.ctx.resolve.bind(this.ctx));
 
     if (!(xobjects instanceof PdfDict)) {
       xobjects = new PdfDict();
@@ -2409,7 +2409,7 @@ export class PDFPage {
 
     // Get or create the resource subdictionary
     const resources = this.getResources();
-    let subdict = resources.get(resourceType);
+    let subdict = resources.get(resourceType, this.ctx.resolve.bind(this.ctx));
 
     if (!(subdict instanceof PdfDict)) {
       subdict = new PdfDict();
