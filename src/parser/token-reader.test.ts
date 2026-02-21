@@ -323,6 +323,27 @@ describe("TokenReader", () => {
       expect(token).toMatchObject({ type: "name", value: "Test#5" });
     });
 
+    it("uses fast path for plain ASCII name", () => {
+      const r = reader("/Type");
+      const token = r.nextToken();
+
+      expect(token).toMatchObject({ type: "name", value: "Type" });
+    });
+
+    it("falls back to slow path when # is first char", () => {
+      const r = reader("/#48ello"); // #48 = 'H'
+      const token = r.nextToken();
+
+      expect(token).toMatchObject({ type: "name", value: "Hello" });
+    });
+
+    it("falls back to slow path when # appears mid-name", () => {
+      const r = reader("/Type#20Name"); // #20 = space
+      const token = r.nextToken();
+
+      expect(token).toMatchObject({ type: "name", value: "Type Name" });
+    });
+
     it("stops at whitespace", () => {
       const r = reader("/Type /Page");
 

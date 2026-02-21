@@ -284,6 +284,48 @@ export class TokenReader {
     // Skip the leading /
     this.scanner.advance();
 
+    const data = this.scanner.bytes;
+    const start = this.scanner.position;
+    let pos = start;
+    const len = data.length;
+
+    // Fast path: scan for end of name, checking for # escapes
+    let hasEscape = false;
+
+    while (pos < len) {
+      const byte = data[pos];
+
+      if (!isRegularChar(byte)) {
+        break;
+      }
+
+      if (byte === CHAR_HASH) {
+        hasEscape = true;
+        break;
+      }
+
+      pos++;
+    }
+
+    if (!hasEscape) {
+      // Common case: pure ASCII name with no escapes.
+      // Build string directly from byte range — no intermediate array,
+      // no Uint8Array allocation, no TextDecoder.
+      this.scanner.moveTo(pos);
+
+      let value = "";
+
+      for (let i = start; i < pos; i++) {
+        value += String.fromCharCode(data[i]);
+      }
+
+      return { type: "name", value, position };
+    }
+
+    // Slow path: name contains # escapes, need byte-by-byte processing.
+    // Reset scanner to start and use the original accumulation approach.
+    this.scanner.moveTo(start);
+
     const bytes: number[] = [];
 
     while (true) {
