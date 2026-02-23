@@ -10,7 +10,7 @@ export {
   CryptoEngine,
   decryptLegacyPbe,
   getCryptoEngine,
-  installCryptoEngine,
+  getCrypto,
   isLegacyPbeOid,
   LEGACY_PBE_OIDS,
 } from "./crypto-engine";

@@ -12,6 +12,7 @@ import { fromBER, ObjectIdentifier, OctetString, Sequence } from "asn1js";
 import * as pkijs from "pkijs";
 
 import { toArrayBuffer } from "../helpers/buffer";
+import { getCrypto } from "./crypto";
 import {
   OID_AD_OCSP,
   OID_AUTHORITY_INFO_ACCESS,
@@ -245,7 +246,7 @@ export class DefaultRevocationProvider implements RevocationProvider {
     cert: pkijs.Certificate,
     issuer: pkijs.Certificate,
   ): Promise<Uint8Array> {
-    const crypto = pkijs.getCrypto(true);
+    const crypto = getCrypto();
 
     // Use SHA-1 for OCSP certID hashes.
     // While SHA-1 is deprecated for signatures, it's widely required for OCSP

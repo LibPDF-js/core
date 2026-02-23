@@ -4,12 +4,10 @@
  * Signs using a CryptoKey directly.
  */
 
-import * as pkijs from "pkijs";
 import { createCMSECDSASignature } from "pkijs";
 
+import { getCrypto } from "../crypto";
 import type { DigestAlgorithm, KeyType, SignatureAlgorithm, Signer } from "../types";
-
-const cryptoEngine = pkijs.getCrypto(true);
 
 /**
  * Signer that uses a Web Crypto CryptoKey directly.
@@ -71,6 +69,8 @@ export class CryptoKeySigner implements Signer {
    * @returns Raw signature bytes
    */
   async sign(data: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array> {
+    const crypto = getCrypto();
+
     let signAlgorithm: { name: string; saltLength?: number; hash?: { name: string } };
 
     switch (this.signatureAlgorithm) {
@@ -87,7 +87,7 @@ export class CryptoKeySigner implements Signer {
         break;
     }
 
-    const signature = await cryptoEngine.sign(signAlgorithm, this.privateKey, new Uint8Array(data));
+    const signature = await crypto.sign(signAlgorithm, this.privateKey, new Uint8Array(data));
 
     // WebCrypto ECDSA returns P1363 format (r || s), but CMS requires DER format
     if (this.signatureAlgorithm === "ECDSA") {

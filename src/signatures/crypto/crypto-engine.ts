@@ -245,12 +245,18 @@ export function getCryptoEngine(): CryptoEngine {
 }
 
 /**
- * Install the legacy crypto engine globally in pkijs.
- * Call this once at startup to enable legacy P12 support.
+ * Get the pkijs Crypto object, ensuring our custom engine is installed.
+ *
+ * Handles cases where pkijs engine might not be set yet, or where another
+ * engine is already installed.
  */
-export function installCryptoEngine(): void {
+export const getCrypto = () => {
   const engine = getCryptoEngine();
 
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-  pkijs.setEngine(engine.name, engine as unknown as pkijs.ICryptoEngine);
-}
+  if (!pkijs.engine || pkijs.engine.name !== engine.name) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    pkijs.setEngine(engine.name, engine as unknown as pkijs.ICryptoEngine);
+  }
+
+  return pkijs.getCrypto(true);
+};

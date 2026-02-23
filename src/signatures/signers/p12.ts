@@ -10,7 +10,7 @@ import { createCMSECDSASignature } from "pkijs";
 
 import { toArrayBuffer } from "../../helpers/buffer";
 import { buildCertificateChain } from "../aia";
-import { decryptLegacyPbe, installCryptoEngine, isLegacyPbeOid, PKCS12KDF } from "../crypto";
+import { decryptLegacyPbe, getCrypto, isLegacyPbeOid, PKCS12KDF } from "../crypto";
 import {
   OID_CERT_BAG,
   OID_EC_PUBLIC_KEY,
@@ -23,12 +23,6 @@ import {
 } from "../oids";
 import type { DigestAlgorithm, KeyType, SignatureAlgorithm, Signer } from "../types";
 import { CertificateChainError, SignerError } from "../types";
-
-// Install our legacy crypto engine to handle 3DES/RC2 encrypted P12 files
-installCryptoEngine();
-
-// Get the crypto engine (now with legacy support)
-const cryptoEngine = pkijs.getCrypto(true);
 
 /**
  * Options for creating a P12Signer.
@@ -252,6 +246,8 @@ export class P12Signer implements Signer {
     password: string,
     passwordBuffer: ArrayBuffer,
   ): Promise<CryptoKey> {
+    const crypto = getCrypto();
+
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const keyBag = safeBag.bagValue as pkijs.PKCS8ShroudedKeyBag;
     const algorithmId = keyBag.encryptionAlgorithm.algorithmId;
@@ -300,7 +296,7 @@ export class P12Signer implements Signer {
       decryptedKey = toArrayBuffer(decrypted);
     } else {
       // Use pkijs/Web Crypto
-      decryptedKey = await cryptoEngine.decryptEncryptedContentInfo({
+      decryptedKey = await crypto.decryptEncryptedContentInfo({
         encryptedContentInfo: new pkijs.EncryptedContentInfo({
           contentEncryptionAlgorithm: keyBag.encryptionAlgorithm,
           encryptedContent: keyBag.encryptedData,
@@ -325,11 +321,13 @@ export class P12Signer implements Signer {
    * Import a PrivateKeyInfo into WebCrypto.
    */
   private static async importPrivateKey(privateKeyInfo: pkijs.PrivateKeyInfo): Promise<CryptoKey> {
+    const crypto = getCrypto();
+
     const algorithmOid = privateKeyInfo.privateKeyAlgorithm.algorithmId;
 
     // RSA
     if (algorithmOid === OID_RSA_ENCRYPTION) {
-      return cryptoEngine.importKey(
+      return crypto.importKey(
         "pkcs8",
         privateKeyInfo.toSchema().toBER(false),
         { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
@@ -355,7 +353,7 @@ export class P12Signer implements Signer {
         }
       }
 
-      return cryptoEngine.importKey(
+      return crypto.importKey(
         "pkcs8",
         privateKeyInfo.toSchema().toBER(false),
         { name: "ECDSA", namedCurve },
@@ -413,6 +411,8 @@ export class P12Signer implements Signer {
    * @returns The signature bytes
    */
   async sign(data: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array> {
+    const crypto = getCrypto();
+
     let signAlgorithm: { name: string; saltLength?: number; hash?: { name: string } };
 
     switch (this.signatureAlgorithm) {
@@ -429,7 +429,7 @@ export class P12Signer implements Signer {
         break;
     }
 
-    const signature = await cryptoEngine.sign(signAlgorithm, this.privateKey, new Uint8Array(data));
+    const signature = await crypto.sign(signAlgorithm, this.privateKey, new Uint8Array(data));
 
     // WebCrypto ECDSA returns P1363 format (r || s), but CMS requires DER format
     if (this.signatureAlgorithm === "ECDSA") {
