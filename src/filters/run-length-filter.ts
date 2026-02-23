@@ -19,7 +19,9 @@ export class RunLengthFilter implements Filter {
   readonly name = "RunLengthDecode";
 
   decode(data: Uint8Array, _params?: PdfDict): Uint8Array {
-    const output = new ByteWriter();
+    const output = new ByteWriter(undefined, {
+      initialSize: data.length * 4, // Estimate output size (RLE can expand up to 4x)
+    });
     let i = 0;
 
     while (i < data.length) {
@@ -52,7 +54,10 @@ export class RunLengthFilter implements Filter {
   }
 
   encode(data: Uint8Array, _params?: PdfDict): Uint8Array {
-    const output = new ByteWriter();
+    const output = new ByteWriter(undefined, {
+      initialSize: data.length * 2, // Worst case (no runs)
+    });
+
     let i = 0;
 
     while (i < data.length) {

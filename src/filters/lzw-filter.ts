@@ -43,7 +43,9 @@ export class LZWFilter implements Filter {
   }
 
   private lzwDecode(data: Uint8Array, earlyChange: number): Uint8Array {
-    const output = new ByteWriter();
+    const output = new ByteWriter(undefined, {
+      initialSize: data.length * 4, // Estimate output size (LZW can expand up to 4x)
+    });
 
     // LZW constants
     // Bit reading state

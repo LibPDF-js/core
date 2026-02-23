@@ -429,8 +429,10 @@ export class PDF {
 
     const pdfCatalog = new PDFCatalog(catalogDict, registry);
     const pagesRef = catalogDict.getRef("Pages");
+    // Use registry.resolve so page tree objects are tracked for
+    // modification detection and reachability analysis during save.
     const pages = pagesRef
-      ? PDFPageTree.load(pagesRef, parsed.getObject.bind(parsed))
+      ? PDFPageTree.load(pagesRef, registry.resolve.bind(registry))
       : PDFPageTree.empty();
 
     // Load Info dictionary if present (for metadata access)
@@ -526,7 +528,7 @@ export class PDF {
     const pdfCatalog = new PDFCatalog(catalogDict, registry);
     const pagesRef = catalogDict.getRef("Pages");
     const pages = pagesRef
-      ? PDFPageTree.load(pagesRef, parsed.getObject.bind(parsed))
+      ? PDFPageTree.load(pagesRef, registry.resolve.bind(registry))
       : PDFPageTree.empty();
 
     // Load Info dictionary if present (for metadata change tracking)
@@ -3171,7 +3173,7 @@ export class PDF {
       return result;
     }
 
-    // Full save (collectReachableRefs in writeComplete will load all reachable objects)
+    // Full save — write all objects in a single pass.
     const result = writeComplete(this.ctx.registry, {
       version: this.ctx.info.version,
       root,
@@ -3182,6 +3184,8 @@ export class PDF {
       securityHandler,
       compressStreams: options.compressStreams,
       compressionThreshold: options.compressionThreshold,
+      // Pre-size output buffer to avoid repeated doubling for large PDFs.
+      sizeHint: this.originalBytes.length > 0 ? this.originalBytes.length : undefined,
     });
 
     // Reset pending security state after successful save

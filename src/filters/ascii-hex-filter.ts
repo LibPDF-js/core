@@ -22,7 +22,9 @@ export class ASCIIHexFilter implements Filter {
   private static readonly NIBBLE_MASK = 0x0f;
 
   decode(data: Uint8Array, _params?: PdfDict): Uint8Array {
-    const output = new ByteWriter();
+    const output = new ByteWriter(undefined, {
+      initialSize: Math.ceil(data.length / 2), // Hex is 2 chars per byte
+    });
 
     let high: number | null = null;
 

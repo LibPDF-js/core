@@ -73,6 +73,14 @@ export interface WriteOptions {
    * The encrypt dictionary reference must also be provided.
    */
   securityHandler?: StandardSecurityHandler;
+
+  /**
+   * Hint for the final PDF size in bytes.
+   *
+   * When provided, the ByteWriter will pre-allocate a buffer of this size,
+   * reducing the need for reallocations during writing.
+   */
+  sizeHint?: number;
 }
 
 /**
@@ -341,7 +349,10 @@ function collectReachableRefs(
  * ```
  */
 export function writeComplete(registry: ObjectRegistry, options: WriteOptions): WriteResult {
-  const writer = new ByteWriter();
+  const writer = new ByteWriter(undefined, {
+    initialSize: options.sizeHint,
+  });
+
   const compress = options.compressStreams ?? true;
   const threshold = options.compressionThreshold ?? DEFAULT_COMPRESSION_THRESHOLD;
 
