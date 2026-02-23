@@ -459,6 +459,8 @@ describe("signing integration", () => {
 
       const pdfStr = new TextDecoder().decode(bytes);
       expect(pdfStr).toContain("/Type /Sig");
+
+      await saveTestOutput("signatures/signed-aes128.pdf", bytes);
     });
 
     it("signs with Triple DES P12", async () => {
@@ -473,6 +475,8 @@ describe("signing integration", () => {
 
       const pdfStr = new TextDecoder().decode(bytes);
       expect(pdfStr).toContain("/Type /Sig");
+
+      await saveTestOutput("signatures/signed-3des.pdf", bytes);
     });
 
     it("signs with legacy RC2 P12", async () => {
@@ -487,6 +491,8 @@ describe("signing integration", () => {
 
       const pdfStr = new TextDecoder().decode(bytes);
       expect(pdfStr).toContain("/Type /Sig");
+
+      await saveTestOutput("signatures/signed-rc2.pdf", bytes);
     });
   });
 
