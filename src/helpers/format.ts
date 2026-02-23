@@ -96,6 +96,8 @@ export function parsePdfDate(str: string): Date | undefined {
 // Number Formatting
 // ─────────────────────────────────────────────────────────────────────────────
 
+const TRAILING_ZERO_REGEX = /\.?0+$/;
+
 /**
  * Format a number for PDF output.
  *
@@ -112,7 +114,7 @@ export function formatPdfNumber(value: number): string {
   let str = value.toFixed(5);
 
   // Remove trailing zeros and unnecessary decimal point
-  str = str.replace(/\.?0+$/, "");
+  str = str.replace(TRAILING_ZERO_REGEX, "");
 
   // Handle edge case where we stripped everything after decimal
   if (str === "" || str === "-") {

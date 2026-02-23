@@ -25,7 +25,9 @@ export class ASCII85Filter implements Filter {
   private static readonly ZERO_SHORTCUT = 0x7a;
 
   decode(data: Uint8Array, _params?: PdfDict): Uint8Array {
-    const output = new ByteWriter();
+    const output = new ByteWriter(undefined, {
+      initialSize: Math.ceil((data.length * 4) / 5), // Estimate output size
+    });
 
     let buffer = 0;
     let count = 0;
@@ -102,7 +104,9 @@ export class ASCII85Filter implements Filter {
   }
 
   encode(data: Uint8Array, _params?: PdfDict): Uint8Array {
-    const output = new ByteWriter();
+    const output = new ByteWriter(undefined, {
+      initialSize: Math.ceil((data.length * 5) / 4) + 2, // Estimate output size + end marker
+    });
 
     // Process 4 bytes at a time
     let i = 0;

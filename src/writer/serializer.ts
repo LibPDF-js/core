@@ -18,7 +18,9 @@ import type { PdfRef } from "#src/objects/pdf-ref";
  * @returns The PDF byte representation
  */
 export function serializeObject(obj: PdfObject): Uint8Array {
-  const writer = new ByteWriter();
+  const writer = new ByteWriter(undefined, {
+    initialSize: 256, // Start with a reasonable buffer size
+  });
 
   // All PdfObject types implement PdfPrimitive
   obj.toBytes(writer);
@@ -36,7 +38,9 @@ export function serializeObject(obj: PdfObject): Uint8Array {
  * @returns The complete indirect object definition
  */
 export function serializeIndirectObject(ref: PdfRef, obj: PdfObject): Uint8Array {
-  const writer = new ByteWriter();
+  const writer = new ByteWriter(undefined, {
+    initialSize: 256, // Start with a reasonable buffer size
+  });
 
   writer.writeAscii(`${ref.objectNumber} ${ref.generation} obj\n`);
   obj.toBytes(writer);

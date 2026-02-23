@@ -132,9 +132,12 @@ export class IndirectObjectParser {
     // Get the stream length
     const length = this.resolveLength(dict);
 
-    // Read exactly `length` bytes
+    // Read exactly `length` bytes.
+    // Use subarray (zero-copy view) since the underlying PDF bytes
+    // are kept alive by the PDF object for the document's lifetime.
     const startPos = this.scanner.position;
-    const data = this.scanner.bytes.slice(startPos, startPos + length);
+    const data = this.scanner.bytes.subarray(startPos, startPos + length);
+
     this.scanner.moveTo(startPos + length);
 
     // Skip optional EOL before "endstream"

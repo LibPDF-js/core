@@ -25,17 +25,19 @@ export class ByteWriter {
    * @param options - Configuration options
    */
   constructor(existingBytes?: Uint8Array, options: ByteWriterOptions = {}) {
-    const initialSize = options.initialSize ?? 65536;
     this.maxSize = options.maxSize ?? Number.MAX_SAFE_INTEGER;
 
     if (existingBytes) {
-      // Start with existing bytes, leave room to grow
-      const size = Math.max(existingBytes.length * 2, initialSize);
-      this.buffer = new Uint8Array(size);
+      // When initialSize is provided, use it directly — the caller knows the
+      // expected final size. Otherwise default to 2x the existing bytes.
+      const size = options.initialSize ?? existingBytes.length * 2;
+
+      this.buffer = new Uint8Array(Math.max(size, existingBytes.length));
       this.buffer.set(existingBytes);
+
       this.offset = existingBytes.length;
     } else {
-      this.buffer = new Uint8Array(initialSize);
+      this.buffer = new Uint8Array(options.initialSize ?? 65536);
     }
   }
 
@@ -105,11 +107,18 @@ export class ByteWriter {
 
   /**
    * Get final bytes.
-   * Returns a copy (slice) so the internal buffer can be garbage collected.
+   *
+   * If the internal buffer is exactly the right size, returns it directly
+   * (zero-copy). Otherwise returns a trimmed copy so the oversized buffer
+   * can be garbage collected.
    *
    * Note: ByteWriter is single-use. Do not write after calling toBytes().
    */
   toBytes(): Uint8Array {
-    return this.buffer.slice(0, this.offset);
+    if (this.offset === this.buffer.length) {
+      return this.buffer;
+    }
+
+    return this.buffer.subarray(0, this.offset);
   }
 }
