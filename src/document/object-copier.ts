@@ -469,6 +469,7 @@ export class ObjectCopier {
    */
   private getInheritedAttribute(page: PdfDict, key: string): PdfObject | null {
     let current: PdfDict | null = page;
+    const visited = new Set<string>();
 
     while (current) {
       const value = current.get(key);
@@ -482,6 +483,14 @@ export class ObjectCopier {
       if (!parentRef) {
         break;
       }
+
+      const refKey = `${parentRef.objectNumber}:${parentRef.generation}`;
+
+      if (visited.has(refKey)) {
+        break;
+      }
+
+      visited.add(refKey);
 
       const parent = this.source.getObject(parentRef);
       current = parent instanceof PdfDict ? parent : null;
