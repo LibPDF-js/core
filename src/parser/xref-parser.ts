@@ -361,17 +361,20 @@ export class XRefParser {
 
     // Detect off-by-one in subsection start: some malformed PDFs report
     // firstObjNum=1 when the entries actually start at object 0.
-    // The free list head (offset 0, generation 65535, type free) is always
-    // object 0, so if we see it at a non-zero starting position, correct it.
+    // The free list head (generation 65535, type free) is always object 0,
+    // so if we see it at position 1, correct it. (Same fix as pdf.js #3248/#7229)
     let correctedFirstObjNum = firstObjNum;
 
     if (
-      firstObjNum > 0 &&
+      firstObjNum === 1 &&
       parsedEntries.length > 0 &&
       parsedEntries[0].type === "free" &&
       parsedEntries[0].generation === 65535
     ) {
       correctedFirstObjNum = 0;
+      console.warn(
+        "XRef: corrected subsection start from 1 to 0 (free list head at wrong position)",
+      );
     }
 
     for (let i = 0; i < parsedEntries.length; i++) {
