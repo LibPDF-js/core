@@ -180,6 +180,47 @@ trailer
 
       expect(result.entries.size).toBe(2);
     });
+
+    it("corrects off-by-one subsection start when free list head is at wrong position", () => {
+      // Some malformed PDFs report firstObjNum=1 when entries actually start at 0.
+      // The free list head (gen 65535, type f) is always object 0.
+      const p = parser(`xref
+1 4
+0000000000 65535 f
+0000000015 00000 n
+0000000074 00000 n
+0000000120 00000 n
+trailer
+<< /Size 4 /Root 1 0 R >>
+`);
+      const result = p.parseTable();
+
+      expect(result.entries.size).toBe(4);
+
+      // Entry should be corrected to object 0 (not 1)
+      const entry0 = result.entries.get(0);
+      expect(entry0).toBeDefined();
+      expect(entry0!.type).toBe("free");
+      if (entry0!.type === "free") {
+        expect(entry0!.generation).toBe(65535);
+      }
+
+      // Object 1 should be at offset 15
+      const entry1 = result.entries.get(1);
+      expect(entry1).toBeDefined();
+      expect(entry1!.type).toBe("uncompressed");
+      if (entry1!.type === "uncompressed") {
+        expect(entry1!.offset).toBe(15);
+      }
+
+      // Object 3 should be at offset 120
+      const entry3 = result.entries.get(3);
+      expect(entry3).toBeDefined();
+      expect(entry3!.type).toBe("uncompressed");
+      if (entry3!.type === "uncompressed") {
+        expect(entry3!.offset).toBe(120);
+      }
+    });
   });
 
   describe("trailer parsing", () => {

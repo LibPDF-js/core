@@ -702,6 +702,23 @@ describe("PDF", () => {
 
       expect(extracted.getPageCount()).toBe(0);
     });
+
+    it("handles PDF with off-by-one xref subsection start", async () => {
+      // Some malformed PDFs have the xref subsection header saying "1 N"
+      // instead of "0 N", shifting all object numbers by one. This caused
+      // wrong page count and infinite loop in extractPages due to objects
+      // resolving to wrong offsets (e.g., Pages root resolving as a Page
+      // with a self-referencing Parent).
+      const bytes = await loadFixture("malformed", "xref-off-by-one.pdf");
+      const pdf = await PDF.load(bytes);
+
+      expect(pdf.getPageCount()).toBe(3);
+      expect(pdf.getPages()[2].width).toBe(300);
+      expect(pdf.getPages()[2].height).toBe(400);
+
+      const extracted = await pdf.extractPages([0, 1, 2]);
+      expect(extracted.getPageCount()).toBe(3);
+    });
   });
 
   describe("embedPage and drawPage", () => {
