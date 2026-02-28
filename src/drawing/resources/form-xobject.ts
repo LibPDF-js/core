@@ -4,6 +4,7 @@
 
 import type { Operator } from "#src/content/operators";
 import { PdfArray } from "#src/objects/pdf-array";
+import { PdfBool } from "#src/objects/pdf-bool";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
@@ -59,6 +60,25 @@ export interface FormXObjectOptions {
   bbox: BBox;
   /** Operators that draw the form content */
   operators: Operator[];
+  /** Optional resources dictionary for self-contained form content */
+  resources?: PdfDict;
+  /** Optional transparency group dictionary */
+  group?: TransparencyGroupOptions;
+}
+
+/** Supported transparency group color spaces. */
+export type TransparencyGroupColorSpace = "DeviceGray" | "DeviceRGB" | "DeviceCMYK";
+
+/**
+ * Form XObject transparency group options.
+ */
+export interface TransparencyGroupOptions {
+  /** Group blending color space (/CS) */
+  colorSpace: TransparencyGroupColorSpace;
+  /** Isolated group flag (/I) */
+  isolated?: boolean;
+  /** Knockout group flag (/K) */
+  knockout?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,10 +122,12 @@ export class PDFFormXObject {
   readonly type = "formxobject";
   readonly ref: PdfRef;
   readonly bbox: BBox;
+  readonly group?: TransparencyGroupOptions;
 
-  constructor(ref: PdfRef, bbox: BBox) {
+  constructor(ref: PdfRef, bbox: BBox, group?: TransparencyGroupOptions) {
     this.ref = ref;
     this.bbox = bbox;
+    this.group = group;
   }
 
   /**
@@ -126,6 +148,27 @@ export class PDFFormXObject {
         PdfNumber.of(y + height),
       ]),
     });
+
+    if (options.resources) {
+      dict.set("Resources", options.resources);
+    }
+
+    if (options.group) {
+      const group = PdfDict.of({
+        S: PdfName.of("Transparency"),
+        CS: PdfName.of(options.group.colorSpace),
+      });
+
+      if (options.group.isolated !== undefined) {
+        group.set("I", PdfBool.of(options.group.isolated));
+      }
+
+      if (options.group.knockout !== undefined) {
+        group.set("K", PdfBool.of(options.group.knockout));
+      }
+
+      dict.set("Group", group);
+    }
 
     return new PdfStream(dict, contentBytes);
   }

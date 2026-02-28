@@ -72,10 +72,11 @@ import {
   drawLineOps,
   drawRectangleOps,
   setFillColor,
+  wrapPathOps,
 } from "#src/drawing/operations";
 import { PathBuilder } from "#src/drawing/path-builder";
-import type { PDFFormXObject, PDFPattern, PDFShading } from "#src/drawing/resources/index";
-import { PDFExtGState } from "#src/drawing/resources/index";
+import type { PDFPattern, PDFShading, PDFShadingPattern } from "#src/drawing/resources/index";
+import { PDFExtGState, PDFFormXObject } from "#src/drawing/resources/index";
 import { serializeOperators } from "#src/drawing/serialize";
 import { layoutJustifiedLine, layoutText, measureText } from "#src/drawing/text-layout";
 import type {
@@ -87,6 +88,7 @@ import type {
   DrawSvgPathOptions,
   DrawTextOptions,
   FontInput,
+  PathOptions,
   Rotation,
 } from "#src/drawing/types";
 import { resolveRotationOrigin } from "#src/drawing/types";
@@ -116,6 +118,7 @@ import {
   showText,
 } from "#src/helpers/operators";
 import * as operatorHelpers from "#src/helpers/operators";
+import { ensureCatalogMinVersion } from "#src/helpers/pdf-version";
 import type { PDFImage } from "#src/images/pdf-image";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -218,6 +221,32 @@ export interface DrawFieldOptions {
   option?: string;
 }
 
+type PatternOpacityMode =
+  | { kind: "none"; uniformOpacity: 1 }
+  | { kind: "uniform"; uniformOpacity: number }
+  | { kind: "varying"; uniformOpacity: 1; pattern: PDFShadingPattern };
+
+interface SoftMaskPatternBinding {
+  name: string;
+  ref: PdfRef;
+}
+
+interface PatternOpacityRoutingOptions {
+  /**
+   * If false, do not intercept when both patterns are fully opaque.
+   * Default behavior intercepts and emits draw ops.
+   */
+  handleWhenNoPatternOpacity?: boolean;
+  fillPattern?: PDFPattern;
+  strokePattern?: PDFPattern;
+  fillOpacity?: number;
+  strokeOpacity?: number;
+  drawFill?: (options: { patternName?: string; graphicsStateName?: string }) => Operator[];
+  drawStroke?: (options: { patternName?: string; graphicsStateName?: string }) => Operator[];
+  createFillMaskOps?: (patternName: string) => Operator[];
+  createStrokeMaskOps?: (patternName: string) => Operator[];
+}
+
 /**
  * PDFPage wraps a page dictionary with convenient accessors.
  */
@@ -236,6 +265,9 @@ export class PDFPage {
 
   /** Resource cache for deduplication - maps object refs to resource names */
   private _resourceCache: Map<PdfRef, string> = new Map();
+
+  /** Cache for generated grayscale opacity patterns keyed by source pattern ref */
+  private _opacityPatternCache: Map<string, PdfRef> = new Map();
 
   constructor(ref: PdfRef, dict: PdfDict, index: number, ctx: PDFContext) {
     this.ref = ref;
@@ -850,21 +882,10 @@ export class PDFPage {
    * ```
    */
   drawRectangle(options: DrawRectangleOptions): void {
-    // Register graphics state for opacity if needed
-    let gsName: string | undefined;
-
-    if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsState({
-        fillOpacity: options.opacity,
-        strokeOpacity: options.borderOpacity,
-      });
-    }
-
-    // Register patterns if provided
-    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
-    const strokePatternName = options.borderPattern
-      ? this.registerPattern(options.borderPattern)
-      : undefined;
+    const fillPattern = options.color === undefined ? options.pattern : undefined;
+    const strokePattern = options.borderColor === undefined ? options.borderPattern : undefined;
+    const hasFill = options.color !== undefined || fillPattern !== undefined;
+    const hasStroke = options.borderColor !== undefined || strokePattern !== undefined;
 
     // Calculate rotation center if rotating
     let rotate: { angle: number; originX: number; originY: number } | undefined;
@@ -876,24 +897,86 @@ export class PDFPage {
       rotate = { angle: options.rotate.angle, originX: origin.x, originY: origin.y };
     }
 
-    const ops = drawRectangleOps({
-      x: options.x,
-      y: options.y,
-      width: options.width,
-      height: options.height,
-      fillColor: options.color,
-      fillPatternName,
-      strokeColor: options.borderColor,
-      strokePatternName,
-      strokeWidth: options.borderWidth,
-      dashArray: options.borderDashArray,
-      dashPhase: options.borderDashPhase,
-      cornerRadius: options.cornerRadius,
-      graphicsStateName: gsName ? `/${gsName}` : undefined,
-      rotate,
-    });
+    let drawFill: PatternOpacityRoutingOptions["drawFill"];
 
-    this.appendOperators(ops);
+    if (hasFill) {
+      drawFill = ({ patternName, graphicsStateName }) =>
+        drawRectangleOps({
+          x: options.x,
+          y: options.y,
+          width: options.width,
+          height: options.height,
+          fillColor: options.color,
+          fillPatternName: patternName,
+          cornerRadius: options.cornerRadius,
+          graphicsStateName,
+          rotate,
+        });
+    }
+
+    let drawStroke: PatternOpacityRoutingOptions["drawStroke"];
+
+    if (hasStroke) {
+      drawStroke = ({ patternName, graphicsStateName }) =>
+        drawRectangleOps({
+          x: options.x,
+          y: options.y,
+          width: options.width,
+          height: options.height,
+          strokeColor: options.borderColor,
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+          dashArray: options.borderDashArray,
+          dashPhase: options.borderDashPhase,
+          cornerRadius: options.cornerRadius,
+          graphicsStateName,
+          rotate,
+        });
+    }
+
+    let createFillMaskOps: PatternOpacityRoutingOptions["createFillMaskOps"];
+
+    if (fillPattern) {
+      createFillMaskOps = patternName =>
+        drawRectangleOps({
+          x: options.x,
+          y: options.y,
+          width: options.width,
+          height: options.height,
+          fillPatternName: patternName,
+          cornerRadius: options.cornerRadius,
+          rotate,
+        });
+    }
+
+    let createStrokeMaskOps: PatternOpacityRoutingOptions["createStrokeMaskOps"];
+
+    if (strokePattern) {
+      createStrokeMaskOps = patternName =>
+        drawRectangleOps({
+          x: options.x,
+          y: options.y,
+          width: options.width,
+          height: options.height,
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+          dashArray: options.borderDashArray,
+          dashPhase: options.borderDashPhase,
+          cornerRadius: options.cornerRadius,
+          rotate,
+        });
+    }
+
+    this.drawWithPatternOpacityRouting({
+      fillPattern,
+      strokePattern,
+      fillOpacity: options.opacity,
+      strokeOpacity: options.borderOpacity,
+      drawFill,
+      drawStroke,
+      createFillMaskOps,
+      createStrokeMaskOps,
+    });
   }
 
   /**
@@ -956,35 +1039,75 @@ export class PDFPage {
    * ```
    */
   drawCircle(options: DrawCircleOptions): void {
-    // Register graphics state for opacity if needed
-    let gsName: string | undefined;
+    const fillPattern = options.color === undefined ? options.pattern : undefined;
+    const strokePattern = options.borderColor === undefined ? options.borderPattern : undefined;
+    const hasFill = options.color !== undefined || fillPattern !== undefined;
+    const hasStroke = options.borderColor !== undefined || strokePattern !== undefined;
 
-    if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsState({
-        fillOpacity: options.opacity,
-        strokeOpacity: options.borderOpacity,
-      });
+    let drawFill: PatternOpacityRoutingOptions["drawFill"];
+
+    if (hasFill) {
+      drawFill = ({ patternName, graphicsStateName }) =>
+        drawCircleOps({
+          cx: options.x,
+          cy: options.y,
+          radius: options.radius,
+          fillColor: options.color,
+          fillPatternName: patternName,
+          graphicsStateName,
+        });
     }
 
-    // Register patterns if provided
-    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
-    const strokePatternName = options.borderPattern
-      ? this.registerPattern(options.borderPattern)
-      : undefined;
+    let drawStroke: PatternOpacityRoutingOptions["drawStroke"];
 
-    const ops = drawCircleOps({
-      cx: options.x,
-      cy: options.y,
-      radius: options.radius,
-      fillColor: options.color,
-      fillPatternName,
-      strokeColor: options.borderColor,
-      strokePatternName,
-      strokeWidth: options.borderWidth,
-      graphicsStateName: gsName ? `/${gsName}` : undefined,
+    if (hasStroke) {
+      drawStroke = ({ patternName, graphicsStateName }) =>
+        drawCircleOps({
+          cx: options.x,
+          cy: options.y,
+          radius: options.radius,
+          strokeColor: options.borderColor,
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+          graphicsStateName,
+        });
+    }
+
+    let createFillMaskOps: PatternOpacityRoutingOptions["createFillMaskOps"];
+
+    if (fillPattern) {
+      createFillMaskOps = patternName =>
+        drawCircleOps({
+          cx: options.x,
+          cy: options.y,
+          radius: options.radius,
+          fillPatternName: patternName,
+        });
+    }
+
+    let createStrokeMaskOps: PatternOpacityRoutingOptions["createStrokeMaskOps"];
+
+    if (strokePattern) {
+      createStrokeMaskOps = patternName =>
+        drawCircleOps({
+          cx: options.x,
+          cy: options.y,
+          radius: options.radius,
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+        });
+    }
+
+    this.drawWithPatternOpacityRouting({
+      fillPattern,
+      strokePattern,
+      fillOpacity: options.opacity,
+      strokeOpacity: options.borderOpacity,
+      drawFill,
+      drawStroke,
+      createFillMaskOps,
+      createStrokeMaskOps,
     });
-
-    this.appendOperators(ops);
   }
 
   /**
@@ -1001,15 +1124,10 @@ export class PDFPage {
    * ```
    */
   drawEllipse(options: DrawEllipseOptions): void {
-    // Register graphics state for opacity if needed
-    let gsName: string | undefined;
-
-    if (options.opacity !== undefined || options.borderOpacity !== undefined) {
-      gsName = this.registerGraphicsState({
-        fillOpacity: options.opacity,
-        strokeOpacity: options.borderOpacity,
-      });
-    }
+    const fillPattern = options.color === undefined ? options.pattern : undefined;
+    const strokePattern = options.borderColor === undefined ? options.borderPattern : undefined;
+    const hasFill = options.color !== undefined || fillPattern !== undefined;
+    const hasStroke = options.borderColor !== undefined || strokePattern !== undefined;
 
     // Calculate rotation center if rotating
     let rotate: { angle: number; originX: number; originY: number } | undefined;
@@ -1027,27 +1145,78 @@ export class PDFPage {
       rotate = { angle: options.rotate.angle, originX: origin.x, originY: origin.y };
     }
 
-    // Register patterns if provided
-    const fillPatternName = options.pattern ? this.registerPattern(options.pattern) : undefined;
-    const strokePatternName = options.borderPattern
-      ? this.registerPattern(options.borderPattern)
-      : undefined;
+    let drawFill: PatternOpacityRoutingOptions["drawFill"];
 
-    const ops = drawEllipseOps({
-      cx: options.x,
-      cy: options.y,
-      rx: options.xRadius,
-      ry: options.yRadius,
-      fillColor: options.color,
-      fillPatternName,
-      strokeColor: options.borderColor,
-      strokePatternName,
-      strokeWidth: options.borderWidth,
-      graphicsStateName: gsName ? `/${gsName}` : undefined,
-      rotate,
+    if (hasFill) {
+      drawFill = ({ patternName, graphicsStateName }) =>
+        drawEllipseOps({
+          cx: options.x,
+          cy: options.y,
+          rx: options.xRadius,
+          ry: options.yRadius,
+          fillColor: options.color,
+          fillPatternName: patternName,
+          graphicsStateName,
+          rotate,
+        });
+    }
+
+    let drawStroke: PatternOpacityRoutingOptions["drawStroke"];
+
+    if (hasStroke) {
+      drawStroke = ({ patternName, graphicsStateName }) =>
+        drawEllipseOps({
+          cx: options.x,
+          cy: options.y,
+          rx: options.xRadius,
+          ry: options.yRadius,
+          strokeColor: options.borderColor,
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+          graphicsStateName,
+          rotate,
+        });
+    }
+
+    let createFillMaskOps: PatternOpacityRoutingOptions["createFillMaskOps"];
+
+    if (fillPattern) {
+      createFillMaskOps = patternName =>
+        drawEllipseOps({
+          cx: options.x,
+          cy: options.y,
+          rx: options.xRadius,
+          ry: options.yRadius,
+          fillPatternName: patternName,
+          rotate,
+        });
+    }
+
+    let createStrokeMaskOps: PatternOpacityRoutingOptions["createStrokeMaskOps"];
+
+    if (strokePattern) {
+      createStrokeMaskOps = patternName =>
+        drawEllipseOps({
+          cx: options.x,
+          cy: options.y,
+          rx: options.xRadius,
+          ry: options.yRadius,
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+          rotate,
+        });
+    }
+
+    this.drawWithPatternOpacityRouting({
+      fillPattern,
+      strokePattern,
+      fillOpacity: options.opacity,
+      strokeOpacity: options.borderOpacity,
+      drawFill,
+      drawStroke,
+      createFillMaskOps,
+      createStrokeMaskOps,
     });
-
-    this.appendOperators(ops);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1377,6 +1546,7 @@ export class PDFPage {
       },
       shading => this.registerShading(shading),
       pattern => this.registerPattern(pattern),
+      (pathOps, options) => this.tryDrawPathWithPatternOpacity(pathOps, options),
     );
   }
 
@@ -2640,6 +2810,354 @@ export class PDFPage {
     };
   }
 
+  private drawWithPatternOpacityRouting(options: PatternOpacityRoutingOptions): boolean {
+    const fillOpacityMode = this.getPatternOpacityMode(options.fillPattern);
+    const strokeOpacityMode = this.getPatternOpacityMode(options.strokePattern);
+
+    const hasVaryingOpacity =
+      fillOpacityMode.kind === "varying" || strokeOpacityMode.kind === "varying";
+
+    const hasPatternOpacityRouting =
+      hasVaryingOpacity ||
+      fillOpacityMode.uniformOpacity < 1 ||
+      strokeOpacityMode.uniformOpacity < 1;
+
+    if (!hasPatternOpacityRouting && options.handleWhenNoPatternOpacity === false) {
+      return false;
+    }
+
+    const fillPatternName = options.fillPattern
+      ? this.registerPattern(options.fillPattern)
+      : undefined;
+
+    const strokePatternName = options.strokePattern
+      ? this.registerPattern(options.strokePattern)
+      : undefined;
+
+    const combinedOps: Operator[] = [];
+
+    if (!hasVaryingOpacity) {
+      const fillOpacity = this.combineOpacity(options.fillOpacity, fillOpacityMode.uniformOpacity);
+      const strokeOpacity = this.combineOpacity(
+        options.strokeOpacity,
+        strokeOpacityMode.uniformOpacity,
+      );
+
+      let gsName: string | undefined;
+
+      if (fillOpacity !== undefined || strokeOpacity !== undefined) {
+        gsName = this.registerGraphicsState({ fillOpacity, strokeOpacity });
+      }
+
+      const graphicsStateName = gsName ? `/${gsName}` : undefined;
+
+      if (options.drawFill) {
+        combinedOps.push(
+          ...options.drawFill({
+            patternName: fillPatternName,
+            graphicsStateName,
+          }),
+        );
+      }
+
+      if (options.drawStroke) {
+        combinedOps.push(
+          ...options.drawStroke({
+            patternName: strokePatternName,
+            graphicsStateName,
+          }),
+        );
+      }
+
+      this.appendOperators(combinedOps);
+
+      return true;
+    }
+
+    if (options.drawFill) {
+      const fillOpacity = this.combineOpacity(options.fillOpacity, fillOpacityMode.uniformOpacity);
+      let fillGraphicsStateName: string | undefined;
+
+      if (fillOpacityMode.kind === "varying") {
+        if (!options.createFillMaskOps) {
+          throw new Error("Internal error: missing fill mask ops builder");
+        }
+
+        const maskPattern = this.createOpacityPatternBinding(fillOpacityMode.pattern, "PmFill");
+        const maskOps = options.createFillMaskOps(maskPattern.name);
+
+        fillGraphicsStateName = this.registerSoftMaskGraphicsState({
+          maskOps,
+          patternBindings: [maskPattern],
+          fillOpacity,
+        });
+      } else if (fillOpacity !== undefined) {
+        fillGraphicsStateName = this.registerGraphicsState({ fillOpacity });
+      }
+
+      combinedOps.push(
+        ...options.drawFill({
+          patternName: fillPatternName,
+          graphicsStateName: fillGraphicsStateName ? `/${fillGraphicsStateName}` : undefined,
+        }),
+      );
+    }
+
+    if (options.drawStroke) {
+      const strokeOpacity = this.combineOpacity(
+        options.strokeOpacity,
+        strokeOpacityMode.uniformOpacity,
+      );
+      let strokeGraphicsStateName: string | undefined;
+
+      if (strokeOpacityMode.kind === "varying") {
+        if (!options.createStrokeMaskOps) {
+          throw new Error("Internal error: missing stroke mask ops builder");
+        }
+
+        const maskPattern = this.createOpacityPatternBinding(strokeOpacityMode.pattern, "PmStroke");
+        const maskOps = options.createStrokeMaskOps(maskPattern.name);
+
+        strokeGraphicsStateName = this.registerSoftMaskGraphicsState({
+          maskOps,
+          patternBindings: [maskPattern],
+          strokeOpacity,
+        });
+      } else if (strokeOpacity !== undefined) {
+        strokeGraphicsStateName = this.registerGraphicsState({ strokeOpacity });
+      }
+
+      combinedOps.push(
+        ...options.drawStroke({
+          patternName: strokePatternName,
+          graphicsStateName: strokeGraphicsStateName ? `/${strokeGraphicsStateName}` : undefined,
+        }),
+      );
+    }
+
+    this.appendOperators(combinedOps);
+
+    return true;
+  }
+
+  private tryDrawPathWithPatternOpacity(pathOps: Operator[], options: PathOptions): boolean {
+    const hasFill = options.pattern !== undefined || options.color !== undefined;
+    const hasStroke = options.borderPattern !== undefined || options.borderColor !== undefined;
+
+    let drawFill: PatternOpacityRoutingOptions["drawFill"];
+
+    if (hasFill) {
+      drawFill = ({ patternName, graphicsStateName }) =>
+        wrapPathOps(pathOps, {
+          fillColor: options.pattern ? undefined : options.color,
+          fillPatternName: patternName,
+          windingRule: options.windingRule,
+          graphicsStateName,
+        });
+    }
+
+    let drawStroke: PatternOpacityRoutingOptions["drawStroke"];
+
+    if (hasStroke) {
+      drawStroke = ({ patternName, graphicsStateName }) =>
+        wrapPathOps(pathOps, {
+          strokeColor: options.borderPattern ? undefined : options.borderColor,
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+          lineCap: options.lineCap,
+          lineJoin: options.lineJoin,
+          miterLimit: options.miterLimit,
+          dashArray: options.dashArray,
+          dashPhase: options.dashPhase,
+          graphicsStateName,
+        });
+    }
+
+    let createFillMaskOps: PatternOpacityRoutingOptions["createFillMaskOps"];
+
+    if (options.pattern) {
+      createFillMaskOps = patternName =>
+        wrapPathOps(pathOps, {
+          fillPatternName: patternName,
+          windingRule: options.windingRule,
+        });
+    }
+
+    let createStrokeMaskOps: PatternOpacityRoutingOptions["createStrokeMaskOps"];
+
+    if (options.borderPattern) {
+      createStrokeMaskOps = patternName =>
+        wrapPathOps(pathOps, {
+          strokePatternName: patternName,
+          strokeWidth: options.borderWidth,
+          lineCap: options.lineCap,
+          lineJoin: options.lineJoin,
+          miterLimit: options.miterLimit,
+          dashArray: options.dashArray,
+          dashPhase: options.dashPhase,
+        });
+    }
+
+    return this.drawWithPatternOpacityRouting({
+      handleWhenNoPatternOpacity: false,
+      fillPattern: options.pattern,
+      strokePattern: options.borderPattern,
+      fillOpacity: options.opacity,
+      strokeOpacity: options.borderOpacity,
+      drawFill,
+      drawStroke,
+      createFillMaskOps,
+      createStrokeMaskOps,
+    });
+  }
+
+  private combineOpacity(opacity: number | undefined, multiplier: number): number | undefined {
+    const base = opacity ?? 1;
+    const combined = Math.max(0, Math.min(1, base * multiplier));
+
+    if (combined >= 1) {
+      return undefined;
+    }
+
+    return combined;
+  }
+
+  private getPatternOpacityMode(pattern: PDFPattern | undefined): PatternOpacityMode {
+    if (!pattern || pattern.patternType !== "shading") {
+      return { kind: "none", uniformOpacity: 1 };
+    }
+
+    const opacity = pattern.shading.getOpacityClassification();
+
+    if (opacity.mode === "opaque") {
+      return { kind: "none", uniformOpacity: 1 };
+    }
+
+    if (opacity.mode === "uniform") {
+      if (opacity.opacity >= 1) {
+        return { kind: "none", uniformOpacity: 1 };
+      }
+
+      return { kind: "uniform", uniformOpacity: opacity.opacity };
+    }
+
+    return { kind: "varying", uniformOpacity: 1, pattern };
+  }
+
+  private createOpacityPatternBinding(
+    pattern: PDFShadingPattern,
+    name: string,
+  ): SoftMaskPatternBinding {
+    return {
+      name,
+      ref: this.getOrCreateOpacityPattern(pattern),
+    };
+  }
+
+  private getOrCreateOpacityPattern(pattern: PDFShadingPattern): PdfRef {
+    const key = `${pattern.ref.objectNumber}:${pattern.ref.generation}`;
+    const cached = this._opacityPatternCache.get(key);
+
+    if (cached) {
+      return cached;
+    }
+
+    const opacityShading = pattern.shading.createOpacityMaskDict();
+    const opacityShadingRef = this.ctx.register(opacityShading);
+
+    const opacityPattern = PdfDict.of({
+      Type: PdfName.of("Pattern"),
+      PatternType: PdfNumber.of(2),
+      Shading: opacityShadingRef,
+    });
+
+    if (pattern.matrix) {
+      const [a, b, c, d, e, f] = pattern.matrix;
+      opacityPattern.set(
+        "Matrix",
+        PdfArray.of(
+          PdfNumber.of(a),
+          PdfNumber.of(b),
+          PdfNumber.of(c),
+          PdfNumber.of(d),
+          PdfNumber.of(e),
+          PdfNumber.of(f),
+        ),
+      );
+    }
+
+    const opacityPatternRef = this.ctx.register(opacityPattern);
+    this._opacityPatternCache.set(key, opacityPatternRef);
+
+    return opacityPatternRef;
+  }
+
+  private registerSoftMaskGraphicsState(options: {
+    maskOps: Operator[];
+    patternBindings: SoftMaskPatternBinding[];
+    fillOpacity?: number;
+    strokeOpacity?: number;
+  }): string {
+    this.ensureMinimumVersion("1.4");
+
+    const patternResources = new PdfDict();
+
+    for (const binding of options.patternBindings) {
+      patternResources.set(binding.name, binding.ref);
+    }
+
+    const resources = PdfDict.of({
+      Pattern: patternResources,
+    });
+
+    const pageBox = this.getMediaBox();
+    const maskBBox = {
+      x: pageBox.x,
+      y: pageBox.y,
+      width: pageBox.width - pageBox.x,
+      height: pageBox.height - pageBox.y,
+    };
+
+    const maskGroupOptions = {
+      colorSpace: "DeviceGray" as const,
+      isolated: true,
+    };
+
+    const maskStream = PDFFormXObject.createStream(
+      {
+        bbox: maskBBox,
+        operators: [],
+        resources,
+        group: maskGroupOptions,
+      },
+      serializeOperators(options.maskOps),
+    );
+
+    const maskRef = this.ctx.register(maskStream);
+    const maskGroup = new PDFFormXObject(maskRef, maskBBox, maskGroupOptions);
+
+    const extGState = PDFExtGState.createDict({
+      fillOpacity: options.fillOpacity,
+      strokeOpacity: options.strokeOpacity,
+      softMask: {
+        subtype: "Luminosity",
+        group: maskGroup,
+      },
+    });
+
+    const extGStateRef = this.ctx.register(extGState);
+
+    return this.registerExtGState({ type: "extgstate", ref: extGStateRef });
+  }
+
+  private ensureMinimumVersion(version: string): void {
+    this.ctx.info.version = ensureCatalogMinVersion(
+      this.ctx.catalog.getDict(),
+      this.ctx.info.version,
+      version,
+    );
+  }
+
   /**
    * Create and register a graphics state, returning its resource name.
    *
@@ -2647,6 +3165,8 @@ export class PDFPage {
    * For the public low-level API, use `pdf.createExtGState()` + `page.registerExtGState()`.
    */
   private registerGraphicsState(options: { fillOpacity?: number; strokeOpacity?: number }): string {
+    this.ensureMinimumVersion("1.4");
+
     const dict = PDFExtGState.createDict(options);
     const ref = this.ctx.register(dict);
 
