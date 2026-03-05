@@ -22,6 +22,11 @@ import type { DigestAlgorithm, KeyType, SignatureAlgorithm, Signer } from "../ty
 
 /** KMS client type - dynamically imported */
 type KeyManagementServiceClient = import("@google-cloud/kms").KeyManagementServiceClient;
+/** Subset of methods actually used for signing */
+type KmsClient = Pick<
+  KeyManagementServiceClient,
+  "asymmetricSign" | "getCryptoKeyVersion" | "getPublicKey"
+>;
 
 /** Secret Manager client type - dynamically imported */
 type SecretManagerServiceClient = import("@google-cloud/secret-manager").SecretManagerServiceClient;
@@ -41,7 +46,7 @@ interface GoogleKmsSignerBaseOptions {
   chainTimeout?: number;
 
   /** Pre-configured KMS client (optional, uses ADC if not provided) */
-  client?: KeyManagementServiceClient;
+  client?: KmsClient;
 }
 
 /** Full resource name style */
@@ -356,10 +361,10 @@ export class GoogleKmsSigner implements Signer {
   /** Full resource name of the KMS key version (for logging/debugging) */
   readonly keyVersionName: string;
 
-  private readonly client: KeyManagementServiceClient;
+  private readonly client: KmsClient;
 
   private constructor(
-    client: KeyManagementServiceClient,
+    client: KmsClient,
     keyVersionName: string,
     certificate: Uint8Array,
     certificateChain: Uint8Array[],
@@ -403,16 +408,14 @@ export class GoogleKmsSigner implements Signer {
    * ```
    */
   static async create(options: GoogleKmsSignerOptions): Promise<GoogleKmsSigner> {
-    // Dynamically import KMS
-    const kms = await importKms();
-
     // Build full resource name if shorthand
     const keyVersionName = isFullNameOptions(options)
       ? options.keyVersionName
       : buildKeyVersionName(options);
 
     // Create or use provided client
-    const client = options.client ?? new kms.KeyManagementServiceClient();
+    // Dynamically import KMS only if client was not provided
+    const client = options.client ?? new (await importKms()).KeyManagementServiceClient();
 
     try {
       // Fetch key version metadata
