@@ -110,6 +110,12 @@ export class P12Signer implements Signer {
     options: P12SignerOptions = {},
   ): Promise<P12Signer> {
     try {
+      // Ensure our custom crypto engine is installed before any pkijs operations.
+      // pkijs's parseInternalValues() uses the engine internally to decrypt safe
+      // contents — if they use legacy algorithms (3DES, RC2), the default engine
+      // will fail with "Unknown contentEncryptionAlgorithm".
+      getCrypto();
+
       // Ensure we have a proper ArrayBuffer (not SharedArrayBuffer)
       const buffer = toArrayBuffer(p12Bytes);
 
