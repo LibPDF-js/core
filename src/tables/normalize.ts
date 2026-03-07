@@ -50,7 +50,7 @@ function extractCells(row: TableRow, columns: readonly TableColumn[]): (string |
   if (isFullRow(row)) {
     return row.cells as (string | TableCell)[];
   }
-  return row as (string | TableCell)[];
+  throw new Error("Unknown row type");
 }
 
 function extractRowMeta(row: TableRow): {

@@ -1,11 +1,6 @@
 import type { Rectangle } from "#src/api/pdf-page";
 import type { FontInput } from "#src/drawing/types";
 import type { Color } from "#src/helpers/colors";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public API Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 export type TableWidth = number | "auto" | "*" | { star: number };
 export type TableRepeat = "none" | "firstPage" | "everyPage" | "lastPage";
 export type TableOverflow = "wrap" | "ellipsis" | "clip";
@@ -87,11 +82,6 @@ export interface DrawTableResult {
   cursorY: number;
   rowCountDrawn: number;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal Normalized Types
-// ─────────────────────────────────────────────────────────────────────────────
-
 export type Section = "head" | "body" | "foot";
 
 export interface ResolvedPadding {

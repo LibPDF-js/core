@@ -10,10 +10,6 @@ import type {
   TableColumn,
 } from "./types";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Text breaking and overflow
-// ─────────────────────────────────────────────────────────────────────────────
-
 interface TextLine {
   text: string;
   width: number;
@@ -41,7 +37,6 @@ export function layoutCellText(
     return ellipsisText(text, font, fontSize, maxWidth);
   }
 
-  // overflow === "wrap"
   const paragraphs = text.split(/\r\n|\r|\n/);
   const lines: TextLine[] = [];
 
@@ -204,10 +199,6 @@ function ellipsisText(
   return [{ text: clipped + ellipsis, width: width + ellipsisWidth }];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Cell and row measurement
-// ─────────────────────────────────────────────────────────────────────────────
-
 function measureCell(
   cell: { text: string; style: ResolvedCellStyle },
   columnWidth: number,
@@ -241,10 +232,6 @@ export function measureRow(row: NormalizedRow, columnWidths: number[]): Measured
     rowHeight,
   };
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Column width resolution
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function resolveColumnWidths(table: NormalizedTable, availableWidth: number): number[] {
   const { columns } = table;

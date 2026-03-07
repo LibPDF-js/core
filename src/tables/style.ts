@@ -84,11 +84,7 @@ export function resolveStyleCascade(
 ): Map<string, ResolvedCellStyle> {
   const styles = new Map<string, ResolvedCellStyle>();
 
-  // Level 1: defaults
-  let base = { ...DEFAULT_STYLE };
-
-  // Level 2: table-wide style
-  base = mergeStyle(base, options.style);
+  let base = mergeStyle({ ...DEFAULT_STYLE }, options.style);
 
   const sectionStyleMap: Record<Section, Partial<TableCellStyle> | undefined> = {
     head: options.headStyle,
@@ -103,29 +99,24 @@ export function resolveStyleCascade(
   ];
 
   for (const { name: section, rows } of sections) {
-    // Level 3: section style
     const sectionBase = mergeStyle(base, sectionStyleMap[section]);
 
     for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-      // Level 4: alternate row style (body only)
       let rowBase = sectionBase;
       if (section === "body" && options.alternateRowStyle && rowIdx % 2 === 1) {
         rowBase = mergeStyle(sectionBase, options.alternateRowStyle);
       }
 
       for (const col of columns) {
-        // Level 5: column style
         let cellBase = rowBase;
         if (options.columnStyles?.[col.key]) {
           cellBase = mergeStyle(rowBase, options.columnStyles[col.key]);
         }
 
-        // Level 5.5: column-level align from TableColumn
         if (col.align) {
           cellBase = { ...cellBase, align: col.align };
         }
 
-        // Column-level style from TableColumn.style
         if (col.style) {
           cellBase = mergeStyle(cellBase, col.style);
         }
