@@ -164,6 +164,30 @@ export { PDFImage } from "./images/pdf-image";
 // Drawing API
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Table API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type {
+  DrawTableOptions,
+  DrawTableResult,
+  TableCell,
+  TableCellStyle,
+  TableColumn,
+  TableDefinition,
+  TableFullRow,
+  TableHAlign,
+  TableOverflow,
+  TableOverflowWrap,
+  TableRepeat,
+  TableRow,
+  TableSparseRow,
+  TableVAlign,
+  TableWidth,
+} from "#src/tables/types";
+
+export { TableLayoutError, TableRowOverflowError } from "#src/tables/measure";
+
 export {
   type DrawCircleOptions,
   type DrawEllipseOptions,
