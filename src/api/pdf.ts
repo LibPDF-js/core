@@ -55,6 +55,10 @@ import { PermissionDeniedError } from "#src/security/errors";
 import { DEFAULT_PERMISSIONS, type Permissions } from "#src/security/permissions";
 import type { StandardSecurityHandler } from "#src/security/standard-handler.ts";
 import type { SignOptions, SignResult } from "#src/signatures/types";
+import { layoutTable } from "#src/tables/layout";
+import { normalizeTable } from "#src/tables/normalize";
+import { renderTable } from "#src/tables/render";
+import type { DrawTableOptions, DrawTableResult, TableDefinition } from "#src/tables/types";
 import type { FindTextOptions, PageText, TextMatch } from "#src/text/types";
 import { writeComplete, writeIncremental } from "#src/writer/pdf-writer";
 import { randomBytes } from "@noble/ciphers/utils.js";
@@ -2061,6 +2065,62 @@ export class PDF {
    */
   getFontRef(font: EmbeddedFont): PdfRef | null {
     return this.fonts.getRef(font);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Image Embedding
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Table Drawing
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Draw a table starting on the given page, with automatic pagination.
+   *
+   * Tables can span multiple pages. New pages are created as needed with the
+   * same dimensions as `startPage`. The returned result includes the last page
+   * drawn on and the cursor position, so you can continue drawing after the table.
+   *
+   * @param startPage - The page to begin drawing on
+   * @param definition - Table structure: columns, head, body, and foot rows
+   * @param options - Layout bounds, style, and pagination options
+   * @returns Result with last page, cursor position, and pages used
+   *
+   * @example
+   * ```typescript
+   * const page = pdf.addPage({ size: "letter" });
+   * const result = pdf.drawTable(page, {
+   *   columns: [
+   *     { key: "item", width: 72 },
+   *     { key: "desc", width: "*" },
+   *     { key: "total", width: 72, align: "right" },
+   *   ],
+   *   head: [["Item", "Description", "Total"]],
+   *   body: items.map(i => [i.name, i.desc, i.total]),
+   * }, {
+   *   bounds: { x: 48, y: 72, width: 516, height: 640 },
+   * });
+   *
+   * result.lastPage.drawText("Thank you", {
+   *   x: 48, y: result.cursorY - 24, size: 10,
+   * });
+   * ```
+   */
+  drawTable(
+    startPage: PDFPage,
+    definition: TableDefinition,
+    options: DrawTableOptions,
+  ): DrawTableResult {
+    const table = normalizeTable(definition, options);
+    const layout = layoutTable(table, options);
+
+    return renderTable(layout, options, startPage, () => {
+      return this.addPage({
+        width: startPage.width,
+        height: startPage.height,
+      });
+    });
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
