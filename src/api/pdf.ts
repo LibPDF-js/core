@@ -32,6 +32,7 @@ import { serializeOperators } from "#src/drawing/serialize";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format";
 import { resolvePageSize } from "#src/helpers/page-size";
+import { ensureCatalogMinVersion } from "#src/helpers/pdf-version";
 import { checkIncrementalSaveBlocker, type IncrementalSaveBlocker } from "#src/helpers/save-utils";
 import { isJpeg, parseJpegHeader } from "#src/images/jpeg";
 import { PDFImage } from "#src/images/pdf-image";
@@ -720,26 +721,11 @@ export class PDF {
    * ```
    */
   upgradeVersion(version: string): void {
-    // Parse versions for comparison
-    const parseVersion = (v: string): number => {
-      const [major, minor] = v.split(".").map(Number);
-      return major * 10 + (minor || 0);
-    };
-
-    const currentVersion = parseVersion(this.ctx.info.version);
-    const targetVersion = parseVersion(version);
-
-    // Only upgrade, never downgrade
-    if (targetVersion <= currentVersion) {
-      return;
-    }
-
-    // Set the version in the catalog
-    const catalog = this.ctx.catalog.getDict();
-    catalog.set("Version", PdfName.of(version));
-
-    // Update internal version tracking
-    this.ctx.info.version = version;
+    this.ctx.info.version = ensureCatalogMinVersion(
+      this.ctx.catalog.getDict(),
+      this.ctx.info.version,
+      version,
+    );
   }
 
   /** Whether the document is encrypted */
@@ -2177,6 +2163,8 @@ export class PDF {
 
     // If there's alpha, create a soft mask
     if (alpha) {
+      this.upgradeVersion("1.4");
+
       const compressedAlpha = deflate(alpha);
 
       const smaskStream = PdfStream.fromDict(
@@ -2228,8 +2216,9 @@ export class PDF {
   createAxialShading(options: AxialShadingOptions): PDFShading {
     const dict = PDFShading.createAxialDict(options);
     const ref = this.register(dict);
+    const definition = PDFShading.createDefinition(options);
 
-    return new PDFShading(ref, "axial");
+    return new PDFShading(ref, "axial", definition);
   }
 
   /**
@@ -2253,8 +2242,9 @@ export class PDF {
   createRadialShading(options: RadialShadingOptions): PDFShading {
     const dict = PDFShading.createRadialDict(options);
     const ref = this.register(dict);
+    const definition = PDFShading.createDefinition(options);
 
-    return new PDFShading(ref, "radial");
+    return new PDFShading(ref, "radial", definition);
   }
 
   /**
@@ -2278,10 +2268,12 @@ export class PDF {
    */
   createLinearGradient(options: LinearGradientOptions): PDFShading {
     const coords = PDFShading.calculateAxialCoords(options.angle, options.length);
-    const dict = PDFShading.createAxialDict({ coords, stops: options.stops });
+    const axialOptions: AxialShadingOptions = { coords, stops: options.stops };
+    const dict = PDFShading.createAxialDict(axialOptions);
     const ref = this.register(dict);
+    const definition = PDFShading.createDefinition(axialOptions);
 
-    return new PDFShading(ref, "axial");
+    return new PDFShading(ref, "axial", definition);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2412,7 +2404,7 @@ export class PDF {
     const dict = PDFShadingPattern.createDict(options);
     const ref = this.register(dict);
 
-    return new PDFShadingPattern(ref, options.shading);
+    return new PDFShadingPattern(ref, options.shading, options.matrix);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -2436,6 +2428,15 @@ export class PDF {
    * ```
    */
   createExtGState(options: ExtGStateOptions): PDFExtGState {
+    if (
+      options.fillOpacity !== undefined ||
+      options.strokeOpacity !== undefined ||
+      options.blendMode !== undefined ||
+      options.softMask !== undefined
+    ) {
+      this.upgradeVersion("1.4");
+    }
+
     const dict = PDFExtGState.createDict(options);
     const ref = this.register(dict);
 
@@ -2476,12 +2477,16 @@ export class PDF {
    * ```
    */
   createFormXObject(options: FormXObjectOptions): PDFFormXObject {
+    if (options.group) {
+      this.upgradeVersion("1.4");
+    }
+
     const contentBytes = serializeOperators(options.operators);
     const stream = PDFFormXObject.createStream(options, contentBytes);
 
     const ref = this.register(stream);
 
-    return new PDFFormXObject(ref, options.bbox);
+    return new PDFFormXObject(ref, options.bbox, options.group);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
