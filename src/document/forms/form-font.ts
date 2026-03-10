@@ -26,16 +26,6 @@ import { PdfStream } from "#src/objects/pdf-stream";
 
 import type { ObjectRegistry } from "../object-registry";
 
-function* iterateCodePoints(text: string): Generator<{ char: string; codePoint: number }> {
-  for (const char of text) {
-    const codePoint = char.codePointAt(0);
-
-    if (codePoint !== undefined) {
-      yield { char, codePoint };
-    }
-  }
-}
-
 /**
  * Union type for fonts usable in form fields.
  */
@@ -101,7 +91,9 @@ export class ExistingFont {
         return false;
       }
 
-      for (const { codePoint } of iterateCodePoints(text)) {
+      for (const char of text) {
+        const codePoint = char.codePointAt(0)!;
+
         if (codePoint > 0xffff) {
           return false;
         }
@@ -143,7 +135,9 @@ export class ExistingFont {
         return false;
       }
 
-      for (const { codePoint } of iterateCodePoints(text)) {
+      for (const char of text) {
+        const codePoint = char.codePointAt(0)!;
+
         if (codePoint > 0xffff) {
           return false;
         }
@@ -209,13 +203,14 @@ export class ExistingFont {
    */
   encodeTextToBytes(text: string): Uint8Array {
     if (this.isCIDFont) {
-      const chars = Array.from(iterateCodePoints(text));
-      const bytes = new Uint8Array(chars.length * 2);
+      const codePoints = Array.from(text, char => char.codePointAt(0)!);
+      const bytes = new Uint8Array(codePoints.length * 2);
 
-      for (let i = 0; i < chars.length; i++) {
-        const codePoint = chars[i].codePoint;
+      for (let i = 0; i < codePoints.length; i++) {
         // Use CIDFont mapping if available, otherwise fall back to raw code point
-        const charCode = this.cidFont ? this.cidFont.getCharCodeForUnicode(codePoint) : codePoint;
+        const charCode = this.cidFont
+          ? this.cidFont.getCharCodeForUnicode(codePoints[i])
+          : codePoints[i];
         bytes[i * 2] = (charCode >> 8) & 0xff;
         bytes[i * 2 + 1] = charCode & 0xff;
       }
@@ -237,10 +232,10 @@ export class ExistingFont {
     if (this.cidFont) {
       let totalWidth = 0;
 
-      for (const { codePoint } of iterateCodePoints(text)) {
+      for (const char of text) {
         // CIDFont.getWidth() expects a CID. For Identity-H, CID = character code.
         // Use getCharCodeForUnicode() to get the correct CID for width lookup.
-        const cid = this.cidFont.getCharCodeForUnicode(codePoint);
+        const cid = this.cidFont.getCharCodeForUnicode(char.codePointAt(0)!);
         totalWidth += this.cidFont.getWidth(cid);
       }
 
