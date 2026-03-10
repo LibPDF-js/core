@@ -7,8 +7,6 @@
  */
 
 import { ContentStreamBuilder } from "#src/content/content-stream";
-import type { Operator } from "#src/content/operators";
-import type { EmbeddedFont } from "#src/fonts/embedded-font";
 import {
   beginMarkedContent,
   beginText,
@@ -22,41 +20,33 @@ import {
   pushGraphicsState,
   rectangle,
   setFont,
-  setNonStrokingCMYK,
   setNonStrokingGray,
   setNonStrokingRGB,
   showText,
 } from "#src/helpers/operators";
-import { PdfDict } from "#src/objects/pdf-dict";
-import { PdfName } from "#src/objects/pdf-name";
 import type { PdfStream } from "#src/objects/pdf-stream";
-import { PdfString } from "#src/objects/pdf-string";
 
-import type { ObjectRegistry } from "../object-registry";
-import type { AcroForm } from "./acro-form";
 import {
+  type AppearanceContext,
+  buildFontResources,
+  calculateAutoFontSize,
   DEFAULT_HIGHLIGHT_COLOR,
+  encodeTextForFont,
+  getColorOperators,
   getFontMetrics,
-  MAX_FONT_SIZE,
-  MIN_FONT_SIZE,
-  mapToStandardFontName,
+  getFontResourceName,
   PADDING,
-  type ParsedDA,
-  parseDAString,
+  parseDefaultAppearance,
+  resolveAppearanceFont,
 } from "./appearance-utils";
-import type { DropdownField, ListBoxField, RgbColor } from "./fields";
-import { ExistingFont, type FormFont, isEmbeddedFont, isExistingFont } from "./form-font";
+import type { DropdownField, ListBoxField } from "./fields";
+import type { FormFont } from "./form-font";
 import type { WidgetAnnotation } from "./widget-annotation";
 
 /**
  * Context for choice appearance generation.
  */
-export interface ChoiceAppearanceContext {
-  acroForm: AcroForm;
-  registry: ObjectRegistry;
-  fontResourceNames: Map<FormFont, string>;
-  fontNameCounter: number;
-}
+export type ChoiceAppearanceContext = AppearanceContext;
 
 /**
  * Generate appearance stream for a dropdown (combo box).
@@ -73,7 +63,7 @@ export function generateDropdownAppearance(
   const selectedOption = options.find(opt => opt.value === value);
   const displayText = selectedOption?.display ?? value;
 
-  const font = resolveFont(ctx, field);
+  const font = resolveAppearanceFont(ctx.acroForm, field, displayText);
   const { name: fontName, counter } = getFontResourceName(ctx, font);
   ctx.fontNameCounter = counter;
 
@@ -108,7 +98,7 @@ export function generateDropdownAppearance(
     endMarkedContent(),
   ]);
 
-  const resources = buildResources(ctx, font, fontName);
+  const resources = buildFontResources(font, fontName);
 
   return {
     stream: content.toFormXObject([0, 0, width, height], resources),
@@ -128,7 +118,11 @@ export function generateListBoxAppearance(
   const options = field.getOptions();
   const { width, height } = widget;
 
-  const font = resolveFont(ctx, field);
+  const font = resolveAppearanceFont(
+    ctx.acroForm,
+    field,
+    options.map(option => option.display).join(""),
+  );
   const { name: fontName, counter } = getFontResourceName(ctx, font);
   ctx.fontNameCounter = counter;
 
@@ -222,190 +216,10 @@ export function generateListBoxAppearance(
 
   content.add(endText()).add(popGraphicsState()).add(endMarkedContent());
 
-  const resources = buildResources(ctx, font, fontName);
+  const resources = buildFontResources(font, fontName);
 
   return {
     stream: content.toFormXObject([0, 0, width, height], resources),
     fontNameCounter: ctx.fontNameCounter,
   };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper Functions
-// ─────────────────────────────────────────────────────────────────────────────
-
-function resolveFont(
-  ctx: ChoiceAppearanceContext,
-  field: { getFont(): FormFont | null; defaultAppearance?: string | null },
-): FormFont {
-  const fieldFont = field.getFont();
-
-  if (fieldFont) {
-    return fieldFont;
-  }
-
-  const defaultFont = ctx.acroForm.getDefaultFont();
-
-  if (defaultFont) {
-    return defaultFont;
-  }
-
-  const da =
-    "defaultAppearance" in field
-      ? (field.defaultAppearance ?? ctx.acroForm.defaultAppearance)
-      : ctx.acroForm.defaultAppearance;
-  const daInfo = parseDAString(da);
-  const existingFont = ctx.acroForm.getExistingFont(daInfo.fontName);
-
-  if (existingFont) {
-    return existingFont;
-  }
-
-  return new ExistingFont("Helv", null, null);
-}
-
-function getFontResourceName(
-  ctx: ChoiceAppearanceContext,
-  font: FormFont,
-): { name: string; counter: number } {
-  if (ctx.fontResourceNames.has(font)) {
-    return {
-      // biome-ignore lint/style/noNonNullAssertion: fontResourceNames is guaranteed to have a value
-      name: ctx.fontResourceNames.get(font)!,
-      counter: ctx.fontNameCounter,
-    };
-  }
-
-  let name: string;
-
-  if (isExistingFont(font)) {
-    name = font.name.startsWith("/") ? font.name : `/${font.name}`;
-  } else {
-    ctx.fontNameCounter++;
-    name = `/F${ctx.fontNameCounter}`;
-  }
-
-  ctx.fontResourceNames.set(font, name);
-
-  return {
-    name,
-    counter: ctx.fontNameCounter,
-  };
-}
-
-function parseDefaultAppearance(
-  ctx: ChoiceAppearanceContext,
-  field: { defaultAppearance?: string | null },
-): ParsedDA {
-  const da =
-    "defaultAppearance" in field
-      ? (field.defaultAppearance ?? ctx.acroForm.defaultAppearance)
-      : ctx.acroForm.defaultAppearance;
-
-  return parseDAString(da);
-}
-
-function calculateAutoFontSize(
-  text: string,
-  width: number,
-  height: number,
-  font: FormFont,
-): number {
-  const contentWidth = width - 2 * PADDING;
-  const contentHeight = height - 2 * PADDING;
-
-  const heightBased = contentHeight * 0.7;
-
-  let fontSize = heightBased;
-  const metrics = getFontMetrics(font);
-  let textWidth = metrics.getTextWidth(text || "X", fontSize);
-
-  while (textWidth > contentWidth && fontSize > MIN_FONT_SIZE) {
-    fontSize -= 1;
-    textWidth = metrics.getTextWidth(text || "X", fontSize);
-  }
-
-  return Math.max(MIN_FONT_SIZE, Math.min(fontSize, MAX_FONT_SIZE));
-}
-
-function encodeTextForFont(text: string, font: FormFont): PdfString {
-  if (isEmbeddedFont(font)) {
-    font.markUsedInForm();
-
-    if (!font.canEncode(text)) {
-      const unencodable = font.getUnencodableCharacters(text);
-      const firstBad = unencodable[0];
-
-      throw new Error(
-        `Font cannot encode character '${firstBad}' (U+${firstBad.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0")})`,
-      );
-    }
-
-    const gids = font.encodeTextToGids(text);
-    const bytes = new Uint8Array(gids.length * 2);
-
-    for (let i = 0; i < gids.length; i++) {
-      bytes[i * 2] = (gids[i] >> 8) & 0xff;
-      bytes[i * 2 + 1] = gids[i] & 0xff;
-    }
-
-    return PdfString.fromBytes(bytes);
-  }
-
-  return PdfString.fromString(text);
-}
-
-function getColorOperators(textColor: RgbColor | null, daInfo: ParsedDA): Operator[] {
-  if (textColor) {
-    return [setNonStrokingRGB(textColor.r, textColor.g, textColor.b)];
-  }
-
-  switch (daInfo.colorOp) {
-    case "g":
-      return [setNonStrokingGray(daInfo.colorArgs[0] ?? 0)];
-    case "rg":
-      return [
-        setNonStrokingRGB(
-          daInfo.colorArgs[0] ?? 0,
-          daInfo.colorArgs[1] ?? 0,
-          daInfo.colorArgs[2] ?? 0,
-        ),
-      ];
-    case "k":
-      return [
-        setNonStrokingCMYK(
-          daInfo.colorArgs[0] ?? 0,
-          daInfo.colorArgs[1] ?? 0,
-          daInfo.colorArgs[2] ?? 0,
-          daInfo.colorArgs[3] ?? 0,
-        ),
-      ];
-    default:
-      return [setNonStrokingGray(0)];
-  }
-}
-
-function buildResources(ctx: ChoiceAppearanceContext, font: FormFont, fontName: string): PdfDict {
-  const resources = new PdfDict();
-  const fonts = new PdfDict();
-
-  const cleanName = fontName.startsWith("/") ? fontName.slice(1) : fontName;
-
-  if (isEmbeddedFont(font)) {
-    fonts.set(cleanName, font.ref);
-  } else if (isExistingFont(font) && font.ref) {
-    fonts.set(cleanName, font.ref);
-  } else {
-    const fontDict = new PdfDict();
-
-    fontDict.set("Type", PdfName.of("Font"));
-    fontDict.set("Subtype", PdfName.of("Type1"));
-    fontDict.set("BaseFont", PdfName.of(mapToStandardFontName(cleanName)));
-
-    fonts.set(cleanName, fontDict);
-  }
-
-  resources.set("Font", fonts);
-
-  return resources;
 }

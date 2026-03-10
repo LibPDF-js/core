@@ -125,6 +125,24 @@ export class CFFType1FontProgram implements FontProgram {
     return this.getGlyphId(codePoint) !== 0;
   }
 
+  hasRenderableGlyph(glyphId: number): boolean {
+    return (
+      glyphId > 0 &&
+      glyphId < this.font.charStrings.length &&
+      this.font.charStrings[glyphId].length > 0
+    );
+  }
+
+  hasRenderableGlyphs(): boolean {
+    for (let glyphId = 1; glyphId < this.font.charStrings.length; glyphId++) {
+      if (this.hasRenderableGlyph(glyphId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   getData(): Uint8Array {
     return this.data;
   }

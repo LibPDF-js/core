@@ -3,6 +3,7 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import { describe, expect, it } from "vitest";
 
 import { CIDFont, CIDWidthMap, parseCIDWidths } from "./cid-font";
+import { ToUnicodeMap } from "./to-unicode";
 
 describe("CIDWidthMap", () => {
   describe("individual mappings", () => {
@@ -184,5 +185,16 @@ describe("CIDFont", () => {
     expect(font.cidSystemInfo.registry).toBe("Adobe");
     expect(font.cidSystemInfo.ordering).toBe("Japan1");
     expect(font.cidSystemInfo.supplement).toBe(6);
+  });
+
+  it("should resolve char codes through ToUnicode when glyph lookup is unavailable", () => {
+    const font = new CIDFont({
+      subtype: "CIDFontType2",
+      baseFontName: "TestFont",
+      cidToGidMap: new Uint16Array([0, 2]),
+      toUnicodeMap: new ToUnicodeMap(new Map([[1, "A"]])),
+    });
+
+    expect(font.tryGetCharCodeForUnicode(0x41)).toBe(1);
   });
 });

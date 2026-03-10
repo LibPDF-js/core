@@ -27,7 +27,9 @@ import { PdfStream } from "#src/objects/pdf-stream.ts";
 
 import { type EmbeddedParserOptions, parseEmbeddedProgram } from "./embedded-parser";
 import { FontDescriptor } from "./font-descriptor";
+import { isCFFCIDFontProgram } from "./font-program/cff-cid.ts";
 import type { FontProgram } from "./font-program/index.ts";
+import type { ToUnicodeMap } from "./to-unicode";
 
 export type CIDFontSubtype = "CIDFontType0" | "CIDFontType2";
 
@@ -69,8 +71,17 @@ export class CIDFont {
   /** CID to GID mapping (null = Identity, Uint16Array = explicit map) */
   private readonly cidToGidMap: "Identity" | Uint16Array | null;
 
+  /** Inverse CID to GID map: GID → CID (built lazily for stream-based maps) */
+  private gidToCidMap: Map<number, number> | null = null;
+
   /** Embedded font program (if available) */
   private readonly embeddedProgram: FontProgram | null;
+
+  /** ToUnicode map from the parent Type0 font, if available */
+  private readonly toUnicodeMap: ToUnicodeMap | null;
+
+  /** Reverse ToUnicode map: Unicode code point -> character code */
+  private unicodeToCharCodeMap: Map<number, number> | null = null;
 
   constructor(options: {
     subtype: CIDFontSubtype;
@@ -81,6 +92,7 @@ export class CIDFont {
     widths?: CIDWidthMap;
     cidToGidMap?: "Identity" | Uint16Array | null;
     embeddedProgram?: FontProgram | null;
+    toUnicodeMap?: ToUnicodeMap | null;
   }) {
     this.subtype = options.subtype;
     this.baseFontName = options.baseFontName;
@@ -94,6 +106,7 @@ export class CIDFont {
     this.widths = options.widths ?? new CIDWidthMap();
     this.cidToGidMap = options.cidToGidMap ?? "Identity";
     this.embeddedProgram = options.embeddedProgram ?? null;
+    this.toUnicodeMap = options.toUnicodeMap ?? null;
   }
 
   /**
@@ -101,6 +114,29 @@ export class CIDFont {
    */
   get hasEmbeddedProgram(): boolean {
     return this.embeddedProgram !== null;
+  }
+
+  /**
+   * Check if the embedded font program has renderable glyph outlines.
+   *
+   * Some PDFs embed fonts with metrics and cmap data but stripped outlines.
+   * These fonts are usable for text extraction but cannot render new text.
+   */
+  get hasRenderableGlyphs(): boolean {
+    return this.embeddedProgram?.hasRenderableGlyphs() ?? false;
+  }
+
+  /**
+   * Check whether the embedded program can render a glyph for the given CID.
+   */
+  hasRenderableGlyphForCID(cid: number): boolean {
+    if (!this.embeddedProgram) {
+      return false;
+    }
+
+    const gid = this.getGid(cid);
+
+    return this.embeddedProgram.hasRenderableGlyph(gid);
   }
 
   /**
@@ -141,11 +177,112 @@ export class CIDFont {
    * Used when accessing embedded font data.
    */
   getGid(cid: number): number {
+    if (this.embeddedProgram && isCFFCIDFontProgram(this.embeddedProgram)) {
+      return this.embeddedProgram.getGlyphIdForCID(cid);
+    }
+
     if (this.cidToGidMap === "Identity" || this.cidToGidMap === null) {
       return cid;
     }
 
     return this.cidToGidMap[cid] ?? 0;
+  }
+
+  /**
+   * Whether the CIDToGIDMap is Identity (or absent, which defaults to Identity).
+   */
+  get isIdentityCidToGid(): boolean {
+    return this.cidToGidMap === "Identity" || this.cidToGidMap === null;
+  }
+
+  /**
+   * Get the character code (= CID for Identity-H) to write in a PDF string
+   * for a given Unicode code point.
+   *
+   * The encoding pipeline for Identity-H is:
+   *   character code (in PDF string) = CID (because Identity-H maps 1:1)
+   *   CID → GID (via CIDToGIDMap)
+   *   GID → glyph in font file
+   *
+   * We need to find the character code such that after the CIDToGIDMap
+   * transformation, we get the GID corresponding to the desired Unicode
+   * character in the embedded font program.
+   *
+   * For Identity CIDToGIDMap: charCode = CID = GID = fontProgram.getGlyphId(unicode)
+   * For stream CIDToGIDMap: charCode = CID where CIDToGIDMap[CID] = desired GID
+   */
+  getCharCodeForUnicode(unicode: number): number {
+    return this.tryGetCharCodeForUnicode(unicode) ?? unicode;
+  }
+
+  /**
+   * Try to resolve the character code (= CID for Identity-H) for a Unicode
+   * code point. Returns null when the mapping cannot be proven.
+   */
+  tryGetCharCodeForUnicode(unicode: number): number | null {
+    const fontProgram = this.getEmbeddedProgram();
+
+    if (fontProgram) {
+      const desiredGid = fontProgram.getGlyphId(unicode);
+
+      if (desiredGid !== 0) {
+        if (this.isIdentityCidToGid) {
+          // Identity CIDToGIDMap: CID = GID, so write GID directly.
+          return desiredGid;
+        }
+
+        const cid = this.getCharCodeForGid(desiredGid);
+
+        if (cid !== null) {
+          return cid;
+        }
+      }
+    }
+
+    if (!this.toUnicodeMap) {
+      return null;
+    }
+
+    if (!this.unicodeToCharCodeMap) {
+      this.unicodeToCharCodeMap = new Map();
+      const unicodeToCharCodeMap = this.unicodeToCharCodeMap;
+
+      this.toUnicodeMap.forEach((unicodeValue, charCode) => {
+        const chars = Array.from(unicodeValue);
+
+        if (chars.length !== 1) {
+          return;
+        }
+
+        const codePoint = chars[0].codePointAt(0);
+
+        if (codePoint === undefined || unicodeToCharCodeMap.has(codePoint)) {
+          return;
+        }
+
+        unicodeToCharCodeMap.set(codePoint, charCode);
+      });
+    }
+
+    return this.unicodeToCharCodeMap.get(unicode) ?? null;
+  }
+
+  private getCharCodeForGid(gid: number): number | null {
+    if (!this.gidToCidMap) {
+      this.gidToCidMap = new Map();
+
+      if (this.cidToGidMap instanceof Uint16Array) {
+        for (let cid = 0; cid < this.cidToGidMap.length; cid++) {
+          const mappedGid = this.cidToGidMap[cid];
+
+          if (mappedGid !== 0 && !this.gidToCidMap.has(mappedGid)) {
+            this.gidToCidMap.set(mappedGid, cid);
+          }
+        }
+      }
+    }
+
+    return this.gidToCidMap.get(gid) ?? null;
   }
 }
 
@@ -271,6 +408,7 @@ export function parseCIDFont(
   dict: PdfDict,
   options: {
     resolver?: RefResolver;
+    toUnicodeMap?: ToUnicodeMap | null;
   } = {},
 ): CIDFont {
   const subtypeName = dict.getName("Subtype");
@@ -298,18 +436,8 @@ export function parseCIDFont(
   const defaultWidth = dict.getNumber("DW")?.value ?? 1000;
 
   // Parse /W array (can be inline or a ref)
-  let widths = new CIDWidthMap();
-  let w = dict.get("W", options.resolver);
-
-  let wArray: PdfArray | null = null;
-
-  if (w instanceof PdfArray) {
-    wArray = w;
-  }
-
-  if (wArray) {
-    widths = parseCIDWidths(wArray);
-  }
+  const w = dict.get("W", options.resolver);
+  const widths = w instanceof PdfArray ? parseCIDWidths(w) : new CIDWidthMap();
 
   // Parse FontDescriptor and embedded font program
   let descriptor: FontDescriptor | null = null;
@@ -359,5 +487,6 @@ export function parseCIDFont(
     widths,
     cidToGidMap,
     embeddedProgram,
+    toUnicodeMap: options.toUnicodeMap,
   });
 }

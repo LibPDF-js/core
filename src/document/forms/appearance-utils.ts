@@ -3,6 +3,8 @@
  */
 
 import type { Operator } from "#src/content/operators";
+import { ContentStreamParser } from "#src/content/parsing/content-stream-parser";
+import { isParsedOperation } from "#src/content/parsing/types";
 import {
   closePath,
   curveTo,
@@ -23,8 +25,18 @@ import {
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import type { PdfStream } from "#src/objects/pdf-stream";
+import { PdfString } from "#src/objects/pdf-string";
 
-import { type FormFont, isEmbeddedFont } from "./form-font";
+import type { ObjectRegistry } from "../object-registry";
+import type { AcroForm } from "./acro-form";
+import type { RgbColor } from "./fields";
+import {
+  ExistingFont,
+  type FormFont,
+  isEmbeddedFont,
+  isExistingFont,
+  mapToStandardFont,
+} from "./form-font";
 
 /**
  * Parsed default appearance string components.
@@ -68,6 +80,11 @@ export interface FontMetrics {
   getTextWidth(text: string, fontSize: number): number;
 }
 
+export interface AppearanceFontSource {
+  getFont(): FormFont | null;
+  defaultAppearance?: string | null;
+}
+
 /**
  * Constants for appearance generation.
  */
@@ -79,118 +96,331 @@ export const DEFAULT_HIGHLIGHT_COLOR = { r: 153 / 255, g: 193 / 255, b: 218 / 25
 /**
  * Extract styling information from an existing appearance stream.
  *
- * Parses the content stream to find colors, fonts, and border widths
- * so they can be reused when regenerating the appearance.
+ * Uses the content stream parser to walk operations while tracking
+ * the graphics state stack (q/Q). This correctly identifies:
+ * - Background color: fill color when a rectangle is filled outside text
+ * - Border color/width: stroke color/width when stroked outside text
+ * - Text color: fill color at the time text is actually shown
+ * - Font: the Tf setting active when text is shown
+ *
+ * Handles all color spaces: gray (g/G), RGB (rg/RG), and CMYK (k/K).
  */
 export function extractAppearanceStyle(stream: PdfStream): ExtractedAppearanceStyle {
   const style: ExtractedAppearanceStyle = {};
 
   try {
     const data = stream.getDecodedData();
+    const parser = new ContentStreamParser(data);
+    const { operations } = parser.parse();
 
-    const content = new TextDecoder().decode(data);
-
-    // Extract background color (first fill color before any BT block)
-    // Look for: r g b rg (RGB) or g g (gray) or c m y k k (CMYK)
-    const btIndex = content.indexOf("BT");
-    const preBT = btIndex > 0 ? content.slice(0, btIndex) : content;
-
-    // RGB fill: "0.5 0.5 0.5 rg"
-    const rgMatch = preBT.match(/([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg/);
-
-    if (rgMatch) {
-      style.backgroundColor = [
-        Number.parseFloat(rgMatch[1]),
-        Number.parseFloat(rgMatch[2]),
-        Number.parseFloat(rgMatch[3]),
-      ];
+    // Graphics state tracking
+    interface GState {
+      fillColor: number[] | null;
+      strokeColor: number[] | null;
+      lineWidth: number | null;
+      fontName: string | null;
+      fontSize: number | null;
     }
 
-    // Gray fill: "0.5 g" (but not "0 g" which resets)
+    const stateStack: GState[] = [];
+    let state: GState = {
+      fillColor: null,
+      strokeColor: null,
+      lineWidth: null,
+      fontName: null,
+      fontSize: null,
+    };
 
-    if (!style.backgroundColor) {
-      const gMatch = preBT.match(/([\d.]+)\s+g(?!\w)/);
+    let inTextBlock = false;
+    let hasSeenTextShowOp = false;
 
-      if (gMatch && Number.parseFloat(gMatch[1]) !== 0) {
-        style.backgroundColor = [Number.parseFloat(gMatch[1])];
+    // State captured at time of text showing (most accurate)
+    let shownTextColor: number[] | null = null;
+    let shownFontName: string | null = null;
+    let shownFontSize: number | null = null;
+
+    // Last font/color set inside a text block (fallback for empty fields)
+    let textBlockFontName: string | null = null;
+    let textBlockFontSize: number | null = null;
+    let textBlockFillColor: number[] | null = null;
+
+    for (const op of operations) {
+      if (!isParsedOperation(op)) {
+        continue;
+      }
+
+      const { operator, operands } = op;
+
+      switch (operator) {
+        // ── Graphics state stack ──
+        case "q":
+          stateStack.push({ ...state });
+          break;
+        case "Q":
+          if (stateStack.length > 0) {
+            // biome-ignore lint/style/noNonNullAssertion: length check above
+            state = stateStack.pop()!;
+          }
+          break;
+
+        // ── Fill colors (g, rg, k) ──
+        case "g":
+          state.fillColor = [num(operands[0])];
+          break;
+        case "rg":
+          state.fillColor = [num(operands[0]), num(operands[1]), num(operands[2])];
+          break;
+        case "k":
+          state.fillColor = [
+            num(operands[0]),
+            num(operands[1]),
+            num(operands[2]),
+            num(operands[3]),
+          ];
+          break;
+
+        // ── Stroke colors (G, RG, K) ──
+        case "G":
+          state.strokeColor = [num(operands[0])];
+          break;
+        case "RG":
+          state.strokeColor = [num(operands[0]), num(operands[1]), num(operands[2])];
+          break;
+        case "K":
+          state.strokeColor = [
+            num(operands[0]),
+            num(operands[1]),
+            num(operands[2]),
+            num(operands[3]),
+          ];
+          break;
+
+        // ── Line width ──
+        case "w":
+          state.lineWidth = num(operands[0]);
+          break;
+
+        // ── Font ──
+        case "Tf":
+          state.fontName = nameStr(operands[0]);
+          state.fontSize = num(operands[1]);
+
+          if (inTextBlock) {
+            textBlockFontName = state.fontName;
+            textBlockFontSize = state.fontSize;
+          }
+          break;
+
+        // ── Fill operations (background detection) ──
+        // Only treat as background if we haven't entered a text block yet
+        case "f":
+        case "F":
+        case "f*":
+          if (!inTextBlock && !hasSeenTextShowOp && state.fillColor) {
+            style.backgroundColor = [...state.fillColor];
+          }
+          break;
+
+        // ── Combined fill+stroke ──
+        case "B":
+        case "B*":
+        case "b":
+        case "b*":
+          if (!inTextBlock && !hasSeenTextShowOp) {
+            if (state.fillColor) {
+              style.backgroundColor = [...state.fillColor];
+            }
+            if (state.strokeColor) {
+              style.borderColor = [...state.strokeColor];
+            }
+            if (state.lineWidth != null) {
+              style.borderWidth = state.lineWidth;
+            }
+          }
+          break;
+
+        // ── Stroke operations (border detection) ──
+        case "S":
+        case "s":
+          if (!inTextBlock && !hasSeenTextShowOp) {
+            if (state.strokeColor) {
+              style.borderColor = [...state.strokeColor];
+            }
+            if (state.lineWidth != null) {
+              style.borderWidth = state.lineWidth;
+            }
+          }
+          break;
+
+        // ── Text blocks ──
+        case "BT":
+          inTextBlock = true;
+          break;
+        case "ET":
+          inTextBlock = false;
+          break;
+
+        // ── Text showing operations ──
+        // The fill color at text-show time IS the text color (render mode 0)
+        case "Tj":
+        case "TJ":
+        case "'":
+        case '"':
+          hasSeenTextShowOp = true;
+          if (state.fillColor) {
+            shownTextColor = [...state.fillColor];
+          }
+          if (state.fontName) {
+            shownFontName = state.fontName;
+            shownFontSize = state.fontSize;
+          }
+          break;
+      }
+
+      // Track fill color changes inside text blocks (for empty field fallback)
+      if (
+        inTextBlock &&
+        (operator === "g" || operator === "rg" || operator === "k") &&
+        state.fillColor
+      ) {
+        textBlockFillColor = [...state.fillColor];
       }
     }
 
-    // Extract border color (stroke color before BT block)
-    // Only extract if there's actually a stroke operation (S or s) - otherwise the
-    // stroke color setting wasn't used to draw a visible border
-    const hasStrokeOp = /\bS\b/.test(preBT);
-
-    if (hasStrokeOp) {
-      // RGB stroke: "0.5 0.5 0.5 RG"
-      const RGMatch = preBT.match(/([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+RG/);
-
-      if (RGMatch) {
-        style.borderColor = [
-          Number.parseFloat(RGMatch[1]),
-          Number.parseFloat(RGMatch[2]),
-          Number.parseFloat(RGMatch[3]),
-        ];
-      }
-
-      // Gray stroke: "0.5 G"
-
-      if (!style.borderColor) {
-        const GMatch = preBT.match(/([\d.]+)\s+G(?!\w)/);
-
-        if (GMatch) {
-          style.borderColor = [Number.parseFloat(GMatch[1])];
-        }
-      }
-
-      // Border width: "2 w" - only meaningful if there's a stroke
-      const wMatch = preBT.match(/([\d.]+)\s+w/);
-
-      if (wMatch) {
-        style.borderWidth = Number.parseFloat(wMatch[1]);
-      }
+    // Assign text color: prefer shown, then text-block, then nothing
+    if (shownTextColor) {
+      style.textColor = shownTextColor;
+    } else if (textBlockFillColor) {
+      style.textColor = textBlockFillColor;
     }
 
-    // Extract text color (inside BT...ET block)
-    const btMatch = content.match(/BT[\s\S]*?ET/);
+    // Assign font: prefer shown, then text-block, then last seen
+    const fontName = shownFontName ?? textBlockFontName ?? state.fontName;
+    const fontSize = shownFontSize ?? textBlockFontSize ?? state.fontSize;
 
-    if (btMatch) {
-      const btContent = btMatch[0];
-
-      // RGB text color
-      const textRgMatch = btContent.match(/([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg/);
-
-      if (textRgMatch) {
-        style.textColor = [
-          Number.parseFloat(textRgMatch[1]),
-          Number.parseFloat(textRgMatch[2]),
-          Number.parseFloat(textRgMatch[3]),
-        ];
+    if (fontName) {
+      style.fontName = fontName;
+      if (fontSize != null && fontSize > 0) {
+        style.fontSize = fontSize;
       }
-
-      // Gray text color
-
-      if (!style.textColor) {
-        const textGMatch = btContent.match(/([\d.]+)\s+g(?!\w)/);
-
-        if (textGMatch) {
-          style.textColor = [Number.parseFloat(textGMatch[1])];
-        }
-      }
-    }
-
-    // Extract font info: "/Helv 12 Tf"
-    const fontMatch = content.match(/\/(\w+)\s+([\d.]+)\s+Tf/);
-
-    if (fontMatch) {
-      style.fontName = fontMatch[1];
-      style.fontSize = Number.parseFloat(fontMatch[2]);
     }
   } catch {
     // If parsing fails, return empty style
   }
 
   return style;
+}
+
+/**
+ * Resolve the first font candidate that can be used for the given appearance text.
+ */
+export function chooseAppearanceFont(
+  text: string,
+  candidates: Iterable<FormFont | null | undefined>,
+): FormFont {
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    if (isExistingFont(candidate)) {
+      if (candidate.canUseForAppearance(text)) {
+        return candidate;
+      }
+
+      continue;
+    }
+
+    if (isEmbeddedFont(candidate)) {
+      if (candidate.canEncode(text)) {
+        return candidate;
+      }
+
+      continue;
+    }
+
+    return candidate;
+  }
+
+  return new ExistingFont("Helv", null, null);
+}
+
+/**
+ * Resolve the best available font for generating an appearance.
+ */
+export function resolveAppearanceFont(
+  acroForm: AcroForm,
+  field: AppearanceFontSource,
+  text: string,
+  existingFontName?: string,
+): FormFont {
+  const candidates: FormFont[] = [];
+  const fieldFont = field.getFont();
+  const defaultFont = acroForm.getDefaultFont();
+
+  if (fieldFont) {
+    candidates.push(fieldFont);
+  }
+
+  if (defaultFont) {
+    candidates.push(defaultFont);
+  }
+
+  if (existingFontName) {
+    const existingFont = acroForm.getExistingFont(existingFontName);
+
+    if (existingFont) {
+      candidates.push(existingFont);
+    }
+  }
+
+  const da = field.defaultAppearance ?? acroForm.defaultAppearance;
+  const daInfo = parseDAString(da);
+  const daFont = acroForm.getExistingFont(daInfo.fontName);
+
+  if (daFont) {
+    candidates.push(daFont);
+  }
+
+  for (const availableFont of acroForm.getAvailableFonts()) {
+    if (!candidates.includes(availableFont)) {
+      candidates.push(availableFont);
+    }
+  }
+
+  return chooseAppearanceFont(text, candidates);
+}
+
+/** Extract numeric value from a content token operand. */
+function num(token: unknown): number {
+  if (
+    token &&
+    typeof token === "object" &&
+    "type" in token &&
+    token.type === "number" &&
+    "value" in token &&
+    typeof token.value === "number"
+  ) {
+    return token.value;
+  }
+
+  return 0;
+}
+
+/** Extract name string from a content token operand (strips leading slash). */
+function nameStr(token: unknown): string {
+  if (
+    token &&
+    typeof token === "object" &&
+    "type" in token &&
+    token.type === "name" &&
+    "value" in token &&
+    typeof token.value === "string"
+  ) {
+    return token.value;
+  }
+
+  return "";
 }
 
 /**
@@ -394,20 +624,192 @@ export function getFontMetrics(font: FormFont): FontMetrics {
   };
 }
 
-/**
- * Map font names to Standard 14 font names.
- */
-export function mapToStandardFontName(name: string): string {
-  const aliases: Record<string, string> = {
-    Helv: "Helvetica",
-    HeBo: "Helvetica-Bold",
-    TiRo: "Times-Roman",
-    TiBo: "Times-Bold",
-    Cour: "Courier",
-    CoBo: "Courier-Bold",
-    ZaDb: "ZapfDingbats",
-    Symb: "Symbol",
-  };
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared Appearance Context & Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
-  return aliases[name] || name;
+/**
+ * Shared context for appearance stream generation.
+ *
+ * All appearance generators (text, button, choice) share this context
+ * to coordinate font resource naming across a generation session.
+ */
+export interface AppearanceContext {
+  acroForm: AcroForm;
+  registry: ObjectRegistry;
+  fontResourceNames: Map<FormFont, string>;
+  fontNameCounter: number;
+}
+
+/**
+ * Assign a resource name for a font in the current generation session.
+ */
+export function getFontResourceName(
+  ctx: AppearanceContext,
+  font: FormFont,
+): { name: string; counter: number } {
+  if (ctx.fontResourceNames.has(font)) {
+    return {
+      // biome-ignore lint/style/noNonNullAssertion: checked above
+      name: ctx.fontResourceNames.get(font)!,
+      counter: ctx.fontNameCounter,
+    };
+  }
+
+  let name: string;
+
+  if (isExistingFont(font)) {
+    name = font.name.startsWith("/") ? font.name : `/${font.name}`;
+  } else {
+    ctx.fontNameCounter++;
+    name = `/F${ctx.fontNameCounter}`;
+  }
+
+  ctx.fontResourceNames.set(font, name);
+
+  return {
+    name,
+    counter: ctx.fontNameCounter,
+  };
+}
+
+/**
+ * Resolve the default appearance string from field or form defaults, and parse it.
+ */
+export function parseDefaultAppearance(
+  ctx: AppearanceContext,
+  field: { defaultAppearance?: string | null },
+): ParsedDA {
+  const da =
+    "defaultAppearance" in field
+      ? (field.defaultAppearance ?? ctx.acroForm.defaultAppearance)
+      : ctx.acroForm.defaultAppearance;
+
+  return parseDAString(da);
+}
+
+/**
+ * Calculate font size to fit text within given dimensions.
+ */
+export function calculateAutoFontSize(
+  text: string,
+  width: number,
+  height: number,
+  font: FormFont,
+  isMultiline = false,
+): number {
+  const contentWidth = width - 2 * PADDING;
+  const contentHeight = height - 2 * PADDING;
+
+  if (isMultiline) {
+    return Math.max(MIN_FONT_SIZE, Math.min(12, contentHeight * 0.15));
+  }
+
+  const heightBased = contentHeight * 0.7;
+
+  let fontSize = heightBased;
+  const metrics = getFontMetrics(font);
+  let textWidth = metrics.getTextWidth(text || "X", fontSize);
+
+  while (textWidth > contentWidth && fontSize > MIN_FONT_SIZE) {
+    fontSize -= 1;
+    textWidth = metrics.getTextWidth(text || "X", fontSize);
+  }
+
+  return Math.max(MIN_FONT_SIZE, Math.min(fontSize, MAX_FONT_SIZE));
+}
+
+/**
+ * Encode text for use in a PDF content stream with the given font.
+ */
+export function encodeTextForFont(text: string, font: FormFont): PdfString {
+  if (isEmbeddedFont(font)) {
+    font.markUsedInForm();
+
+    if (!font.canEncode(text)) {
+      const unencodable = font.getUnencodableCharacters(text);
+      const firstBad = unencodable[0];
+
+      throw new Error(
+        `Font cannot encode character '${firstBad}' (U+${firstBad.codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0")})`,
+      );
+    }
+
+    const gids = font.encodeTextToGids(text);
+    const bytes = new Uint8Array(gids.length * 2);
+
+    for (let i = 0; i < gids.length; i++) {
+      bytes[i * 2] = (gids[i] >> 8) & 0xff;
+      bytes[i * 2 + 1] = gids[i] & 0xff;
+    }
+
+    return PdfString.fromBytes(bytes);
+  }
+
+  if (isExistingFont(font) && font.isCIDFont) {
+    return PdfString.fromBytes(font.encodeTextToBytes(text));
+  }
+
+  return PdfString.fromString(text);
+}
+
+/**
+ * Generate color operators for text rendering.
+ */
+export function getColorOperators(textColor: RgbColor | null, daInfo: ParsedDA): Operator[] {
+  if (textColor) {
+    return [setNonStrokingRGB(textColor.r, textColor.g, textColor.b)];
+  }
+
+  switch (daInfo.colorOp) {
+    case "g":
+      return [setNonStrokingGray(daInfo.colorArgs[0] ?? 0)];
+    case "rg":
+      return [
+        setNonStrokingRGB(
+          daInfo.colorArgs[0] ?? 0,
+          daInfo.colorArgs[1] ?? 0,
+          daInfo.colorArgs[2] ?? 0,
+        ),
+      ];
+    case "k":
+      return [
+        setNonStrokingCMYK(
+          daInfo.colorArgs[0] ?? 0,
+          daInfo.colorArgs[1] ?? 0,
+          daInfo.colorArgs[2] ?? 0,
+          daInfo.colorArgs[3] ?? 0,
+        ),
+      ];
+    default:
+      return [setNonStrokingGray(0)];
+  }
+}
+
+/**
+ * Build a resources dictionary containing a single font entry.
+ */
+export function buildFontResources(font: FormFont, fontName: string): PdfDict {
+  const resources = new PdfDict();
+  const fonts = new PdfDict();
+
+  const cleanName = fontName.startsWith("/") ? fontName.slice(1) : fontName;
+
+  if (isEmbeddedFont(font)) {
+    fonts.set(cleanName, font.ref);
+  } else if (isExistingFont(font) && font.ref) {
+    fonts.set(cleanName, font.ref);
+  } else {
+    const fontDict = new PdfDict();
+
+    fontDict.set("Type", PdfName.of("Font"));
+    fontDict.set("Subtype", PdfName.of("Type1"));
+    fontDict.set("BaseFont", PdfName.of(mapToStandardFont(cleanName) ?? cleanName));
+
+    fonts.set(cleanName, fontDict);
+  }
+
+  resources.set("Font", fonts);
+
+  return resources;
 }

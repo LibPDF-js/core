@@ -38,7 +38,7 @@ export {
 } from "./appearance-utils";
 
 // Import implementation modules
-import type { ExtractedAppearanceStyle } from "./appearance-utils";
+import type { AppearanceContext, ExtractedAppearanceStyle } from "./appearance-utils";
 import * as ButtonAppearance from "./button-appearance";
 import * as ChoiceAppearance from "./choice-appearance";
 import * as TextAppearance from "./text-appearance";
@@ -67,9 +67,7 @@ export class AppearanceGenerator {
   /**
    * Get the shared context for appearance generation.
    */
-  private getContext(): TextAppearance.TextAppearanceContext &
-    ButtonAppearance.ButtonAppearanceContext &
-    ChoiceAppearance.ChoiceAppearanceContext {
+  private getContext(): AppearanceContext {
     return {
       acroForm: this.acroForm,
       registry: this.registry,

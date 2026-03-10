@@ -73,6 +73,22 @@ export interface FontProgram {
   hasGlyph(codePoint: number): boolean;
 
   /**
+   * Check if the font has renderable glyph outlines.
+   *
+   * Some PDF subsetted fonts are "crippled" — they contain glyph metrics
+   * and cmap data but no actual outline data (0 contours for all glyphs).
+   * These fonts are used only for text extraction and cannot render text.
+   *
+   * Returns true if at least some common glyphs have actual outline data.
+   */
+  hasRenderableGlyphs(): boolean;
+
+  /**
+   * Check if a specific glyph has renderable outlines or charstring data.
+   */
+  hasRenderableGlyph(glyphId: number): boolean;
+
+  /**
    * Get the raw font data.
    */
   getData(): Uint8Array;

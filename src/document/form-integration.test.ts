@@ -7,6 +7,7 @@
  */
 
 import { PDF } from "#src/api/pdf";
+import { DropdownField } from "#src/document/forms/fields/choice-fields";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
@@ -844,6 +845,147 @@ describe("Form Integration: Edge Cases", () => {
     expect(savedBytes.length).toBeGreaterThan(0);
   });
 
+  it("reuses valid registered existing fonts for appearance generation", async () => {
+    const pdfBytes = await loadFixture("forms", "with_combed_fields.pdf");
+    const pdf = await PDF.load(pdfBytes);
+    const form = pdf.getForm();
+    expect(form).not.toBeNull();
+
+    const targetField = form!
+      .getTextFields()
+      .find(field => field.alternateName === "6. Certification. Name.");
+
+    expect(targetField).toBeDefined();
+
+    targetField!.setValue("Jane Doe");
+    form!.updateAppearances();
+
+    const savedBytes = await pdf.save();
+    const pdf2 = await PDF.load(savedBytes);
+    const field2 = pdf2
+      .getForm()!
+      .getTextFields()
+      .find(field => field.alternateName === "6. Certification. Name.");
+
+    expect(field2).toBeDefined();
+    expect(field2!.getValue()).toBe("Jane Doe");
+
+    const appearance = field2!.getWidgets()[0].getNormalAppearance();
+    expect(appearance).not.toBeNull();
+
+    const streamContent = new TextDecoder().decode(appearance!.getDecodedData());
+
+    expect(streamContent).toContain("/HeBo");
+    expect(streamContent).not.toContain("/Helv");
+    expect(streamContent).toContain("(Jane Doe) Tj");
+  });
+
+  it("skips unusable field fonts and reuses a later registered font", async () => {
+    const pdfBytes = await loadFixture("forms", "pdfjs/bug1669099.pdf");
+    const pdf = await PDF.load(pdfBytes);
+    const form = pdf.getForm();
+    expect(form).not.toBeNull();
+
+    const targetField = form!.getTextField("_e");
+    expect(targetField).not.toBeNull();
+
+    targetField!.setValue("Visible text");
+    form!.updateAppearances();
+
+    const savedBytes = await pdf.save();
+    const pdf2 = await PDF.load(savedBytes);
+    const field2 = pdf2.getForm()!.getTextField("_e");
+    expect(field2).not.toBeNull();
+    expect(field2!.getValue()).toBe("Visible text");
+
+    const appearance = field2!.getWidgets()[0].getNormalAppearance();
+    expect(appearance).not.toBeNull();
+
+    const streamContent = new TextDecoder().decode(appearance!.getDecodedData());
+
+    // Original /DA uses an unusable anonymous font name ("/"). We should
+    // skip it and reuse the later registered OpenSans font instead.
+    expect(streamContent).toContain("/Fo2");
+    expect(streamContent).not.toContain("/Helv");
+    expect(streamContent).not.toContain("\n/ 12.00000 Tf");
+    expect(streamContent).toContain("Visible text");
+  });
+
+  it("reuses existing fonts for choice field appearances", async () => {
+    const pdfBytes = await loadFixture("forms", "pdfjs/annotation-choice-widget.pdf");
+    const pdf = await PDF.load(pdfBytes);
+    const form = pdf.getForm();
+    expect(form).not.toBeNull();
+
+    const dropdown = form!
+      .acroForm()
+      .getFields()
+      .find(field => field.type === "dropdown" && field.alternateName === "Combo box");
+
+    expect(dropdown).toBeInstanceOf(DropdownField);
+
+    const comboBox = dropdown as DropdownField;
+
+    comboBox.setValue("Amet");
+    form!.updateAppearances();
+
+    const savedBytes = await pdf.save();
+    const pdf2 = await PDF.load(savedBytes);
+    const dropdown2 = pdf2
+      .getForm()!
+      .acroForm()
+      .getFields()
+      .find(field => field.type === "dropdown" && field.alternateName === "Combo box");
+
+    expect(dropdown2).toBeInstanceOf(DropdownField);
+
+    const appearance = (dropdown2 as DropdownField).getWidgets()[0].getNormalAppearance();
+    expect(appearance).not.toBeNull();
+
+    const streamContent = new TextDecoder().decode(appearance!.getDecodedData());
+
+    expect(streamContent).toContain("/MyriadPro-Regular");
+    expect(streamContent).not.toContain("/Helv");
+    expect(streamContent).toContain("(Amet) Tj");
+  });
+
+  it("reuses valid Type0 fonts for button captions", async () => {
+    const pdfBytes = await loadFixture("forms", "pdfjs/issue15053.pdf");
+    const pdf = await PDF.load(pdfBytes);
+    const form = pdf.getForm();
+    expect(form).not.toBeNull();
+
+    const buttonField = form!
+      .acroForm()
+      .getFields()
+      .find(field => field.type === "button" && field.name === "Button2");
+
+    expect(buttonField).toBeDefined();
+
+    buttonField!.setFont(form!.acroForm().getExistingFont("/KozMinPr6N-Regular")!);
+    buttonField!.needsAppearanceUpdate = true;
+    form!.updateAppearances();
+
+    const savedBytes = await pdf.save();
+    const pdf2 = await PDF.load(savedBytes);
+    const buttonField2 = pdf2
+      .getForm()!
+      .acroForm()
+      .getFields()
+      .find(field => field.type === "button" && field.name === "Button2");
+
+    expect(buttonField2).toBeDefined();
+
+    const appearance = buttonField2!.getWidgets()[0].getNormalAppearance();
+    expect(appearance).not.toBeNull();
+
+    const streamContent = new TextDecoder().decode(appearance!.getDecodedData());
+
+    expect(streamContent).toContain("/KozMinPr6N-Regular");
+    expect(streamContent).not.toContain("/Helv");
+    expect(streamContent).toContain("<0042007500740074006F006E0031> Tj");
+  });
+
   it("handles multiline text fields", async () => {
     const pdfBytes = await loadFixture("forms", "sample_form.pdf");
     const pdf = await PDF.load(pdfBytes);
@@ -1135,6 +1277,134 @@ describe("Form Integration: Stress Test", () => {
     const pdf2 = await PDF.load(flattenedBytes);
     const form2 = pdf2.getForm();
 
+    if (form2) {
+      expect(form2.getFields().length).toBe(0);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CID Font Form Filling (FINTRAC)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Form Integration: CID Font PDFs", () => {
+  it("fills FINTRAC form without black rectangles or tofu", async () => {
+    // This PDF uses a CID font (Type0/Identity-H) for its form fields.
+    // Previously, filling caused:
+    //   1. Black rectangles (text color misidentified as background fill)
+    //   2. Tofu characters (CID font used for single-byte text encoding)
+    const pdfBytes = await loadFixture("issues", "form-filling/FINTRAC.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    const form = pdf.getForm();
+    expect(form).not.toBeNull();
+
+    // Fill text fields
+    const result = form!.fill({
+      transaction: "123 main st",
+      realtor: "No one",
+      date: "2026-02-02",
+      full_name: "John Doe",
+      client_address: "123 Any Street, Toronto, ON, M0M 0M0",
+      date_of_birth: "1968-09-05",
+      nature_of_business: "asd",
+      id_number: "D6101-40706-60905",
+      issuing_authority: "Ontario",
+      issuing_country: "Canada",
+      expiry_date: "2012-11-26",
+      // Checkboxes
+      driverslicense_button: true,
+      passport_button: false,
+      third_party_no_button: true,
+      question_1_yes: true,
+      question_2_no: true,
+      question_3_no: true,
+      question_4_no: true,
+      question_5_yes: true,
+      relationship_nature_residential: true,
+    });
+
+    expect(result.filled.length).toBeGreaterThan(0);
+
+    // Save and reload
+    const savedBytes = await pdf.save();
+    const outputPath = await saveTestOutput("forms/fintrac-filled.pdf", savedBytes);
+    console.log(`  -> Filled output: ${outputPath}`);
+
+    expect(savedBytes.length).toBeGreaterThan(0);
+
+    // Verify text field values round-trip correctly
+    const pdf2 = await PDF.load(savedBytes);
+    const form2 = pdf2.getForm()!;
+
+    expect(form2.getTextField("full_name")?.getValue()).toBe("John Doe");
+    expect(form2.getTextField("transaction")?.getValue()).toBe("123 main st");
+    expect(form2.getTextField("date")?.getValue()).toBe("2026-02-02");
+
+    // Verify appearance streams don't contain background fill operations
+    // (the bug was: text color 0.266667 g was drawn as a filled rectangle)
+    const fullNameField = form2.getTextField("full_name")!;
+    const widgets = fullNameField.getWidgets();
+    const appearance = widgets[0].getNormalAppearance();
+    expect(appearance).not.toBeNull();
+
+    const streamContent = new TextDecoder().decode(appearance!.getDecodedData());
+
+    // The appearance should contain the text
+    expect(streamContent).toContain("Tj");
+    // The appearance should NOT have a filled background rectangle
+    // (a "re f" before BT would indicate a background fill)
+    const preBT = streamContent.slice(0, streamContent.indexOf("BT"));
+    expect(preBT).not.toMatch(/re\s*\n?\s*f/);
+
+    // The FINTRAC PDF's CID font has stripped glyph outlines (no renderable
+    // data). The appearance generator should fall back to Helvetica.
+    expect(streamContent).toContain("/Helv");
+    // Text should be encoded as a regular PDF string (not hex for CID)
+    expect(streamContent).toContain("John Doe");
+  });
+
+  it("flattens FINTRAC form correctly", async () => {
+    const pdfBytes = await loadFixture("issues", "form-filling/FINTRAC.pdf");
+    const pdf = await PDF.load(pdfBytes);
+
+    const form = pdf.getForm()!;
+
+    form.fill({
+      transaction: "123 main st",
+      realtor: "No one",
+      date: "2026-02-02",
+      full_name: "John Doe",
+      client_address: "123 Any Street, Toronto, ON, M0M 0M0",
+      date_of_birth: "1968-09-05",
+      nature_of_business: "asd",
+      id_number: "D6101-40706-60905",
+      issuing_authority: "Ontario",
+      issuing_country: "Canada",
+      expiry_date: "2012-11-26",
+      // Checkboxes
+      driverslicense_button: true,
+      passport_button: false,
+      third_party_no_button: true,
+      question_1_yes: true,
+      question_2_no: true,
+      question_3_no: true,
+      question_4_no: true,
+      question_5_yes: true,
+      relationship_nature_residential: true,
+    });
+
+    form.flatten();
+
+    const savedBytes = await pdf.save();
+    const outputPath = await saveTestOutput("forms/fintrac-flattened.pdf", savedBytes);
+    console.log(`  -> Flattened output: ${outputPath}`);
+
+    expect(savedBytes.length).toBeGreaterThan(0);
+
+    // Form should have no fields after flattening
+    const pdf2 = await PDF.load(savedBytes);
+    const form2 = pdf2.getForm();
     if (form2) {
       expect(form2.getFields().length).toBe(0);
     }

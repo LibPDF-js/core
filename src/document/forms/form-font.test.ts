@@ -2,9 +2,57 @@
  * Tests for form font functionality.
  */
 
+import { CIDFont } from "#src/fonts/cid-font";
+import type { FontProgram } from "#src/fonts/font-program";
+import { ToUnicodeMap } from "#src/fonts/to-unicode";
 import { describe, expect, it } from "vitest";
 
 import { ExistingFont, isEmbeddedFont, isExistingFont } from "./form-font";
+
+class StubFontProgram implements FontProgram {
+  readonly type = "truetype" as const;
+  readonly numGlyphs = 4;
+  readonly unitsPerEm = 1000;
+  readonly bbox = [0, 0, 1000, 1000] as const;
+  readonly postScriptName = "Stub";
+  readonly familyName = "Stub";
+  readonly isFixedPitch = false;
+  readonly italicAngle = 0;
+  readonly ascent = 800;
+  readonly descent = -200;
+  readonly capHeight = 700;
+  readonly xHeight = 500;
+  readonly stemV = 80;
+
+  constructor(
+    private readonly glyphMap: Map<number, number>,
+    private readonly renderableGlyphs: Set<number>,
+  ) {}
+
+  getGlyphId(codePoint: number): number {
+    return this.glyphMap.get(codePoint) ?? 0;
+  }
+
+  getAdvanceWidth(_glyphId: number): number {
+    return 600;
+  }
+
+  hasGlyph(codePoint: number): boolean {
+    return this.glyphMap.has(codePoint);
+  }
+
+  hasRenderableGlyphs(): boolean {
+    return this.renderableGlyphs.size > 0;
+  }
+
+  hasRenderableGlyph(glyphId: number): boolean {
+    return this.renderableGlyphs.has(glyphId);
+  }
+
+  getData(): Uint8Array {
+    return new Uint8Array();
+  }
+}
 
 describe("ExistingFont", () => {
   describe("constructor", () => {
@@ -41,6 +89,68 @@ describe("ExistingFont", () => {
       const font = new ExistingFont("Helv", null, null);
       // Use Unicode escape for CJK character (U+4E16 = )
       expect(font.canEncode("\u4E16")).toBe(false);
+    });
+
+    it("returns true for CID fonts with explicit CIDToGID maps when ToUnicode resolves the code", () => {
+      const cidFont = new CIDFont({
+        subtype: "CIDFontType2",
+        baseFontName: "StubCID",
+        cidToGidMap: new Uint16Array([0, 7]),
+        embeddedProgram: new StubFontProgram(new Map([[0x0041, 7]]), new Set([7])),
+        toUnicodeMap: new ToUnicodeMap(new Map([[1, "A"]])),
+      });
+      const font = new ExistingFont("F0", null, null, true, cidFont);
+
+      expect(font.canEncode("A")).toBe(true);
+      expect(Array.from(font.encodeTextToBytes("A"))).toEqual([0x00, 0x01]);
+    });
+
+    it("returns false for astral characters in CID fonts", () => {
+      const cidFont = new CIDFont({
+        subtype: "CIDFontType2",
+        baseFontName: "StubCID",
+        embeddedProgram: new StubFontProgram(new Map([[0x1f600, 5]]), new Set([5])),
+      });
+      const font = new ExistingFont("F0", null, null, true, cidFont);
+
+      expect(font.canEncode("😀")).toBe(false);
+      expect(font.canUseForAppearance("😀")).toBe(false);
+    });
+  });
+
+  describe("canUseForAppearance", () => {
+    it("returns true for standard 14 fonts with encodable text", () => {
+      const font = new ExistingFont("Helv", null, null);
+
+      expect(font.canUseForAppearance("Hello World")).toBe(true);
+    });
+
+    it("returns false for standard 14 fonts with unencodable text", () => {
+      const font = new ExistingFont("Helv", null, null);
+
+      expect(font.canUseForAppearance("\u4E16")).toBe(false);
+    });
+
+    it("returns false for CID fonts whose mapped glyph is not renderable", () => {
+      const cidFont = new CIDFont({
+        subtype: "CIDFontType2",
+        baseFontName: "StubCID",
+        embeddedProgram: new StubFontProgram(new Map([[0x0041, 1]]), new Set()),
+      });
+      const font = new ExistingFont("F0", null, null, true, cidFont);
+
+      expect(font.canUseForAppearance("A")).toBe(false);
+    });
+
+    it("returns true for CID fonts whose mapped glyph is renderable", () => {
+      const cidFont = new CIDFont({
+        subtype: "CIDFontType2",
+        baseFontName: "StubCID",
+        embeddedProgram: new StubFontProgram(new Map([[0x0041, 1]]), new Set([1])),
+      });
+      const font = new ExistingFont("F0", null, null, true, cidFont);
+
+      expect(font.canUseForAppearance("A")).toBe(true);
     });
   });
 

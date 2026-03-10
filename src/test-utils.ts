@@ -29,6 +29,7 @@ export type FixtureCategory =
   | "fonts"
   | "forms"
   | "images"
+  | "issues"
   | "layers"
   | "malformed"
   | "scenarios"

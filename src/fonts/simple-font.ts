@@ -278,7 +278,7 @@ export function parseSimpleFont(
   const lastChar = dict.getNumber("LastChar", options.resolver)?.value ?? 255;
   // Parse widths array (can be inline or a ref)
 
-  let widthsArray = dict.getArray("Widths", options.resolver);
+  const widthsArray = dict.getArray("Widths", options.resolver);
 
   const widths: number[] = [];
 
