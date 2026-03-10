@@ -147,3 +147,83 @@ export type {
 } from "./worker-proxy";
 
 export { WorkerProxy, createWorkerProxy } from "./worker-proxy";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ParsingWorker (Dedicated Parsing Worker)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type {
+  CancellableParseOperation,
+  ExtractOptions,
+  ExtractTextResult,
+  ParseOptions,
+  ParseResult,
+  ParsingWorkerHostOptions,
+  ParsingWorkerState,
+} from "./parsing-worker-host";
+
+export {
+  ParsingWorkerHost,
+  createParsingWorkerHost,
+  isWorkerSupported,
+} from "./parsing-worker-host";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Progress Tracking
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type { ProgressTrackerOptions } from "./progress-tracker";
+
+export {
+  ProgressTracker,
+  createProgressTracker,
+  DEFAULT_PROGRESS_INTERVAL,
+} from "./progress-tracker";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Parsing Worker Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type {
+  // Progress types
+  ParsingProgress,
+  ParsingProgressCallback,
+  ParsingProgressMessage,
+  ParsingPhase,
+  // Document types
+  ParsedDocumentInfo,
+  DocumentMetadata,
+  ExtractedPageText,
+  TextItem,
+  // Error types
+  ParsingErrorCode,
+  ParsingWorkerError,
+  // Options
+  WorkerParseOptions,
+} from "./parsing-types";
+
+export {
+  createParsingProgress,
+  createParsingError,
+  isParsingProgress,
+  isParsingResponse,
+} from "./parsing-types";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Parsing Utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type { RuntimeEnvironment, ParsingWorkerCreationOptions, Deferred } from "./parsing-utils";
+
+export {
+  detectEnvironment,
+  isWorkerContext,
+  createWorkerInstance,
+  extractTransferables,
+  cloneForTransfer,
+  generateParsingMessageId,
+  generateParsingTaskId,
+  DEFAULT_PARSING_TIMEOUTS,
+  calculateParsingTimeout,
+  createDeferred,
+} from "./parsing-utils";

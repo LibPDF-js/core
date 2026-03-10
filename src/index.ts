@@ -428,3 +428,81 @@ export {
   type WorkerError,
   type ProgressMessage,
 } from "./worker";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Parsing Worker Support
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Parsing worker host
+  createParsingWorkerHost,
+  isWorkerSupported,
+  ParsingWorkerHost,
+  type CancellableParseOperation,
+  type ExtractOptions,
+  type ExtractTextResult,
+  type ParseOptions as ParsingWorkerParseOptions,
+  type ParseResult,
+  type ParsingWorkerHostOptions,
+  type ParsingWorkerState,
+} from "./worker/parsing-worker-host";
+
+export {
+  // Progress tracking
+  createProgressTracker,
+  DEFAULT_PROGRESS_INTERVAL,
+  ProgressTracker,
+  type ProgressTrackerOptions,
+} from "./worker/progress-tracker";
+
+export type {
+  // Parsing types
+  DocumentMetadata as ParsingDocumentMetadata,
+  ExtractedPageText,
+  ParsedDocumentInfo,
+  ParsingErrorCode,
+  ParsingPhase,
+  ParsingProgress,
+  ParsingProgressCallback,
+  ParsingWorkerError,
+  TextItem,
+  WorkerParseOptions,
+} from "./worker/parsing-types";
+
+export {
+  // Parsing utilities
+  calculateParsingTimeout,
+  createDeferred,
+  DEFAULT_PARSING_TIMEOUTS,
+  detectEnvironment,
+  extractTransferables,
+  generateParsingMessageId,
+  generateParsingTaskId,
+  isWorkerContext,
+  type Deferred,
+  type ParsingWorkerCreationOptions,
+  type RuntimeEnvironment,
+} from "./worker/parsing-utils";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Parser Module
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Synchronous parsing
+  DocumentParser,
+  parseDocument,
+  parseDocumentAsync,
+  type ParsedDocument,
+  type ParseOptions,
+  // Errors
+  ObjectParseError,
+  RecoverableParseError,
+  StreamDecodeError,
+  StructureError,
+  UnrecoverableParseError,
+  XRefParseError,
+  // XRef types
+  type XRefData,
+  type XRefEntry,
+} from "./parser";
