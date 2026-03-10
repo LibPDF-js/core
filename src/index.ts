@@ -319,6 +319,17 @@ export {
 } from "./pdf-viewer";
 
 export {
+  CoordinateTransformer,
+  createCoordinateTransformer,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  type CoordinateTransformerOptions,
+  type Point2D,
+  type Rect2D,
+  type RotationAngle,
+} from "./coordinate-transformer";
+
+export {
   createRenderingPipeline,
   RenderingPipeline,
   type RenderingPipelineOptions,

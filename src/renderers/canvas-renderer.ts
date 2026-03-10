@@ -7,6 +7,12 @@
  */
 
 import { Op, type Operator } from "#src/content/operators";
+import {
+  CoordinateTransformer,
+  type Point2D,
+  type Rect2D,
+  type RotationAngle,
+} from "#src/coordinate-transformer";
 import { Matrix } from "#src/helpers/matrix";
 import type { PdfArray } from "#src/objects/pdf-array";
 import type { PdfName } from "#src/objects/pdf-name";
@@ -516,6 +522,148 @@ export class CanvasRenderer implements BaseRenderer {
    */
   get isHeadless(): boolean {
     return this._headless;
+  }
+
+  // ============================================================================
+  // Coordinate Transformation
+  // ============================================================================
+
+  /**
+   * Create a CoordinateTransformer for the given viewport and page dimensions.
+   *
+   * This transformer can be used to convert coordinates between PDF space
+   * and screen space, which is essential for:
+   * - Hit testing (determining which PDF element was clicked)
+   * - Text selection positioning
+   * - Annotation layer alignment
+   * - Interactive element positioning
+   *
+   * @param viewport - The viewport used for rendering
+   * @param pageWidth - Width of the PDF page in points
+   * @param pageHeight - Height of the PDF page in points
+   * @param pageRotation - Page rotation from the PDF (0, 90, 180, 270)
+   * @returns A configured CoordinateTransformer instance
+   *
+   * @example
+   * ```ts
+   * const transformer = renderer.createCoordinateTransformer(viewport, 612, 792);
+   *
+   * // Convert a screen click to PDF coordinates
+   * const pdfPoint = transformer.screenToPdf({ x: clickX, y: clickY });
+   *
+   * // Convert PDF annotation bounds to screen position
+   * const screenRect = transformer.pdfRectToScreen(annotationRect);
+   * ```
+   */
+  createCoordinateTransformer(
+    viewport: Viewport,
+    pageWidth: number,
+    pageHeight: number,
+    pageRotation: RotationAngle = 0,
+  ): CoordinateTransformer {
+    return new CoordinateTransformer({
+      pageWidth,
+      pageHeight,
+      pageRotation,
+      viewerRotation: viewport.rotation as RotationAngle,
+      scale: viewport.scale,
+      offsetX: viewport.offsetX,
+      offsetY: viewport.offsetY,
+      devicePixelRatio: this.getDevicePixelRatio(),
+    });
+  }
+
+  /**
+   * Convert a point from PDF space to screen space using the given viewport.
+   *
+   * This is a convenience method for quick one-off conversions.
+   * For multiple conversions, use createCoordinateTransformer instead.
+   *
+   * @param pdfPoint - Point in PDF coordinates (origin bottom-left, y up)
+   * @param viewport - The viewport for the transformation
+   * @param pageWidth - Width of the PDF page in points
+   * @param pageHeight - Height of the PDF page in points
+   * @returns Point in screen coordinates (origin top-left, y down)
+   */
+  pdfToScreen(
+    pdfPoint: Point2D,
+    viewport: Viewport,
+    pageWidth: number,
+    pageHeight: number,
+  ): Point2D {
+    const transformer = this.createCoordinateTransformer(viewport, pageWidth, pageHeight);
+    return transformer.pdfToScreen(pdfPoint);
+  }
+
+  /**
+   * Convert a point from screen space to PDF space using the given viewport.
+   *
+   * This is a convenience method for quick one-off conversions.
+   * For multiple conversions, use createCoordinateTransformer instead.
+   *
+   * @param screenPoint - Point in screen coordinates (origin top-left, y down)
+   * @param viewport - The viewport for the transformation
+   * @param pageWidth - Width of the PDF page in points
+   * @param pageHeight - Height of the PDF page in points
+   * @returns Point in PDF coordinates (origin bottom-left, y up)
+   */
+  screenToPdf(
+    screenPoint: Point2D,
+    viewport: Viewport,
+    pageWidth: number,
+    pageHeight: number,
+  ): Point2D {
+    const transformer = this.createCoordinateTransformer(viewport, pageWidth, pageHeight);
+    return transformer.screenToPdf(screenPoint);
+  }
+
+  /**
+   * Convert a rectangle from PDF space to screen space.
+   *
+   * @param pdfRect - Rectangle in PDF coordinates
+   * @param viewport - The viewport for the transformation
+   * @param pageWidth - Width of the PDF page in points
+   * @param pageHeight - Height of the PDF page in points
+   * @returns Rectangle in screen coordinates
+   */
+  pdfRectToScreen(
+    pdfRect: Rect2D,
+    viewport: Viewport,
+    pageWidth: number,
+    pageHeight: number,
+  ): Rect2D {
+    const transformer = this.createCoordinateTransformer(viewport, pageWidth, pageHeight);
+    return transformer.pdfRectToScreen(pdfRect);
+  }
+
+  /**
+   * Convert a rectangle from screen space to PDF space.
+   *
+   * @param screenRect - Rectangle in screen coordinates
+   * @param viewport - The viewport for the transformation
+   * @param pageWidth - Width of the PDF page in points
+   * @param pageHeight - Height of the PDF page in points
+   * @returns Rectangle in PDF coordinates
+   */
+  screenRectToPdf(
+    screenRect: Rect2D,
+    viewport: Viewport,
+    pageWidth: number,
+    pageHeight: number,
+  ): Rect2D {
+    const transformer = this.createCoordinateTransformer(viewport, pageWidth, pageHeight);
+    return transformer.screenRectToPdf(screenRect);
+  }
+
+  /**
+   * Get the device pixel ratio for high-DPI rendering.
+   * Returns 1 in headless mode or when window is not available.
+   */
+  private getDevicePixelRatio(): number {
+    if (this._headless || typeof window === "undefined") {
+      return 1;
+    }
+    return window.devicePixelRatio ?? 1;
   }
 
   // ============================================================================
