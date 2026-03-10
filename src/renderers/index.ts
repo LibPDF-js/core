@@ -26,3 +26,10 @@ export {
 } from "./canvas-renderer";
 
 export { SVGRenderer, createSVGRenderer, type SVGRendererOptions } from "./svg-renderer";
+
+export {
+  createTextLayerBuilder,
+  TextLayerBuilder,
+  type TextLayerBuilderOptions,
+  type TextLayerResult,
+} from "./text-layer-builder";

@@ -362,6 +362,13 @@ export {
   TextRenderMode as SVGTextRenderMode,
 } from "./renderers/svg-renderer";
 
+export {
+  createTextLayerBuilder,
+  TextLayerBuilder,
+  type TextLayerBuilderOptions,
+  type TextLayerResult,
+} from "./renderers/text-layer-builder";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Web Worker Support
 // ─────────────────────────────────────────────────────────────────────────────
