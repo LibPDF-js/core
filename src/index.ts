@@ -370,6 +370,36 @@ export {
 } from "./renderers/text-layer-builder";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Virtual Scrolling
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  createVirtualScroller,
+  VirtualScroller,
+  type ContainerInfo,
+  type PageDimensions,
+  type PageLayout,
+  type ScrollPosition,
+  type VisibleRange,
+  type VirtualScrollerEvent,
+  type VirtualScrollerEventListener,
+  type VirtualScrollerEventType,
+  type VirtualScrollerOptions,
+} from "./virtual-scroller";
+
+export {
+  createViewportManager,
+  ViewportManager,
+  type ManagedPage,
+  type PageSource,
+  type PageState,
+  type ViewportManagerEvent,
+  type ViewportManagerEventListener,
+  type ViewportManagerEventType,
+  type ViewportManagerOptions,
+} from "./viewport-manager";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Web Worker Support
 // ─────────────────────────────────────────────────────────────────────────────
 

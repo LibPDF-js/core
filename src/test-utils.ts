@@ -31,6 +31,7 @@ export type FixtureCategory =
   | "images"
   | "layers"
   | "malformed"
+  | "performance"
   | "scenarios"
   | "text"
   | "xref";
