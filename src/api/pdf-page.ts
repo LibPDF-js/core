@@ -1776,7 +1776,7 @@ export class PDFPage {
     }
 
     for (let i = 0; i < annotsArray.length; i++) {
-      let entry = annotsArray.at(i);
+      const entry = annotsArray.at(i);
 
       if (!entry) {
         continue;
@@ -2981,7 +2981,7 @@ export class PDFPage {
       const name = key.value;
       const resolved = entry instanceof PdfRef ? this.ctx.resolve(entry) : entry;
 
-      let entryDict = resolved instanceof PdfDict ? resolved : null;
+      const entryDict = resolved instanceof PdfDict ? resolved : null;
 
       if (!entryDict) {
         continue;

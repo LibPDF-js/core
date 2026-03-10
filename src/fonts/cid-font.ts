@@ -299,7 +299,7 @@ export function parseCIDFont(
 
   // Parse /W array (can be inline or a ref)
   let widths = new CIDWidthMap();
-  let w = dict.get("W", options.resolver);
+  const w = dict.get("W", options.resolver);
 
   let wArray: PdfArray | null = null;
 

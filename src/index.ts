@@ -341,3 +341,33 @@ export {
 } from "./renderers/canvas-renderer";
 
 export { createSVGRenderer, SVGRenderer, type SVGRendererOptions } from "./renderers/svg-renderer";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Web Worker Support
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Low-level worker management
+  createPDFWorker,
+  PDFWorker,
+  type PDFWorkerOptions,
+  type WorkerState,
+  type WorkerTask,
+  // High-level proxy API
+  createWorkerProxy,
+  WorkerProxy,
+  type WorkerProxyOptions,
+  type ProxyLoadOptions,
+  type ProxySaveOptions,
+  type ExtractTextOptions,
+  type FindTextOptions,
+  type LoadedDocument,
+  type CancellableOperation,
+  // Message protocol types
+  type MessageId,
+  type TaskId,
+  type WorkerRequest,
+  type WorkerResponse,
+  type WorkerError,
+  type ProgressMessage,
+} from "./worker";

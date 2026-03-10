@@ -187,7 +187,7 @@ export function parseCompositeFont(
   // Parse DescendantFonts (should be array with one CIDFont)
   // DescendantFonts can be inline array or a ref to an array
   let cidFont: CIDFont;
-  let descendants = dict.get("DescendantFonts", options.resolver);
+  const descendants = dict.get("DescendantFonts", options.resolver);
   let descendantsArray: PdfArray | null = null;
 
   if (descendants instanceof PdfArray) {

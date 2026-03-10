@@ -78,7 +78,7 @@ export class AnnotationFlattener {
    * @returns Number of annotations flattened
    */
   flattenPage(pageDict: PdfDict, options: FlattenAnnotationsOptions = {}): number {
-    let annots = pageDict.getArray("Annots", this.registry.resolve.bind(this.registry));
+    const annots = pageDict.getArray("Annots", this.registry.resolve.bind(this.registry));
 
     if (!annots || annots.length === 0) {
       return 0;

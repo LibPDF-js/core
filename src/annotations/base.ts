@@ -375,13 +375,13 @@ export class PDFAnnotation {
    * Get an appearance stream by type.
    */
   private getAppearance(type: "N" | "R" | "D"): PdfStream | null {
-    let ap = this.dict.getDict("AP", this.registry.resolve.bind(this.registry));
+    const ap = this.dict.getDict("AP", this.registry.resolve.bind(this.registry));
 
     if (!ap) {
       return null;
     }
 
-    let entry = ap.get(type, this.registry.resolve.bind(this.registry));
+    const entry = ap.get(type, this.registry.resolve.bind(this.registry));
 
     if (entry instanceof PdfStream) {
       return entry;

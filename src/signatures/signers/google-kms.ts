@@ -591,7 +591,7 @@ export class GoogleKmsSigner implements Signer {
         throw new KmsSignerError(`Secret is empty: ${secretVersionName}`);
       }
 
-      let data =
+      const data =
         typeof version.payload.data === "string"
           ? version.payload.data
           : new TextDecoder().decode(version.payload.data);
