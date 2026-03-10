@@ -351,7 +351,16 @@ export {
   createCanvasRenderer,
 } from "./renderers/canvas-renderer";
 
-export { createSVGRenderer, SVGRenderer, type SVGRendererOptions } from "./renderers/svg-renderer";
+export {
+  createSVGRenderer,
+  SVGRenderer,
+  type SVGRendererOptions,
+  type GraphicsState as SVGGraphicsState,
+  type TextState as SVGTextState,
+  LineCap as SVGLineCap,
+  LineJoin as SVGLineJoin,
+  TextRenderMode as SVGTextRenderMode,
+} from "./renderers/svg-renderer";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Web Worker Support

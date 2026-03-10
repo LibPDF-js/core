@@ -1651,7 +1651,7 @@ function extractTextArray(array: PdfArray): Array<string | number> {
       }
       // Check for PdfString (has asString method)
       else if ("asString" in item && typeof item.asString === "function") {
-        result.push((item as PdfString).asString());
+        result.push(item.asString());
       }
       // Fallback for bytes property
       else if ("bytes" in item && item.bytes instanceof Uint8Array) {
