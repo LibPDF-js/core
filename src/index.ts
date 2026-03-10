@@ -302,3 +302,42 @@ export {
   type TextAnnotationStateModel,
   type TextMarkupAnnotationOptions,
 } from "./annotations";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PDF Viewer
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  createPDFViewer,
+  PDFViewer,
+  type PDFViewerEvent,
+  type PDFViewerEventListener,
+  type PDFViewerEventType,
+  type PDFViewerOptions,
+  type ScrollMode,
+  type SpreadMode,
+} from "./pdf-viewer";
+
+export {
+  createRenderingPipeline,
+  RenderingPipeline,
+  type RenderingPipelineOptions,
+} from "./rendering-pipeline";
+
+export type {
+  BaseRenderer,
+  RendererFactory,
+  RendererOptions,
+  RendererType,
+  RenderResult,
+  RenderTask,
+  Viewport,
+} from "./renderers/base-renderer";
+
+export {
+  CanvasRenderer,
+  type CanvasRendererOptions,
+  createCanvasRenderer,
+} from "./renderers/canvas-renderer";
+
+export { createSVGRenderer, SVGRenderer, type SVGRendererOptions } from "./renderers/svg-renderer";
