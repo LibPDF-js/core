@@ -347,10 +347,6 @@ body {
   opacity: 1;
   line-height: 1;
   pointer-events: none;
-
-  /* Highlight colors as CSS custom properties */
-  --highlight-bg-color: rgb(180 0 170 / 0.25);
-  --highlight-selected-bg-color: rgb(0 100 0 / 0.25);
 }
 
 .text-layer > span,
@@ -362,28 +358,28 @@ body {
   cursor: text;
 }
 
-/* Mouse text selection - purple */
+/* Mouse text selection - purple #bfbfff */
 .text-layer > span::selection,
 .text-layer > div::selection {
-  background: rgb(191 191 255 / 0.7);
+  background: #bfbfff;
   color: transparent;
 }
 
 .text-layer > span::-moz-selection,
 .text-layer > div::-moz-selection {
-  background: rgb(191 191 255 / 0.7);
+  background: #bfbfff;
   color: transparent;
 }
 
-/* Search highlight - applied via .highlight class on spans */
+/* Search highlight - green #c5d9c3 applied via .highlight class on spans */
 .text-layer .highlight {
-  background-color: var(--highlight-bg-color);
-  border-radius: 2px;
+  background-color: #c5d9c3;
+  border-radius: 3px;
 }
 
-/* Current/selected search result */
+/* Current/selected search result - same green, slightly darker */
 .text-layer .highlight.selected {
-  background-color: var(--highlight-selected-bg-color);
+  background-color: #a8c9a5;
 }
 
 
