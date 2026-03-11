@@ -362,10 +362,14 @@ export class CanvasRenderer implements BaseRenderer {
   }
 
   render(pageIndex: number, viewport: Viewport): RenderTask {
-    require("fs").appendFileSync(
-      "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
-      `${new Date().toISOString()} CanvasRenderer.render() called with pageIndex=${pageIndex}, viewport.width=${viewport.width}, viewport.height=${viewport.height}\n`,
-    ); // [DEBUG_INSTRUMENTATION]
+    try {
+      require("fs").appendFileSync(
+        "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
+        `${new Date().toISOString()} CanvasRenderer.render() called with pageIndex=${pageIndex}, viewport.width=${viewport.width}, viewport.height=${viewport.height}\n`,
+      );
+    } catch {
+      console.log(`[DEBUG] CanvasRenderer.render() pageIndex=${pageIndex}`);
+    } // [DEBUG_INSTRUMENTATION]
     if (!this._initialized) {
       throw new Error("Renderer must be initialized before rendering");
     }
@@ -426,11 +430,14 @@ export class CanvasRenderer implements BaseRenderer {
           // Clear canvas
           context.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Apply background if specified
-          if (options.background) {
-            context.fillStyle = options.background;
-            context.fillRect(0, 0, canvas.width, canvas.height);
-          }
+          // Apply background - default to white if not specified so pages are visible
+          context.fillStyle = options.background ?? "#ffffff";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw a light border so the page boundaries are visible (temporary until content rendering is implemented)
+          context.strokeStyle = "#cccccc";
+          context.lineWidth = 1;
+          context.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
 
           // Apply viewport transformation
           context.save();
@@ -455,13 +462,32 @@ export class CanvasRenderer implements BaseRenderer {
           // Note: Actual PDF content rendering will be implemented in future tasks.
           // This foundation sets up the canvas transformation pipeline.
           // The page content stream operators will be executed here.
-          // BUG: No PDF content is being rendered - this is just creating a blank canvas with correct dimensions!
-          require("fs").appendFileSync(
-            "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
-            `${new Date().toISOString()} CanvasRenderer.render() STUB: No PDF content rendered, just blank canvas ${canvas.width}x${canvas.height}\n`,
-          ); // [DEBUG_INSTRUMENTATION]
+          // TODO: Implement actual PDF content rendering by calling executeOperators() with page content
 
+          // Draw placeholder text to indicate page is recognized but content rendering is not implemented
+          context.restore(); // Restore to draw text in screen coordinates
+          context.save();
+          context.fillStyle = "#999999";
+          context.font = "14px sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText(`Page ${pageIndex + 1}`, canvas.width / 2, canvas.height / 2 - 10);
+          context.font = "11px sans-serif";
+          context.fillText(
+            "(PDF content rendering not yet implemented)",
+            canvas.width / 2,
+            canvas.height / 2 + 10,
+          );
           context.restore();
+
+          try {
+            require("fs").appendFileSync(
+              "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
+              `${new Date().toISOString()} CanvasRenderer.render() STUB: blank canvas ${canvas.width}x${canvas.height}\n`,
+            );
+          } catch {
+            console.log(`[DEBUG] STUB: blank canvas ${canvas.width}x${canvas.height}`);
+          } // [DEBUG_INSTRUMENTATION]
 
           resolve({
             width: canvas.width,

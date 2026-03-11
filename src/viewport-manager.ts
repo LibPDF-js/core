@@ -712,10 +712,14 @@ export class ViewportManager {
       page.viewport = viewport;
 
       // Start render
-      require("fs").appendFileSync(
-        "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
-        `${new Date().toISOString()} ViewportManager.startPageRender() calling renderer.render(pageIndex=${pageIndex}) - NOTE: renderer has no access to PDF page content!\n`,
-      ); // [DEBUG_INSTRUMENTATION]
+      try {
+        require("fs").appendFileSync(
+          "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
+          `${new Date().toISOString()} ViewportManager.startPageRender() pageIndex=${pageIndex}\n`,
+        );
+      } catch {
+        console.log(`[DEBUG] ViewportManager.startPageRender() pageIndex=${pageIndex}`);
+      } // [DEBUG_INSTRUMENTATION]
       const renderTask = this._renderer.render(pageIndex, viewport);
       page.renderTask = renderTask;
 
@@ -733,10 +737,14 @@ export class ViewportManager {
       page.renderTask = null;
       page.lastRenderedAt = Date.now();
       this._activeRenders--;
-      require("fs").appendFileSync(
-        "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
-        `${new Date().toISOString()} ViewportManager.startPageRender() render complete for pageIndex=${pageIndex}, element=${!!result.element}, width=${result.width}, height=${result.height}\n`,
-      ); // [DEBUG_INSTRUMENTATION]
+      try {
+        require("fs").appendFileSync(
+          "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
+          `${new Date().toISOString()} render complete pageIndex=${pageIndex}\n`,
+        );
+      } catch {
+        console.log(`[DEBUG] render complete pageIndex=${pageIndex}`);
+      } // [DEBUG_INSTRUMENTATION]
 
       this.emitEvent({
         type: "pageRendered",
