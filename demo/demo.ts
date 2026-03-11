@@ -136,12 +136,36 @@ async function initializeViewer(): Promise<void> {
   }
 
   // Create virtual scroller
+  const viewerRect = elements.viewer.getBoundingClientRect();
   state.virtualScroller = createVirtualScroller({
-    container: elements.viewer,
     pageDimensions,
     scale: state.scale,
-    gap: 20,
-    overscan: 1,
+    pageGap: 20,
+    bufferSize: 1,
+    viewportWidth: viewerRect.width,
+    viewportHeight: viewerRect.height,
+  });
+
+  // Set up viewer container for scrolling
+  elements.viewer.style.position = "relative";
+  elements.viewer.style.overflow = "auto";
+
+  // Create content container with total height for scrolling
+  const contentContainer = document.createElement("div");
+  contentContainer.className = "viewer-content";
+  contentContainer.style.position = "relative";
+  contentContainer.style.width = `${state.virtualScroller.totalWidth}px`;
+  contentContainer.style.height = `${state.virtualScroller.totalHeight}px`;
+  elements.viewer.appendChild(contentContainer);
+
+  // Store reference to content container for page placement
+  (state as any).contentContainer = contentContainer;
+
+  // Handle scroll events to update virtual scroller
+  elements.viewer.addEventListener("scroll", () => {
+    if (state.virtualScroller) {
+      state.virtualScroller.scrollTo(elements.viewer.scrollLeft, elements.viewer.scrollTop);
+    }
   });
 
   // Create shared renderer for viewport manager
@@ -184,15 +208,26 @@ async function initializeViewer(): Promise<void> {
     console.log(
       `[DEBUG_INSTRUMENTATION] pageRendered event: pageIndex=${event.pageIndex}, element=${!!event.element}`,
     ); // [DEBUG_INSTRUMENTATION]
-    if (event.element) {
+    if (event.element && state.virtualScroller) {
+      // Get page layout from virtual scroller for positioning
+      const layout = state.virtualScroller.getPageLayout(event.pageIndex);
+      if (!layout) {
+        console.error(`[DEBUG] No layout for page ${event.pageIndex}`);
+        return;
+      }
+
       // Get or create the page container
       let container = state.pageElements.get(event.pageIndex);
-      if (!container) {
+      const contentContainer = (state as any).contentContainer as HTMLElement;
+      if (!container && contentContainer) {
         container = document.createElement("div");
         container.className = "page-container";
         container.dataset.pageIndex = String(event.pageIndex);
         state.pageElements.set(event.pageIndex, container);
-        elements.viewer.appendChild(container);
+        contentContainer.appendChild(container);
+      }
+      if (!container) {
+        return;
       }
 
       // The element from ViewportManager is the rendered canvas
@@ -206,10 +241,17 @@ async function initializeViewer(): Promise<void> {
         ctx.drawImage(canvas, 0, 0);
       }
 
+      // Position and size the container based on layout
+      container.style.position = "absolute";
+      container.style.left = `${layout.left}px`;
+      container.style.top = `${layout.top}px`;
+      container.style.width = `${layout.width}px`;
+      container.style.height = `${layout.height}px`;
+
       // Clear container and add the cloned canvas
       container.innerHTML = "";
-      container.style.width = `${canvas.width}px`;
-      container.style.height = `${canvas.height}px`;
+      clonedCanvas.style.width = "100%";
+      clonedCanvas.style.height = "100%";
       container.appendChild(clonedCanvas);
     }
   });
