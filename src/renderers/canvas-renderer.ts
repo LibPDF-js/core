@@ -485,6 +485,15 @@ export class CanvasRenderer implements BaseRenderer {
               // PDF uses bottom-left origin, canvas uses top-left
               this._pageHeight = canvas.height / viewport.scale;
 
+              // Apply PDF coordinate system transformation:
+              // PDF has origin at bottom-left with Y increasing upward
+              // Canvas has origin at top-left with Y increasing downward
+              // We need to flip the Y axis by:
+              // 1. Translate to move origin to bottom-left
+              // 2. Scale Y by -1 to flip the axis
+              context.translate(0, this._pageHeight);
+              context.scale(1, -1);
+
               // Reset graphics state before rendering
               this.resetGraphicsState();
 
@@ -1348,17 +1357,20 @@ export class CanvasRenderer implements BaseRenderer {
     const ctm = this._graphicsState.ctm;
 
     // Calculate the position in PDF coordinates
-    const pdfX = tm.e;
-    const pdfY = tm.f;
-
-    // Transform to canvas coordinates (flip Y axis)
-    // PDF: origin at bottom-left, Y increases upward
-    // Canvas: origin at top-left, Y increases downward
-    const canvasX = ctm.a * pdfX + ctm.c * pdfY + ctm.e;
-    const canvasY = this._pageHeight - (ctm.b * pdfX + ctm.d * pdfY + ctm.f);
+    // The canvas has been transformed to use PDF coordinate system (Y-flipped),
+    // so we can use PDF coordinates directly
+    const pdfX = ctm.a * tm.e + ctm.c * tm.f + ctm.e;
+    const pdfY = ctm.b * tm.e + ctm.d * tm.f + ctm.f;
 
     // Calculate effective font size considering all transformations
     const effectiveFontSize = Math.abs(fontSize * tm.d * ctm.d);
+
+    // Text needs special handling because the canvas Y-axis is flipped.
+    // We need to flip text back so it appears right-side up.
+    // Save current transform, flip locally for text, then restore.
+    this._context.save();
+    this._context.translate(pdfX, pdfY);
+    this._context.scale(1, -1); // Flip text back to normal orientation
 
     // Set up the context for text rendering
     this._context.font = `${effectiveFontSize}px ${mapPdfFontToCanvas(this._graphicsState.fontName)}`;
@@ -1367,28 +1379,24 @@ export class CanvasRenderer implements BaseRenderer {
 
     // Apply horizontal scaling
     if (horizontalScale !== 100) {
-      this._context.save();
-      this._context.translate(canvasX, canvasY);
       this._context.scale(horizontalScale / 100, 1);
-      this._context.translate(-canvasX, -canvasY);
     }
 
-    // Apply text rise (vertical offset)
-    const adjustedY = canvasY - textRise * ctm.d;
+    // Apply text rise (vertical offset) - in the flipped coordinate system
+    const adjustedY = -textRise * ctm.d;
 
     // Render based on mode
+    // Since we've translated to the text position, draw at local (0, 0)
     let xOffset = 0;
     for (const char of text) {
-      const drawX = canvasX + xOffset;
-
       if (textRenderMode === TextRenderMode.Fill || textRenderMode === TextRenderMode.FillStroke) {
-        this._context.fillText(char, drawX, adjustedY);
+        this._context.fillText(char, xOffset, adjustedY);
       }
       if (
         textRenderMode === TextRenderMode.Stroke ||
         textRenderMode === TextRenderMode.FillStroke
       ) {
-        this._context.strokeText(char, drawX, adjustedY);
+        this._context.strokeText(char, xOffset, adjustedY);
       }
 
       // Advance position
@@ -1399,9 +1407,8 @@ export class CanvasRenderer implements BaseRenderer {
       }
     }
 
-    if (horizontalScale !== 100) {
-      this._context.restore();
-    }
+    // Restore the text-local transform (handles both horizontal scaling and the flip)
+    this._context.restore();
 
     this._context.restore();
 
