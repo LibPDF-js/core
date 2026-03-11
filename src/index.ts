@@ -611,3 +611,37 @@ export {
   type LoadResourceResult,
   type ResourceInput,
 } from "./resource-loader";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI Components
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // UIStateManager
+  createUIStateManager,
+  UIStateManager,
+  type PartialUIState,
+  type UIState,
+  type UIStateEvent,
+  type UIStateEventListener,
+  type UIStateEventType,
+  type UIStateManagerOptions,
+  type ZoomFitMode,
+  // ToolbarController
+  createToolbarController,
+  ToolbarController,
+  type ToolbarButtonId,
+  type ToolbarControllerOptions,
+  type ToolbarEvent,
+  type ToolbarEventListener,
+  type ToolbarEventType,
+  // OverlayManager
+  createOverlayManager,
+  OverlayManager,
+  type OverlayConfig,
+  type OverlayEvent,
+  type OverlayEventListener,
+  type OverlayEventType,
+  type OverlayManagerOptions,
+  type OverlayType,
+} from "./ui";
