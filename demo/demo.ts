@@ -173,9 +173,22 @@ async function initializeViewer(): Promise<void> {
 
   // Set up viewport manager events
   state.viewportManager.addEventListener("pageRendered", event => {
+    console.log(
+      `[DEBUG_INSTRUMENTATION] pageRendered event: pageIndex=${event.pageIndex}, element=${!!event.element}`,
+    ); // [DEBUG_INSTRUMENTATION]
     if (event.element) {
       renderPage(event.pageIndex, event.element as HTMLElement);
     }
+  });
+  state.viewportManager.addEventListener("pageStateChange", event => {
+    console.log(
+      `[DEBUG_INSTRUMENTATION] pageStateChange: pageIndex=${event.pageIndex}, state=${event.state}`,
+    ); // [DEBUG_INSTRUMENTATION]
+  });
+  state.viewportManager.addEventListener("pageError", event => {
+    console.log(
+      `[DEBUG_INSTRUMENTATION] pageError: pageIndex=${event.pageIndex}, error=${event.error}`,
+    ); // [DEBUG_INSTRUMENTATION]
   });
 
   // Initialize search engine
@@ -186,7 +199,13 @@ async function initializeViewer(): Promise<void> {
   updatePageControls();
 
   // Initialize viewport manager (loads page dimensions and triggers initial render)
+  console.log(
+    `[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} calling viewportManager.initialize()`,
+  ); // [DEBUG_INSTRUMENTATION]
   await state.viewportManager.initialize();
+  console.log(
+    `[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} viewportManager.initialize() complete, managedPageCount=${state.viewportManager.managedPageCount}`,
+  ); // [DEBUG_INSTRUMENTATION]
 }
 
 function createPageSource() {

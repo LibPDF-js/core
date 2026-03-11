@@ -271,11 +271,15 @@ export class ViewportManager {
    * This loads page dimensions and sets up the scroller.
    */
   async initialize(): Promise<void> {
+    console.log(
+      `[DEBUG_INSTRUMENTATION] ViewportManager.initialize() called, _initialized=${this._initialized}, _disposed=${this._disposed}`,
+    ); // [DEBUG_INSTRUMENTATION]
     if (this._initialized || this._disposed) {
       return;
     }
 
     const pageCount = this._pageSource.getPageCount();
+    console.log(`[DEBUG_INSTRUMENTATION] ViewportManager.initialize() pageCount=${pageCount}`); // [DEBUG_INSTRUMENTATION]
     const dimensions: Array<{ width: number; height: number }> = [];
 
     // Load all page dimensions
@@ -283,6 +287,9 @@ export class ViewportManager {
       const dim = await this._pageSource.getPageDimensions(i);
       dimensions.push(dim);
     }
+    console.log(
+      `[DEBUG_INSTRUMENTATION] ViewportManager.initialize() loaded ${dimensions.length} dimensions`,
+    ); // [DEBUG_INSTRUMENTATION]
 
     // Set dimensions on scroller
     this._scroller.setPageDimensions(dimensions);
@@ -290,6 +297,9 @@ export class ViewportManager {
     this._initialized = true;
 
     // Trigger initial render if auto-render is enabled
+    console.log(
+      `[DEBUG_INSTRUMENTATION] ViewportManager.initialize() autoRender=${this._options.autoRender}`,
+    ); // [DEBUG_INSTRUMENTATION]
     if (this._options.autoRender) {
       this.updateVisiblePages();
     }
@@ -569,11 +579,17 @@ export class ViewportManager {
    * Update visible pages - queue renders for any visible pages not yet rendered.
    */
   private updateVisiblePages(): void {
+    console.log(
+      `[DEBUG_INSTRUMENTATION] updateVisiblePages() called, _initialized=${this._initialized}`,
+    ); // [DEBUG_INSTRUMENTATION]
     if (!this._initialized || this._disposed) {
       return;
     }
 
     const range = this._scroller.getVisibleRange();
+    console.log(
+      `[DEBUG_INSTRUMENTATION] updateVisiblePages() visibleRange: start=${range.start}, end=${range.end}`,
+    ); // [DEBUG_INSTRUMENTATION]
     const pagesToRender: number[] = [];
 
     for (let i = range.start; i <= range.end; i++) {
@@ -582,6 +598,10 @@ export class ViewportManager {
         pagesToRender.push(i);
       }
     }
+
+    console.log(
+      `[DEBUG_INSTRUMENTATION] updateVisiblePages() pagesToRender: [${pagesToRender.join(", ")}]`,
+    ); // [DEBUG_INSTRUMENTATION]
 
     // Sort by priority mode
     if (this._options.priorityMode === "visible") {
