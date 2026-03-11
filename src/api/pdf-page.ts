@@ -2959,9 +2959,24 @@ export class PDFPage {
   }
 
   /**
-   * Create a font resolver function for text extraction.
+   * Create a font resolver function for text extraction and rendering.
+   *
+   * The font resolver maps font names (like "F1") to PdfFont objects,
+   * which contain encoding information needed to properly decode
+   * character codes to Unicode text.
+   *
+   * @returns A function that takes a font name and returns the corresponding PdfFont
+   *
+   * @example
+   * ```typescript
+   * const fontResolver = page.createFontResolver();
+   * const font = fontResolver("F1");
+   * if (font) {
+   *   const unicode = font.toUnicode(charCode);
+   * }
+   * ```
    */
-  private createFontResolver(): (name: string) => PdfFont | null {
+  createFontResolver(): (name: string) => PdfFont | null {
     // Get the page's Font resources (may be a ref or inherited from parent)
     const resourcesDict = this.resolveInheritedResources();
 

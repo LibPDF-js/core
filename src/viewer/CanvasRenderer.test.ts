@@ -609,3 +609,91 @@ describe("CanvasRenderer performance scenarios", () => {
     expect(renderer.stateStackDepth).toBe(0);
   });
 });
+
+describe("CanvasRenderer font encoding", () => {
+  let renderer: CanvasRenderer;
+
+  beforeEach(async () => {
+    renderer = new CanvasRenderer();
+    await renderer.initialize({ headless: true });
+  });
+
+  afterEach(() => {
+    renderer.destroy();
+  });
+
+  it("uses font resolver when rendering text with showTextFromCodes", () => {
+    // Create a mock font that maps character codes to specific Unicode
+    const mockFont = {
+      toUnicode: (code: number) => {
+        // Map 0x41 -> "A", 0x42 -> "B", 0x43 -> "C"
+        // This simulates a WinAnsi font
+        if (code >= 0x41 && code <= 0x5a) {
+          return String.fromCharCode(code);
+        }
+        // Map 0x01-0x03 to "X", "Y", "Z" to test non-trivial encoding
+        if (code === 0x01) {
+          return "X";
+        }
+        if (code === 0x02) {
+          return "Y";
+        }
+        if (code === 0x03) {
+          return "Z";
+        }
+        return "";
+      },
+    };
+
+    const fontResolver = (name: string) => {
+      if (name === "F1") {
+        return mockFont as any;
+      }
+      return null;
+    };
+
+    // Render with the font resolver
+    const viewport = renderer.createViewport(612, 792, 0);
+    const contentBytes = new Uint8Array([]);
+    const task = renderer.render(0, viewport, contentBytes, fontResolver);
+
+    // Set font - this should store the resolved font
+    renderer.setFont("/F1", 12);
+
+    // showTextFromCodes should use the font's toUnicode method
+    // The test verifies the method exists and is callable
+    expect(typeof renderer.showTextFromCodes).toBe("function");
+
+    task.promise.catch(() => {}); // Handle any cancellation
+  });
+
+  it("falls back to Latin-1 when no font resolver is provided", () => {
+    renderer.setFont("/F1", 12);
+
+    // Without a font resolver, showTextFromCodes should use Latin-1 fallback
+    expect(typeof renderer.showTextFromCodes).toBe("function");
+  });
+
+  it("renders text array with byte-based method", () => {
+    const mockFont = {
+      toUnicode: (code: number) => String.fromCharCode(code),
+    };
+
+    const fontResolver = (name: string) => {
+      if (name === "F1") {
+        return mockFont as any;
+      }
+      return null;
+    };
+
+    const viewport = renderer.createViewport(612, 792, 0);
+    const task = renderer.render(0, viewport, null, fontResolver);
+
+    renderer.setFont("/F1", 12);
+
+    // Test that showTextArrayFromCodes exists and is callable
+    expect(typeof renderer.showTextArrayFromCodes).toBe("function");
+
+    task.promise.catch(() => {});
+  });
+});

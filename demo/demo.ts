@@ -311,6 +311,20 @@ function createPageSource() {
         return null;
       }
     },
+    getPageFontResolver: async (pageIndex: number) => {
+      const page = state.pdf?.getPage(pageIndex);
+      if (!page) {
+        return null;
+      }
+      try {
+        const resolver = page.createFontResolver();
+        console.log(`[DEBUG] getPageFontResolver(${pageIndex}): resolver created`);
+        return resolver;
+      } catch (err) {
+        console.error(`[DEBUG] Error creating font resolver for page ${pageIndex}:`, err);
+        return null;
+      }
+    },
     createPageElement: (pageIndex: number): HTMLElement => {
       const container = document.createElement("div");
       container.className = "page-container";

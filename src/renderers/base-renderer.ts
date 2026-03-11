@@ -5,10 +5,18 @@
  * Renderers are responsible for converting PDF page content to visual output.
  */
 
+import type { PdfFont } from "#src/fonts/pdf-font";
+
 /**
  * Renderer type identifier.
  */
 export type RendererType = "canvas" | "svg";
+
+/**
+ * Font resolver function type.
+ * Takes a font name (e.g., "/F1") and returns the parsed font object.
+ */
+export type FontResolver = (fontName: string) => PdfFont | null;
 
 /**
  * Options for initializing a renderer.
@@ -162,9 +170,15 @@ export interface BaseRenderer {
    * @param pageIndex - The 0-indexed page number
    * @param viewport - The viewport to render into
    * @param contentBytes - Optional raw content stream bytes to render
+   * @param fontResolver - Optional function to resolve font names to PdfFont objects
    * @returns A render task that can be awaited or cancelled
    */
-  render(pageIndex: number, viewport: Viewport, contentBytes?: Uint8Array | null): RenderTask;
+  render(
+    pageIndex: number,
+    viewport: Viewport,
+    contentBytes?: Uint8Array | null,
+    fontResolver?: FontResolver | null,
+  ): RenderTask;
 
   /**
    * Clean up resources used by the renderer.

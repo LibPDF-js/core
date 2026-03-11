@@ -7,7 +7,7 @@
  * actual rendering infrastructure.
  */
 
-import type { BaseRenderer, RenderTask, Viewport } from "./renderers/base-renderer";
+import type { BaseRenderer, FontResolver, RenderTask, Viewport } from "./renderers/base-renderer";
 import type { PageLayout, VisibleRange, VirtualScroller } from "./virtual-scroller";
 
 /**
@@ -158,6 +158,14 @@ export interface PageSource {
    * Optional - if not provided, pages will render as blank.
    */
   getPageContentBytes?(pageIndex: number): Promise<Uint8Array | null>;
+
+  /**
+   * Get a font resolver function for a page.
+   * The resolver maps font names (e.g., "F1") to PdfFont objects.
+   * This is required for proper text rendering with correct font encoding.
+   * Optional - if not provided, text will be rendered using Latin-1 encoding.
+   */
+  getPageFontResolver?(pageIndex: number): Promise<FontResolver | null>;
 }
 
 /**
@@ -724,18 +732,24 @@ export class ViewportManager {
         contentBytes = await this._pageSource.getPageContentBytes(pageIndex);
       }
 
+      // Get font resolver if available (required for proper text encoding)
+      let fontResolver: FontResolver | null = null;
+      if (this._pageSource.getPageFontResolver) {
+        fontResolver = await this._pageSource.getPageFontResolver(pageIndex);
+      }
+
       // Start render
       try {
         require("fs").appendFileSync(
           "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
-          `${new Date().toISOString()} ViewportManager.startPageRender() pageIndex=${pageIndex}, hasContent=${!!contentBytes}\n`,
+          `${new Date().toISOString()} ViewportManager.startPageRender() pageIndex=${pageIndex}, hasContent=${!!contentBytes}, hasFontResolver=${!!fontResolver}\n`,
         );
       } catch {
         console.log(
-          `[DEBUG] ViewportManager.startPageRender() pageIndex=${pageIndex}, hasContent=${!!contentBytes}`,
+          `[DEBUG] ViewportManager.startPageRender() pageIndex=${pageIndex}, hasContent=${!!contentBytes}, hasFontResolver=${!!fontResolver}`,
         );
       } // [DEBUG_INSTRUMENTATION]
-      const renderTask = this._renderer.render(pageIndex, viewport, contentBytes);
+      const renderTask = this._renderer.render(pageIndex, viewport, contentBytes, fontResolver);
       page.renderTask = renderTask;
 
       // Wait for completion

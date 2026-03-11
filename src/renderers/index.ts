@@ -6,6 +6,7 @@
 
 export type {
   BaseRenderer,
+  FontResolver,
   RendererFactory,
   RendererOptions,
   RendererType,

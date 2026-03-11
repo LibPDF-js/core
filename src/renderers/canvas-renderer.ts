@@ -14,6 +14,7 @@ import {
   type Rect2D,
   type RotationAngle,
 } from "#src/coordinate-transformer";
+import type { PdfFont } from "#src/fonts/pdf-font";
 import { Matrix } from "#src/helpers/matrix";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfName } from "#src/objects/pdf-name";
@@ -22,6 +23,7 @@ import { PdfString } from "#src/objects/pdf-string";
 
 import type {
   BaseRenderer,
+  FontResolver,
   RendererOptions,
   RenderResult,
   RenderTask,
@@ -249,6 +251,12 @@ export class CanvasRenderer implements BaseRenderer {
   /** Current path being constructed */
   private _currentPath: Path2D | null = null;
 
+  /** Font resolver for the current rendering operation */
+  private _fontResolver: FontResolver | null = null;
+
+  /** Current font object (resolved from font name) */
+  private _currentFont: PdfFont | null = null;
+
   get initialized(): boolean {
     return this._initialized;
   }
@@ -365,17 +373,26 @@ export class CanvasRenderer implements BaseRenderer {
     };
   }
 
-  render(pageIndex: number, viewport: Viewport, contentBytes?: Uint8Array | null): RenderTask {
+  render(
+    pageIndex: number,
+    viewport: Viewport,
+    contentBytes?: Uint8Array | null,
+    fontResolver?: FontResolver | null,
+  ): RenderTask {
     try {
       require("fs").appendFileSync(
         "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
-        `${new Date().toISOString()} CanvasRenderer.render() pageIndex=${pageIndex}, hasContent=${!!contentBytes}, contentLength=${contentBytes?.length ?? 0}\n`,
+        `${new Date().toISOString()} CanvasRenderer.render() pageIndex=${pageIndex}, hasContent=${!!contentBytes}, contentLength=${contentBytes?.length ?? 0}, hasFontResolver=${!!fontResolver}\n`,
       );
     } catch {
       console.log(
-        `[DEBUG] CanvasRenderer.render() pageIndex=${pageIndex}, hasContent=${!!contentBytes}`,
+        `[DEBUG] CanvasRenderer.render() pageIndex=${pageIndex}, hasContent=${!!contentBytes}, hasFontResolver=${!!fontResolver}`,
       );
     } // [DEBUG_INSTRUMENTATION]
+
+    // Store the font resolver for use during rendering
+    this._fontResolver = fontResolver ?? null;
+
     if (!this._initialized) {
       throw new Error("Renderer must be initialized before rendering");
     }
@@ -1187,6 +1204,16 @@ export class CanvasRenderer implements BaseRenderer {
   setFont(name: string, size: number): void {
     this._graphicsState.fontName = name;
     this._graphicsState.fontSize = size;
+
+    // Resolve the font using the font resolver if available
+    if (this._fontResolver) {
+      // Font names in content streams are like "/F1", but the resolver expects "F1"
+      const fontKey = name.startsWith("/") ? name.slice(1) : name;
+      this._currentFont = this._fontResolver(fontKey);
+    } else {
+      this._currentFont = null;
+    }
+
     if (this._context) {
       // Map PDF font names to canvas-compatible names
       const fontFamily = mapPdfFontToCanvas(name);
@@ -1265,9 +1292,47 @@ export class CanvasRenderer implements BaseRenderer {
   // ============================================================================
 
   /**
+   * Show text from raw character codes using the current font's encoding.
+   * This is the core text rendering method that properly handles font encoding.
+   */
+  showTextFromCodes(codes: Uint8Array | number[]): void {
+    if (!this._context || !this._inTextObject) {
+      return;
+    }
+
+    const { textRenderMode, charSpacing, wordSpacing, horizontalScale, textRise, fontSize } =
+      this._graphicsState;
+
+    // Decode character codes to Unicode using the font's encoding
+    let decodedText = "";
+    for (const code of codes) {
+      if (this._currentFont) {
+        // Use the font's toUnicode method for proper decoding
+        const unicode = this._currentFont.toUnicode(code);
+        decodedText += unicode || String.fromCharCode(code);
+      } else {
+        // Fallback: treat as Latin-1 (direct byte-to-char mapping)
+        decodedText += String.fromCharCode(code);
+      }
+    }
+
+    // Render the decoded text
+    this.showTextString(decodedText);
+  }
+
+  /**
    * Show text (Tj operator).
+   * Note: The input `text` is expected to be already decoded character codes
+   * from the PDF string. For proper font encoding support, use showTextFromCodes.
    */
   showText(text: string): void {
+    this.showTextString(text);
+  }
+
+  /**
+   * Internal method to render a decoded Unicode string.
+   */
+  private showTextString(text: string): void {
     if (!this._context || !this._inTextObject) {
       return;
     }
@@ -1351,11 +1416,28 @@ export class CanvasRenderer implements BaseRenderer {
 
   /**
    * Show text with individual glyph positioning (TJ operator).
+   * @deprecated Use showTextArrayFromCodes for proper font encoding support
    */
   showTextArray(array: Array<string | number>): void {
     for (const item of array) {
       if (typeof item === "string") {
         this.showText(item);
+      } else {
+        // Negative numbers move text position forward
+        const adjustment = -item / 1000;
+        this._textState.textMatrix = this._textState.textMatrix.translate(adjustment, 0);
+      }
+    }
+  }
+
+  /**
+   * Show text with individual glyph positioning (TJ operator) using raw bytes.
+   * Properly handles font encoding for each text segment.
+   */
+  showTextArrayFromCodes(array: Array<Uint8Array | number>): void {
+    for (const item of array) {
+      if (item instanceof Uint8Array) {
+        this.showTextFromCodes(item);
       } else {
         // Negative numbers move text position forward
         const adjustment = -item / 1000;
@@ -1586,22 +1668,22 @@ export class CanvasRenderer implements BaseRenderer {
         this.nextLine();
         break;
 
-      // Text showing
+      // Text showing - use byte-based methods for proper font encoding
       case Op.ShowText:
-        this.showText(extractTextString(operands[0]));
+        this.showTextFromCodes(extractTextBytes(operands[0]));
         break;
       case Op.ShowTextArray:
-        this.showTextArray(extractTextArray(operands[0] as PdfArray));
+        this.showTextArrayFromCodes(extractTextArrayWithBytes(operands[0] as PdfArray));
         break;
       case Op.MoveAndShowText:
-        this.moveAndShowText(extractTextString(operands[0]));
+        this.nextLine();
+        this.showTextFromCodes(extractTextBytes(operands[0]));
         break;
       case Op.MoveSetSpacingShowText:
-        this.setSpacingMoveShowText(
-          operands[0] as number,
-          operands[1] as number,
-          extractTextString(operands[2]),
-        );
+        this._graphicsState.wordSpacing = operands[0] as number;
+        this._graphicsState.charSpacing = operands[1] as number;
+        this.nextLine();
+        this.showTextFromCodes(extractTextBytes(operands[2]));
         break;
 
       default:
@@ -1739,6 +1821,7 @@ function decodeLatin1(bytes: Uint8Array): string {
 
 /**
  * Extract text string from operand (can be string or PdfString).
+ * @deprecated Use extractTextBytes for proper font encoding support
  */
 function extractTextString(operand: unknown): string {
   if (typeof operand === "string") {
@@ -1758,7 +1841,50 @@ function extractTextString(operand: unknown): string {
 }
 
 /**
+ * Extract raw bytes from a text operand.
+ * These bytes are character codes that should be decoded using the font's encoding.
+ */
+function extractTextBytes(operand: unknown): Uint8Array {
+  if (operand && typeof operand === "object") {
+    if ("bytes" in operand && operand.bytes instanceof Uint8Array) {
+      return operand.bytes;
+    }
+  }
+  // Fallback: convert string to byte array
+  if (typeof operand === "string") {
+    const bytes = new Uint8Array(operand.length);
+    for (let i = 0; i < operand.length; i++) {
+      bytes[i] = operand.charCodeAt(i) & 0xff;
+    }
+    return bytes;
+  }
+  return new Uint8Array(0);
+}
+
+/**
+ * Extract text array elements as raw bytes or numbers (for TJ arrays).
+ * Strings are kept as Uint8Array for proper font encoding support.
+ */
+function extractTextArrayWithBytes(array: PdfArray): Array<Uint8Array | number> {
+  const result: Array<Uint8Array | number> = [];
+  for (const item of array) {
+    if (item && typeof item === "object") {
+      // Check for PdfNumber (has value property as number)
+      if ("value" in item && typeof (item as PdfNumber).value === "number") {
+        result.push((item as PdfNumber).value);
+      }
+      // Check for PdfString (has bytes property)
+      else if ("bytes" in item && item.bytes instanceof Uint8Array) {
+        result.push(item.bytes);
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Extract text array elements (strings and numbers).
+ * @deprecated Use extractTextArrayWithBytes for proper font encoding support
  */
 function extractTextArray(array: PdfArray): Array<string | number> {
   const result: Array<string | number> = [];
