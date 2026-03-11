@@ -168,6 +168,13 @@ function generateMarkdown(data: BenchmarkOutput): string {
 
       for (const bench of sorted) {
         const name = bench.name;
+
+        // Handle benchmarks that errored out (no samples collected)
+        if (bench.hz == null || bench.sampleCount == null) {
+          lines.push(`| ${name} | FAILED | - | - | - | 0 |`);
+          continue;
+        }
+
         const hz = formatHz(bench.hz);
         const mean = formatTime(bench.mean);
         const p99 = formatTime(bench.p99);
@@ -180,9 +187,12 @@ function generateMarkdown(data: BenchmarkOutput): string {
       lines.push("");
 
       // Add comparison summary for groups with multiple benchmarks
-      if (sorted.length >= 2) {
-        const fastest = sorted[0];
-        const rest = sorted.slice(1);
+      // (only include benchmarks that actually produced results)
+      const validSorted = sorted.filter(b => b.hz != null);
+
+      if (validSorted.length >= 2) {
+        const fastest = validSorted[0];
+        const rest = validSorted.slice(1);
 
         for (const slower of rest) {
           const ratio = (fastest.hz / slower.hz).toFixed(2);

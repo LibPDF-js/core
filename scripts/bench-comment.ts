@@ -93,6 +93,12 @@ for (const file of data.files) {
     lines.push("|:---|---:|---:|---:|---:|");
 
     for (const b of group.benchmarks) {
+      // Handle benchmarks that errored out (no samples collected)
+      if (b.hz == null || b.sampleCount == null) {
+        lines.push(`| ${b.name} | FAILED | - | - | 0 |`);
+        continue;
+      }
+
       lines.push(
         `| ${b.name} | ${formatMs(b.mean)} | ${formatMs(b.p99)} | ${formatRme(b.rme)} | ${b.sampleCount} |`,
       );
