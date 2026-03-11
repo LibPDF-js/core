@@ -347,6 +347,10 @@ body {
   opacity: 1;
   line-height: 1;
   pointer-events: none;
+
+  /* Highlight colors as CSS custom properties */
+  --highlight-bg-color: rgb(180 0 170 / 0.25);
+  --highlight-selected-bg-color: rgb(0 100 0 / 0.25);
 }
 
 .text-layer > span,
@@ -358,33 +362,30 @@ body {
   cursor: text;
 }
 
+/* Mouse text selection - purple */
 .text-layer > span::selection,
 .text-layer > div::selection {
-  background: rgba(191, 191, 255, 0.7);
+  background: rgb(191 191 255 / 0.7);
   color: transparent;
 }
 
 .text-layer > span::-moz-selection,
 .text-layer > div::-moz-selection {
-  background: rgba(191, 191, 255, 0.7);
+  background: rgb(191 191 255 / 0.7);
   color: transparent;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Search Highlights
-   ───────────────────────────────────────────────────────────────────────────── */
-
-.search-highlight {
-  position: absolute;
-  background: rgba(197, 217, 195, 0.7);
-  border-radius: 3px;
-  pointer-events: none;
+/* Search highlight - applied via .highlight class on spans */
+.text-layer .highlight {
+  background-color: var(--highlight-bg-color);
+  border-radius: 2px;
 }
 
-.search-highlight.current {
-  background: rgba(168, 212, 165, 0.85);
-  z-index: 10;
+/* Current/selected search result */
+.text-layer .highlight.selected {
+  background-color: var(--highlight-selected-bg-color);
 }
+
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Status Bar

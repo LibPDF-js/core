@@ -25,6 +25,13 @@ import {
 // State
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface TextSpanInfo {
+  element: HTMLElement;
+  text: string;
+  startOffset: number;
+  endOffset: number;
+}
+
 interface DemoState {
   pdfDocument: PDFDocumentProxy | null;
   pdfBytes: Uint8Array | null;
@@ -35,6 +42,7 @@ interface DemoState {
   virtualScroller: VirtualScroller | null;
   searchEngine: PDFJSSearchEngine | null;
   pageElements: Map<number, HTMLElement>;
+  pageTextSpans: Map<number, TextSpanInfo[]>;
 }
 
 const state: DemoState = {
@@ -47,6 +55,7 @@ const state: DemoState = {
   virtualScroller: null,
   searchEngine: null,
   pageElements: new Map(),
+  pageTextSpans: new Map(),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,9 +264,10 @@ async function initializeViewer(): Promise<void> {
       // Add text layer for text selection
       const pdfDocument = state.pdfDocument;
       const scale = state.scale;
+      const pageIndex = event.pageIndex;
       void (async () => {
         try {
-          const page = await pdfDocument.getPage(event.pageIndex + 1);
+          const page = await pdfDocument.getPage(pageIndex + 1);
           const viewport = page.getViewport({ scale });
 
           // Create text layer container
@@ -272,17 +282,20 @@ async function initializeViewer(): Promise<void> {
           textLayerDiv.style.lineHeight = "1";
 
           // Build text layer using PDF.js
-          await buildPDFJSTextLayer(page, {
+          const result = await buildPDFJSTextLayer(page, {
             container: textLayerDiv,
             viewport: viewport as any,
           });
 
+          // Store text spans for highlighting
+          state.pageTextSpans.set(pageIndex, result.textSpans);
+
           container!.appendChild(textLayerDiv);
 
           // Highlight search results on this page
-          await highlightSearchResults(event.pageIndex, container!);
+          highlightSearchResults(pageIndex);
         } catch (err) {
-          console.error(`Failed to build text layer for page ${event.pageIndex}:`, err);
+          console.error(`Failed to build text layer for page ${pageIndex}:`, err);
         }
       })();
     }
@@ -348,6 +361,7 @@ function cleanupViewer(): void {
     state.searchEngine = null;
   }
   state.pageElements.clear();
+  state.pageTextSpans.clear();
   elements.viewer.innerHTML = "";
 }
 
@@ -449,10 +463,11 @@ async function setScale(scale: number): Promise<void> {
       contentContainer.style.height = `${state.virtualScroller.totalHeight}px`;
     }
 
-    // Clear existing page elements and re-render
+    // Clear existing page elements and text spans, then re-render
     for (const [pageIndex, container] of state.pageElements) {
       container.remove();
     }
+    state.pageTextSpans.clear();
     state.pageElements.clear();
 
     // Restore scroll position proportionally
@@ -575,19 +590,34 @@ function updateSearchResults(): void {
   elements.btnSearchPrev.disabled = count === 0;
   elements.btnSearchNext.disabled = count === 0;
 
-  // Update highlights on visible pages
-  for (const [pageIndex, container] of state.pageElements) {
-    void highlightSearchResults(pageIndex, container);
+  // Update highlights on all pages with text spans
+  for (const pageIndex of state.pageTextSpans.keys()) {
+    highlightSearchResults(pageIndex);
   }
 }
 
-async function highlightSearchResults(pageIndex: number, container: HTMLElement): Promise<void> {
-  if (!state.searchEngine || !state.pdfDocument) {
+function highlightSearchResults(pageIndex: number): void {
+  if (!state.searchEngine) {
     return;
   }
 
-  // Remove existing highlights
-  container.querySelectorAll(".search-highlight").forEach(el => el.remove());
+  const textSpans = state.pageTextSpans.get(pageIndex);
+  if (!textSpans) {
+    return;
+  }
+
+  // Clear existing highlights from all spans on this page
+  for (const spanInfo of textSpans) {
+    spanInfo.element.classList.remove("highlight", "selected");
+    // Remove any highlight wrapper spans we may have created
+    const parent = spanInfo.element.parentElement;
+    if (parent) {
+      const highlightSpans = spanInfo.element.querySelectorAll(".highlight");
+      highlightSpans.forEach(el => el.remove());
+    }
+    // Reset inner HTML to just the text
+    spanInfo.element.textContent = spanInfo.text;
+  }
 
   const results = state.searchEngine.getResultsForPage(pageIndex);
   const currentResult = state.searchEngine.currentResult;
@@ -596,46 +626,51 @@ async function highlightSearchResults(pageIndex: number, container: HTMLElement)
     return;
   }
 
-  // Get the page to access viewport for coordinate conversion
-  const page = await state.pdfDocument.getPage(pageIndex + 1);
-  const viewport = page.getViewport({ scale: state.scale });
-
+  // For each result, find overlapping text spans and add highlight class
   for (const result of results) {
     const isCurrent = currentResult && currentResult.resultIndex === result.resultIndex;
 
-    // Use boundsArray for multiline support, fall back to bounds for backwards compatibility
-    const boundsToHighlight = result.boundsArray || (result.bounds ? [result.bounds] : []);
+    // Find all text spans that overlap with this result
+    for (const spanInfo of textSpans) {
+      // Check if this span overlaps with the search result
+      if (spanInfo.endOffset > result.startOffset && spanInfo.startOffset < result.endOffset) {
+        // Calculate the overlap within this span
+        const overlapStart =
+          Math.max(result.startOffset, spanInfo.startOffset) - spanInfo.startOffset;
+        const overlapEnd = Math.min(result.endOffset, spanInfo.endOffset) - spanInfo.startOffset;
 
-    // Create a highlight element for each bounds (supports multiline matches)
-    for (const bounds of boundsToHighlight) {
-      const highlight = document.createElement("div");
-      highlight.className = "search-highlight";
+        // If the entire span is highlighted
+        if (overlapStart === 0 && overlapEnd === spanInfo.text.length) {
+          spanInfo.element.classList.add("highlight");
+          if (isCurrent) {
+            spanInfo.element.classList.add("selected");
+          }
+        } else {
+          // Partial highlight - need to wrap the highlighted portion in a span
+          const beforeText = spanInfo.text.slice(0, overlapStart);
+          const highlightText = spanInfo.text.slice(overlapStart, overlapEnd);
+          const afterText = spanInfo.text.slice(overlapEnd);
 
-      if (isCurrent) {
-        highlight.classList.add("current");
+          // Clear the span and rebuild with highlight
+          spanInfo.element.textContent = "";
+
+          if (beforeText) {
+            spanInfo.element.appendChild(document.createTextNode(beforeText));
+          }
+
+          const highlightSpan = document.createElement("span");
+          highlightSpan.className = "highlight";
+          if (isCurrent) {
+            highlightSpan.classList.add("selected");
+          }
+          highlightSpan.textContent = highlightText;
+          spanInfo.element.appendChild(highlightSpan);
+
+          if (afterText) {
+            spanInfo.element.appendChild(document.createTextNode(afterText));
+          }
+        }
       }
-
-      // Position highlight based on bounds
-      // PDF coordinates: origin at bottom-left, Y increases upward
-      // Screen coordinates: origin at top-left, Y increases downward
-      // bounds.y is the baseline (bottom of text) in PDF coordinates
-      // bounds.height is the text height (ascent)
-
-      // Convert to scaled coordinates
-      const x = bounds.x * state.scale;
-      const width = bounds.width * state.scale;
-      const height = bounds.height * state.scale;
-
-      // Convert Y: baseline is at bounds.y, text extends upward by bounds.height
-      // In screen coords: top of text = viewport.height - (baseline + height) * scale
-      // But we want to align with the actual text, so use baseline directly
-      const y = viewport.height - bounds.y * state.scale - height;
-
-      highlight.style.left = `${x}px`;
-      highlight.style.top = `${y}px`;
-      highlight.style.width = `${Math.max(width, 4)}px`;
-      highlight.style.height = `${Math.max(height, 10)}px`;
-      container.appendChild(highlight);
     }
   }
 }
@@ -654,15 +689,29 @@ async function scrollToCurrentResult(): Promise<void> {
     return;
   }
 
-  // Get viewport info for coordinate conversion
-  const page = await state.pdfDocument.getPage(result.pageIndex + 1);
-  const viewport = page.getViewport({ scale: state.scale });
+  // Try to find the actual highlighted element
+  const textSpans = state.pageTextSpans.get(result.pageIndex);
+  let resultY = layout.height / 2; // Default to middle of page
 
-  // Calculate the position of the result within the page
-  let resultY = 0;
-  if (result.bounds) {
-    // Convert PDF coordinates to screen coordinates
-    resultY = viewport.height - (result.bounds.y + result.bounds.height) * state.scale;
+  if (textSpans) {
+    // Find the first span that contains the search result
+    for (const spanInfo of textSpans) {
+      if (spanInfo.endOffset > result.startOffset && spanInfo.startOffset < result.endOffset) {
+        // Found a span with the highlight - get its position
+        const rect = spanInfo.element.getBoundingClientRect();
+        const container = state.pageElements.get(result.pageIndex);
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          resultY = rect.top - containerRect.top;
+        }
+        break;
+      }
+    }
+  } else if (result.bounds) {
+    // Fallback to bounds-based calculation
+    const page = await state.pdfDocument.getPage(result.pageIndex + 1);
+    const viewport = page.getViewport({ scale: state.scale });
+    resultY = viewport.height - result.bounds.y * state.scale - result.bounds.height * state.scale;
   }
 
   // Calculate absolute scroll position

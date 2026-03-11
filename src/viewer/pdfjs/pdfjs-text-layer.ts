@@ -54,6 +54,16 @@ export interface PDFJSTextLayerResult {
    * The text content used to build the layer.
    */
   textContent: TextContent;
+
+  /**
+   * Array of text spans with their character offsets for highlighting.
+   */
+  textSpans: Array<{
+    element: HTMLElement;
+    text: string;
+    startOffset: number;
+    endOffset: number;
+  }>;
 }
 
 /**
@@ -92,6 +102,8 @@ export async function buildPDFJSTextLayer(
   const textContent = await getTextContent(page);
 
   let divCount = 0;
+  let charOffset = 0;
+  const textSpans: PDFJSTextLayerResult["textSpans"] = [];
 
   // Process each text item
   for (const item of textContent.items) {
@@ -103,12 +115,22 @@ export async function buildPDFJSTextLayer(
     const textItem = item as TextItem;
 
     // Skip empty strings
-    if (!textItem.str || textItem.str.trim() === "") {
+    if (!textItem.str) {
       continue;
     }
 
-    const div = createTextDiv(textItem, viewport, enhanceTextAccessibility);
-    container.appendChild(div);
+    const span = createTextSpan(textItem, viewport, enhanceTextAccessibility);
+    container.appendChild(span);
+
+    // Store span info for highlighting
+    textSpans.push({
+      element: span,
+      text: textItem.str,
+      startOffset: charOffset,
+      endOffset: charOffset + textItem.str.length,
+    });
+
+    charOffset += textItem.str.length;
     divCount++;
   }
 
@@ -116,21 +138,22 @@ export async function buildPDFJSTextLayer(
     divCount,
     container,
     textContent,
+    textSpans,
   };
 }
 
 /**
- * Create a text div element for a text item.
+ * Create a text span element for a text item.
  */
-function createTextDiv(
+function createTextSpan(
   item: TextItem,
   viewport: PageViewport,
   enhanceAccessibility: boolean,
-): HTMLDivElement {
-  const div = document.createElement("div");
+): HTMLSpanElement {
+  const span = document.createElement("span");
 
   // Set text content
-  div.textContent = item.str;
+  span.textContent = item.str;
 
   // Calculate position
   // PDF.js text items have transform property: [scaleX, skewX, skewY, scaleY, x, y]
@@ -143,34 +166,36 @@ function createTextDiv(
   const [x, y] = viewport.convertToViewportPoint(tx[4], tx[5]);
 
   // Apply styles
-  div.style.position = "absolute";
-  div.style.left = `${x}px`;
-  div.style.top = `${y - fontAscent * viewport.scale}px`;
-  div.style.fontSize = `${fontHeight * viewport.scale}px`;
-  div.style.fontFamily = item.fontName ? mapFontName(item.fontName) : "sans-serif";
+  span.style.position = "absolute";
+  span.style.left = `${x}px`;
+  span.style.top = `${y - fontAscent * viewport.scale}px`;
+  span.style.fontSize = `${fontHeight * viewport.scale}px`;
+  span.style.fontFamily = item.fontName ? mapFontName(item.fontName) : "sans-serif";
 
   // Apply rotation if needed
   if (angle !== 0) {
-    div.style.transform = `rotate(${angle}rad)`;
-    div.style.transformOrigin = "left bottom";
+    span.style.transform = `rotate(${angle}rad)`;
+    span.style.transformOrigin = "left bottom";
   }
 
   // Make text transparent but selectable
-  div.style.color = "transparent";
-  div.style.whiteSpace = "nowrap";
-  div.style.pointerEvents = "auto";
+  span.style.color = "transparent";
+  span.style.whiteSpace = "pre";
+  span.style.pointerEvents = "auto";
 
-  // Apply width if available
-  if (item.width) {
-    div.style.width = `${item.width * viewport.scale}px`;
+  // Apply width if available - use letter-spacing to stretch text to match PDF width
+  if (item.width && item.str.length > 0) {
+    const targetWidth = item.width * viewport.scale;
+    span.style.width = `${targetWidth}px`;
   }
 
   // Accessibility enhancements
   if (enhanceAccessibility) {
-    div.setAttribute("role", "text");
+    span.setAttribute("role", "presentation");
+    span.setAttribute("dir", "ltr");
   }
 
-  return div;
+  return span;
 }
 
 /**
