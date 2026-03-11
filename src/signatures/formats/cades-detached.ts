@@ -62,7 +62,7 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
     const allCerts = [signerCert, ...chainCerts];
 
     // Build signed attributes
-    const signedAttrs = this.buildSignedAttributes(
+    const signedAttrs = await this.buildSignedAttributes(
       documentHash,
       digestAlgorithm,
       signer,
@@ -151,13 +151,13 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
   /**
    * Build the signed attributes for CAdES signature.
    */
-  private buildSignedAttributes(
+  private async buildSignedAttributes(
     documentHash: Uint8Array,
     digestAlgorithm: DigestAlgorithm,
     signer: Signer,
     signerCert: pkijs.Certificate,
     signingTime?: Date,
-  ): pkijs.Attribute[] {
+  ): Promise<pkijs.Attribute[]> {
     const attrs: pkijs.Attribute[] = [];
 
     // Content Type (required)
@@ -190,7 +190,7 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
     );
 
     // ESS signing-certificate-v2 (required for CAdES/PAdES)
-    attrs.push(this.buildSigningCertificateV2(signerCert, digestAlgorithm));
+    attrs.push(await this.buildSigningCertificateV2(signerCert, digestAlgorithm));
 
     return attrs;
   }
@@ -213,13 +213,13 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
    *   issuerSerial            IssuerSerial OPTIONAL
    * }
    */
-  private buildSigningCertificateV2(
+  private async buildSigningCertificateV2(
     signerCert: pkijs.Certificate,
     digestAlgorithm: DigestAlgorithm,
-  ): pkijs.Attribute {
+  ): Promise<pkijs.Attribute> {
     // Hash the certificate
     const certDer = signerCert.toSchema().toBER(false);
-    const certHash = hashData(new Uint8Array(certDer), digestAlgorithm);
+    const certHash = await hashData(new Uint8Array(certDer), digestAlgorithm);
 
     // Build IssuerSerial using pkijs classes for proper encoding
     // IssuerSerial ::= SEQUENCE {

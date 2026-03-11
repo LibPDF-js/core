@@ -2,7 +2,6 @@
  * Shared utilities for signature operations.
  */
 
-import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
 
@@ -38,19 +37,18 @@ export function escapePdfString(str: string): string {
 /**
  * Hash data using the specified algorithm.
  *
+ * Uses the Web Crypto API for native-speed hashing, which is significantly
+ * faster than pure-JS implementations for large inputs (e.g. hashing an
+ * entire PDF during signing).
+ *
  * @param data - Data to hash
  * @param algorithm - Digest algorithm
  * @returns Hash bytes
  */
-export function hashData(data: Uint8Array, algorithm: DigestAlgorithm): Uint8Array {
-  switch (algorithm) {
-    case "SHA-256":
-      return sha256(data);
-    case "SHA-384":
-      return sha384(data);
-    case "SHA-512":
-      return sha512(data);
-  }
+export async function hashData(data: Uint8Array, algorithm: DigestAlgorithm): Promise<Uint8Array> {
+  const digest = await crypto.subtle.digest(algorithm, data as Uint8Array<ArrayBuffer>);
+
+  return new Uint8Array(digest);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

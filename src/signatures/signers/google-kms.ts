@@ -8,7 +8,6 @@
 
 import { toArrayBuffer } from "#src/helpers/buffer.ts";
 import { derToPem, isPem, normalizePem, parsePem } from "#src/helpers/pem.ts";
-import { sha256, sha384, sha512 } from "@noble/hashes/sha2.js";
 import { fromBER } from "asn1js";
 import * as pkijs from "pkijs";
 
@@ -659,7 +658,7 @@ export class GoogleKmsSigner implements Signer {
     }
 
     // Hash data locally and build digest object for KMS
-    const { digest, digestKey } = this.hashData(data, algorithm);
+    const { digest, digestKey } = await this.hashData(data, algorithm);
 
     try {
       const [response] = await this.client.asymmetricSign({
@@ -701,19 +700,21 @@ export class GoogleKmsSigner implements Signer {
   /**
    * Hash data using the specified algorithm.
    *
+   * Uses the Web Crypto API for native-speed hashing.
+   *
    * @returns The digest bytes and the KMS digest key name
    */
-  private hashData(
+  private async hashData(
     data: Uint8Array,
     algorithm: DigestAlgorithm,
-  ): { digest: Uint8Array; digestKey: "sha256" | "sha384" | "sha512" } {
-    switch (algorithm) {
-      case "SHA-256":
-        return { digest: sha256(data), digestKey: "sha256" };
-      case "SHA-384":
-        return { digest: sha384(data), digestKey: "sha384" };
-      case "SHA-512":
-        return { digest: sha512(data), digestKey: "sha512" };
-    }
+  ): Promise<{ digest: Uint8Array; digestKey: "sha256" | "sha384" | "sha512" }> {
+    const digestKeyMap: Record<DigestAlgorithm, "sha256" | "sha384" | "sha512"> = {
+      "SHA-256": "sha256",
+      "SHA-384": "sha384",
+      "SHA-512": "sha512",
+    };
+
+    const arrayBuffer = await crypto.subtle.digest(algorithm, data as Uint8Array<ArrayBuffer>);
+    return { digest: new Uint8Array(arrayBuffer), digestKey: digestKeyMap[algorithm] };
   }
 }
