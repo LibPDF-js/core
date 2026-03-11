@@ -485,14 +485,10 @@ export class CanvasRenderer implements BaseRenderer {
               // PDF uses bottom-left origin, canvas uses top-left
               this._pageHeight = canvas.height / viewport.scale;
 
-              // Apply PDF coordinate system transformation:
-              // PDF has origin at bottom-left with Y increasing upward
-              // Canvas has origin at top-left with Y increasing downward
-              // We need to flip the Y axis by:
-              // 1. Translate to move origin to bottom-left
-              // 2. Scale Y by -1 to flip the axis
-              context.translate(0, this._pageHeight);
-              context.scale(1, -1);
+              // NOTE: We do NOT apply a global Y-flip transformation here.
+              // Instead, we handle the PDF-to-Canvas coordinate conversion
+              // per drawing operation in the individual methods (moveTo, lineTo, text, etc).
+              // This gives us more control and avoids double-flip issues with text.
 
               // Reset graphics state before rendering
               this.resetGraphicsState();
@@ -957,6 +953,19 @@ export class CanvasRenderer implements BaseRenderer {
   }
 
   // ============================================================================
+  // Coordinate Conversion Helpers
+  // ============================================================================
+
+  /**
+   * Convert PDF Y coordinate to Canvas Y coordinate.
+   * PDF uses bottom-left origin (Y increases upward).
+   * Canvas uses top-left origin (Y increases downward).
+   */
+  private pdfYToCanvasY(pdfY: number): number {
+    return this._pageHeight - pdfY;
+  }
+
+  // ============================================================================
   // Path Construction Operations
   // ============================================================================
 
@@ -980,9 +989,11 @@ export class CanvasRenderer implements BaseRenderer {
     if (!this._currentPath) {
       this.beginPath();
     }
-    this._currentPath?.moveTo(x, y);
+    // Convert PDF coordinates to canvas coordinates
+    const canvasY = this.pdfYToCanvasY(y);
+    this._currentPath?.moveTo(x, canvasY);
     if (this._context) {
-      this._context.moveTo(x, y);
+      this._context.moveTo(x, canvasY);
     }
   }
 
@@ -993,9 +1004,11 @@ export class CanvasRenderer implements BaseRenderer {
     if (!this._currentPath) {
       this.beginPath();
     }
-    this._currentPath?.lineTo(x, y);
+    // Convert PDF coordinates to canvas coordinates
+    const canvasY = this.pdfYToCanvasY(y);
+    this._currentPath?.lineTo(x, canvasY);
     if (this._context) {
-      this._context.lineTo(x, y);
+      this._context.lineTo(x, canvasY);
     }
   }
 
@@ -1006,9 +1019,13 @@ export class CanvasRenderer implements BaseRenderer {
     if (!this._currentPath) {
       this.beginPath();
     }
-    this._currentPath?.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+    // Convert PDF coordinates to canvas coordinates
+    const cy1 = this.pdfYToCanvasY(y1);
+    const cy2 = this.pdfYToCanvasY(y2);
+    const cy3 = this.pdfYToCanvasY(y3);
+    this._currentPath?.bezierCurveTo(x1, cy1, x2, cy2, x3, cy3);
     if (this._context) {
-      this._context.bezierCurveTo(x1, y1, x2, y2, x3, y3);
+      this._context.bezierCurveTo(x1, cy1, x2, cy2, x3, cy3);
     }
   }
 
@@ -1022,10 +1039,13 @@ export class CanvasRenderer implements BaseRenderer {
     if (!this._currentPath) {
       this.beginPath();
     }
+    // Convert PDF coordinates to canvas coordinates
+    const cy2 = this.pdfYToCanvasY(y2);
+    const cy3 = this.pdfYToCanvasY(y3);
     // This is a simplification - proper implementation would track current point
-    this._currentPath?.bezierCurveTo(x2, y2, x2, y2, x3, y3);
+    this._currentPath?.bezierCurveTo(x2, cy2, x2, cy2, x3, cy3);
     if (this._context) {
-      this._context.bezierCurveTo(x2, y2, x2, y2, x3, y3);
+      this._context.bezierCurveTo(x2, cy2, x2, cy2, x3, cy3);
     }
   }
 
@@ -1037,9 +1057,12 @@ export class CanvasRenderer implements BaseRenderer {
     if (!this._currentPath) {
       this.beginPath();
     }
-    this._currentPath?.bezierCurveTo(x1, y1, x3, y3, x3, y3);
+    // Convert PDF coordinates to canvas coordinates
+    const cy1 = this.pdfYToCanvasY(y1);
+    const cy3 = this.pdfYToCanvasY(y3);
+    this._currentPath?.bezierCurveTo(x1, cy1, x3, cy3, x3, cy3);
     if (this._context) {
-      this._context.bezierCurveTo(x1, y1, x3, y3, x3, y3);
+      this._context.bezierCurveTo(x1, cy1, x3, cy3, x3, cy3);
     }
   }
 
@@ -1060,9 +1083,13 @@ export class CanvasRenderer implements BaseRenderer {
     if (!this._currentPath) {
       this.beginPath();
     }
-    this._currentPath?.rect(x, y, width, height);
+    // Convert PDF coordinates to canvas coordinates
+    // In PDF, (x, y) is bottom-left of rectangle with positive height going up
+    // In canvas, we need to convert to top-left corner
+    const canvasY = this.pdfYToCanvasY(y + height);
+    this._currentPath?.rect(x, canvasY, width, height);
     if (this._context) {
-      this._context.rect(x, y, width, height);
+      this._context.rect(x, canvasY, width, height);
     }
   }
 
@@ -1357,37 +1384,36 @@ export class CanvasRenderer implements BaseRenderer {
     const ctm = this._graphicsState.ctm;
 
     // Calculate the position in PDF coordinates
-    // The canvas has been transformed to use PDF coordinate system (Y-flipped),
-    // so we can use PDF coordinates directly
+    // Text matrix (tm.e, tm.f) gives position in user space
+    // CTM transforms from user space to device space
     const pdfX = ctm.a * tm.e + ctm.c * tm.f + ctm.e;
     const pdfY = ctm.b * tm.e + ctm.d * tm.f + ctm.f;
 
+    // Convert PDF Y to canvas Y (PDF origin is bottom-left, canvas is top-left)
+    const canvasX = pdfX;
+    const canvasY = this.pdfYToCanvasY(pdfY);
+
     // Calculate effective font size considering all transformations
     const effectiveFontSize = Math.abs(fontSize * tm.d * ctm.d);
-
-    // Text needs special handling because the canvas Y-axis is flipped.
-    // We need to flip text back so it appears right-side up.
-    // Save current transform, flip locally for text, then restore.
-    this._context.save();
-    this._context.translate(pdfX, pdfY);
-    this._context.scale(1, -1); // Flip text back to normal orientation
 
     // Set up the context for text rendering
     this._context.font = `${effectiveFontSize}px ${mapPdfFontToCanvas(this._graphicsState.fontName)}`;
     this._context.fillStyle = this._graphicsState.fillColor;
     this._context.strokeStyle = this._graphicsState.strokeColor;
 
-    // Apply horizontal scaling
+    // Apply horizontal scaling if needed
     if (horizontalScale !== 100) {
+      this._context.save();
+      this._context.translate(canvasX, canvasY);
       this._context.scale(horizontalScale / 100, 1);
+      this._context.translate(-canvasX, -canvasY);
     }
 
-    // Apply text rise (vertical offset) - in the flipped coordinate system
-    const adjustedY = -textRise * ctm.d;
+    // Apply text rise (vertical offset)
+    const adjustedY = canvasY - textRise * ctm.d;
 
     // Render based on mode
-    // Since we've translated to the text position, draw at local (0, 0)
-    let xOffset = 0;
+    let xOffset = canvasX;
     for (const char of text) {
       if (textRenderMode === TextRenderMode.Fill || textRenderMode === TextRenderMode.FillStroke) {
         this._context.fillText(char, xOffset, adjustedY);
@@ -1407,14 +1433,17 @@ export class CanvasRenderer implements BaseRenderer {
       }
     }
 
-    // Restore the text-local transform (handles both horizontal scaling and the flip)
-    this._context.restore();
+    // Restore horizontal scaling if applied
+    if (horizontalScale !== 100) {
+      this._context.restore();
+    }
 
     this._context.restore();
 
     // Update text matrix (advance position in text space units)
-    // xOffset is in canvas pixels, need to convert back to text space
-    const textSpaceAdvance = xOffset / (effectiveFontSize / fontSize);
+    // xOffset is now the final X position, so calculate advance from starting position
+    const advanceInCanvasPixels = xOffset - canvasX;
+    const textSpaceAdvance = advanceInCanvasPixels / (effectiveFontSize / fontSize);
     this._textState.textMatrix = this._textState.textMatrix.translate(
       textSpaceAdvance / fontSize,
       0,
