@@ -10,6 +10,16 @@ import type { PDFDocumentProxy, PDFPageProxy, TextContent, TextItem } from "./pd
 import { getTextContent, isTextItem } from "./pdfjs-wrapper";
 
 /**
+ * A bounding rectangle for a portion of a search result.
+ */
+export interface SearchResultBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
  * A single search result.
  */
 export interface PDFJSSearchResult {
@@ -40,13 +50,17 @@ export interface PDFJSSearchResult {
 
   /**
    * Bounding rectangle in PDF coordinates (if available).
+   * For single-line matches, this contains one bounds object.
+   * For multiline matches, this contains multiple bounds (one per line/text item).
+   * @deprecated Use boundsArray instead for multiline support
    */
-  bounds?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  bounds?: SearchResultBounds;
+
+  /**
+   * Array of bounding rectangles for the match.
+   * For multiline matches, this contains one bounds per text item/line.
+   */
+  boundsArray?: SearchResultBounds[];
 }
 
 /**
@@ -243,33 +257,48 @@ export async function searchDocument(
         break;
       }
 
-      // Calculate precise bounds for the matched text
-      let bounds: PDFJSSearchResult["bounds"];
+      // Calculate bounds for all text items that the match spans
+      const boundsArray: SearchResultBounds[] = [];
       let charOffset = 0;
+      let matchStartFound = false;
 
       for (const item of items) {
+        const itemStart = charOffset;
         const itemEnd = charOffset + item.text.length;
 
-        if (match.start >= charOffset && match.start < itemEnd) {
-          // Match starts in this item
-          const offsetInItem = match.start - charOffset;
-          const matchLength = Math.min(match.end - match.start, item.text.length - offsetInItem);
+        // Check if this item overlaps with the match
+        if (itemEnd > match.start && itemStart < match.end) {
+          matchStartFound = true;
+
+          // Calculate the portion of this item that is part of the match
+          const overlapStart = Math.max(match.start, itemStart);
+          const overlapEnd = Math.min(match.end, itemEnd);
+
+          // Calculate offsets within this item
+          const offsetInItem = overlapStart - itemStart;
+          const matchLengthInItem = overlapEnd - overlapStart;
 
           // Calculate x offset based on character position
           const xOffset = offsetInItem * item.charWidth;
-          // Calculate width based on matched text length
-          const matchWidth = matchLength * item.charWidth;
+          // Calculate width based on matched text length in this item
+          const matchWidth = matchLengthInItem * item.charWidth;
 
-          bounds = {
+          boundsArray.push({
             x: item.transform[4] + xOffset,
             y: item.transform[5],
-            width: matchWidth > 0 ? matchWidth : item.charWidth * query.length,
+            width: matchWidth > 0 ? matchWidth : item.charWidth,
             height: item.height || 12,
-          };
+          });
+        } else if (matchStartFound && itemStart >= match.end) {
+          // We've passed the match, no need to continue
           break;
         }
+
         charOffset = itemEnd;
       }
+
+      // Use the first bounds for backwards compatibility
+      const bounds = boundsArray.length > 0 ? boundsArray[0] : undefined;
 
       results.push({
         pageIndex,
@@ -278,6 +307,7 @@ export async function searchDocument(
         startOffset: match.start,
         endOffset: match.end,
         bounds,
+        boundsArray: boundsArray.length > 0 ? boundsArray : undefined,
       });
     }
   }

@@ -92,4 +92,5 @@ export {
   type PDFJSSearchResult,
   type PDFJSSearchOptions,
   type PDFJSSearchState,
+  type SearchResultBounds,
 } from "./pdfjs-search";

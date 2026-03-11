@@ -602,22 +602,28 @@ async function highlightSearchResults(pageIndex: number, container: HTMLElement)
   const viewport = page.getViewport({ scale: state.scale });
 
   for (const result of results) {
-    const highlight = document.createElement("div");
-    highlight.className = "search-highlight";
+    const isCurrent = currentResult && currentResult.resultIndex === result.resultIndex;
 
-    if (currentResult && currentResult.resultIndex === result.resultIndex) {
-      highlight.classList.add("current");
-    }
+    // Use boundsArray for multiline support, fall back to bounds for backwards compatibility
+    const boundsToHighlight = result.boundsArray || (result.bounds ? [result.bounds] : []);
 
-    // Position highlight based on bounds
-    // PDF coordinates have origin at bottom-left, need to convert to top-left
-    if (result.bounds) {
+    // Create a highlight element for each bounds (supports multiline matches)
+    for (const bounds of boundsToHighlight) {
+      const highlight = document.createElement("div");
+      highlight.className = "search-highlight";
+
+      if (isCurrent) {
+        highlight.classList.add("current");
+      }
+
+      // Position highlight based on bounds
+      // PDF coordinates have origin at bottom-left, need to convert to top-left
       // Convert PDF coordinates to viewport coordinates
-      const x = result.bounds.x * state.scale;
+      const x = bounds.x * state.scale;
       // Flip Y coordinate: viewport.height - (y + height) * scale
-      const y = viewport.height - (result.bounds.y + result.bounds.height) * state.scale;
-      const width = result.bounds.width * state.scale;
-      const height = result.bounds.height * state.scale;
+      const y = viewport.height - (bounds.y + bounds.height) * state.scale;
+      const width = bounds.width * state.scale;
+      const height = bounds.height * state.scale;
 
       highlight.style.left = `${x}px`;
       highlight.style.top = `${y}px`;
