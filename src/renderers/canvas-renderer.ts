@@ -485,10 +485,12 @@ export class CanvasRenderer implements BaseRenderer {
               // PDF uses bottom-left origin, canvas uses top-left
               this._pageHeight = canvas.height / viewport.scale;
 
-              // NOTE: We do NOT apply a global Y-flip transformation here.
-              // Instead, we handle the PDF-to-Canvas coordinate conversion
-              // per drawing operation in the individual methods (moveTo, lineTo, text, etc).
-              // This gives us more control and avoids double-flip issues with text.
+              // Apply PDF coordinate system transformation:
+              // PDF has origin at bottom-left with Y increasing upward
+              // Canvas has origin at top-left with Y increasing downward
+              // Transform: translate to bottom, flip Y axis
+              context.translate(0, this._pageHeight);
+              context.scale(1, -1);
 
               // Reset graphics state before rendering
               this.resetGraphicsState();
@@ -953,19 +955,6 @@ export class CanvasRenderer implements BaseRenderer {
   }
 
   // ============================================================================
-  // Coordinate Conversion Helpers
-  // ============================================================================
-
-  /**
-   * Convert PDF Y coordinate to Canvas Y coordinate.
-   * PDF uses bottom-left origin (Y increases upward).
-   * Canvas uses top-left origin (Y increases downward).
-   */
-  private pdfYToCanvasY(pdfY: number): number {
-    return this._pageHeight - pdfY;
-  }
-
-  // ============================================================================
   // Path Construction Operations
   // ============================================================================
 
@@ -984,53 +973,49 @@ export class CanvasRenderer implements BaseRenderer {
 
   /**
    * Move to a point (m operator).
+   * Coordinates are in PDF space; canvas transform handles the conversion.
    */
   moveTo(x: number, y: number): void {
     if (!this._currentPath) {
       this.beginPath();
     }
-    // Convert PDF coordinates to canvas coordinates
-    const canvasY = this.pdfYToCanvasY(y);
-    this._currentPath?.moveTo(x, canvasY);
+    this._currentPath?.moveTo(x, y);
     if (this._context) {
-      this._context.moveTo(x, canvasY);
+      this._context.moveTo(x, y);
     }
   }
 
   /**
    * Draw a line to a point (l operator).
+   * Coordinates are in PDF space; canvas transform handles the conversion.
    */
   lineTo(x: number, y: number): void {
     if (!this._currentPath) {
       this.beginPath();
     }
-    // Convert PDF coordinates to canvas coordinates
-    const canvasY = this.pdfYToCanvasY(y);
-    this._currentPath?.lineTo(x, canvasY);
+    this._currentPath?.lineTo(x, y);
     if (this._context) {
-      this._context.lineTo(x, canvasY);
+      this._context.lineTo(x, y);
     }
   }
 
   /**
    * Draw a cubic Bezier curve (c operator).
+   * Coordinates are in PDF space; canvas transform handles the conversion.
    */
   curveTo(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number): void {
     if (!this._currentPath) {
       this.beginPath();
     }
-    // Convert PDF coordinates to canvas coordinates
-    const cy1 = this.pdfYToCanvasY(y1);
-    const cy2 = this.pdfYToCanvasY(y2);
-    const cy3 = this.pdfYToCanvasY(y3);
-    this._currentPath?.bezierCurveTo(x1, cy1, x2, cy2, x3, cy3);
+    this._currentPath?.bezierCurveTo(x1, y1, x2, y2, x3, y3);
     if (this._context) {
-      this._context.bezierCurveTo(x1, cy1, x2, cy2, x3, cy3);
+      this._context.bezierCurveTo(x1, y1, x2, y2, x3, y3);
     }
   }
 
   /**
    * Draw a cubic Bezier curve with current point as first control (v operator).
+   * Coordinates are in PDF space; canvas transform handles the conversion.
    */
   curveToInitial(x2: number, y2: number, x3: number, y3: number): void {
     // For 'v' operator, first control point is the current point
@@ -1039,30 +1024,25 @@ export class CanvasRenderer implements BaseRenderer {
     if (!this._currentPath) {
       this.beginPath();
     }
-    // Convert PDF coordinates to canvas coordinates
-    const cy2 = this.pdfYToCanvasY(y2);
-    const cy3 = this.pdfYToCanvasY(y3);
     // This is a simplification - proper implementation would track current point
-    this._currentPath?.bezierCurveTo(x2, cy2, x2, cy2, x3, cy3);
+    this._currentPath?.bezierCurveTo(x2, y2, x2, y2, x3, y3);
     if (this._context) {
-      this._context.bezierCurveTo(x2, cy2, x2, cy2, x3, cy3);
+      this._context.bezierCurveTo(x2, y2, x2, y2, x3, y3);
     }
   }
 
   /**
    * Draw a cubic Bezier curve with end point as last control (y operator).
+   * Coordinates are in PDF space; canvas transform handles the conversion.
    */
   curveToFinal(x1: number, y1: number, x3: number, y3: number): void {
     // For 'y' operator, last control point equals the end point
     if (!this._currentPath) {
       this.beginPath();
     }
-    // Convert PDF coordinates to canvas coordinates
-    const cy1 = this.pdfYToCanvasY(y1);
-    const cy3 = this.pdfYToCanvasY(y3);
-    this._currentPath?.bezierCurveTo(x1, cy1, x3, cy3, x3, cy3);
+    this._currentPath?.bezierCurveTo(x1, y1, x3, y3, x3, y3);
     if (this._context) {
-      this._context.bezierCurveTo(x1, cy1, x3, cy3, x3, cy3);
+      this._context.bezierCurveTo(x1, y1, x3, y3, x3, y3);
     }
   }
 
@@ -1078,18 +1058,15 @@ export class CanvasRenderer implements BaseRenderer {
 
   /**
    * Draw a rectangle (re operator).
+   * Coordinates are in PDF space; canvas transform handles the conversion.
    */
   rectangle(x: number, y: number, width: number, height: number): void {
     if (!this._currentPath) {
       this.beginPath();
     }
-    // Convert PDF coordinates to canvas coordinates
-    // In PDF, (x, y) is bottom-left of rectangle with positive height going up
-    // In canvas, we need to convert to top-left corner
-    const canvasY = this.pdfYToCanvasY(y + height);
-    this._currentPath?.rect(x, canvasY, width, height);
+    this._currentPath?.rect(x, y, width, height);
     if (this._context) {
-      this._context.rect(x, canvasY, width, height);
+      this._context.rect(x, y, width, height);
     }
   }
 
@@ -1384,17 +1361,21 @@ export class CanvasRenderer implements BaseRenderer {
     const ctm = this._graphicsState.ctm;
 
     // Calculate the position in PDF coordinates
-    // Text matrix (tm.e, tm.f) gives position in user space
-    // CTM transforms from user space to device space
-    const pdfX = ctm.a * tm.e + ctm.c * tm.f + ctm.e;
-    const pdfY = ctm.b * tm.e + ctm.d * tm.f + ctm.f;
-
-    // Convert PDF Y to canvas Y (PDF origin is bottom-left, canvas is top-left)
-    const canvasX = pdfX;
-    const canvasY = this.pdfYToCanvasY(pdfY);
+    // The text position is given by the text matrix translation (tm.e, tm.f)
+    // In most simple cases, CTM is identity, so we just use tm.e and tm.f directly
+    const pdfX = tm.e;
+    const pdfY = tm.f;
 
     // Calculate effective font size considering all transformations
     const effectiveFontSize = Math.abs(fontSize * tm.d * ctm.d);
+
+    // The canvas has a global Y-flip transformation applied (scale(1, -1)).
+    // This means text would appear upside-down and mirrored.
+    // To render text correctly, we need to:
+    // 1. Move to the text position in PDF space
+    // 2. Apply a local flip to counteract the global flip
+    this._context.translate(pdfX, pdfY);
+    this._context.scale(1, -1); // Flip text so it appears right-side up
 
     // Set up the context for text rendering
     this._context.font = `${effectiveFontSize}px ${mapPdfFontToCanvas(this._graphicsState.fontName)}`;
@@ -1403,17 +1384,14 @@ export class CanvasRenderer implements BaseRenderer {
 
     // Apply horizontal scaling if needed
     if (horizontalScale !== 100) {
-      this._context.save();
-      this._context.translate(canvasX, canvasY);
       this._context.scale(horizontalScale / 100, 1);
-      this._context.translate(-canvasX, -canvasY);
     }
 
-    // Apply text rise (vertical offset)
-    const adjustedY = canvasY - textRise * ctm.d;
+    // Apply text rise (vertical offset) - note: sign is flipped due to local scale
+    const adjustedY = textRise * ctm.d;
 
-    // Render based on mode
-    let xOffset = canvasX;
+    // Render based on mode - draw at local origin (0, 0) since we translated
+    let xOffset = 0;
     for (const char of text) {
       if (textRenderMode === TextRenderMode.Fill || textRenderMode === TextRenderMode.FillStroke) {
         this._context.fillText(char, xOffset, adjustedY);
@@ -1433,17 +1411,11 @@ export class CanvasRenderer implements BaseRenderer {
       }
     }
 
-    // Restore horizontal scaling if applied
-    if (horizontalScale !== 100) {
-      this._context.restore();
-    }
-
     this._context.restore();
 
     // Update text matrix (advance position in text space units)
-    // xOffset is now the final X position, so calculate advance from starting position
-    const advanceInCanvasPixels = xOffset - canvasX;
-    const textSpaceAdvance = advanceInCanvasPixels / (effectiveFontSize / fontSize);
+    // xOffset is the advance in canvas pixels from the starting position
+    const textSpaceAdvance = xOffset / (effectiveFontSize / fontSize);
     this._textState.textMatrix = this._textState.textMatrix.translate(
       textSpaceAdvance / fontSize,
       0,
