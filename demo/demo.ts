@@ -140,14 +140,14 @@ async function initializeViewer(): Promise<void> {
   }
 
   // Create virtual scroller
-  const viewerRect = elements.viewer.getBoundingClientRect();
+  // Use clientWidth/clientHeight for accurate viewport size (excludes scrollbars)
   state.virtualScroller = createVirtualScroller({
     pageDimensions,
     scale: state.scale,
     pageGap: 20,
     bufferSize: 1,
-    viewportWidth: viewerRect.width,
-    viewportHeight: viewerRect.height,
+    viewportWidth: elements.viewer.clientWidth,
+    viewportHeight: elements.viewer.clientHeight,
   });
 
   // Set up viewer container for scrolling
@@ -158,7 +158,8 @@ async function initializeViewer(): Promise<void> {
   const contentContainer = document.createElement("div");
   contentContainer.className = "viewer-content";
   contentContainer.style.position = "relative";
-  contentContainer.style.width = `${state.virtualScroller.totalWidth}px`;
+  // Set width to total content width - pages are centered within this by VirtualScroller
+  contentContainer.style.width = `${Math.max(state.virtualScroller.totalWidth, elements.viewer.clientWidth)}px`;
   contentContainer.style.height = `${state.virtualScroller.totalHeight}px`;
   elements.viewer.appendChild(contentContainer);
 
@@ -436,10 +437,16 @@ async function setScale(scale: number): Promise<void> {
 
     state.virtualScroller.setScale(state.scale);
 
+    // Update viewport size to reflect any changes in viewer dimensions
+    state.virtualScroller.setViewportSize(
+      elements.viewer.clientWidth,
+      elements.viewer.clientHeight,
+    );
+
     // Update content container size
     const contentContainer = (state as any).contentContainer as HTMLElement;
     if (contentContainer) {
-      contentContainer.style.width = `${state.virtualScroller.totalWidth}px`;
+      contentContainer.style.width = `${Math.max(state.virtualScroller.totalWidth, elements.viewer.clientWidth)}px`;
       contentContainer.style.height = `${state.virtualScroller.totalHeight}px`;
     }
 
