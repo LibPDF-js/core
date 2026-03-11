@@ -591,3 +591,23 @@ export {
   type CMapRegistryOptions,
   type CMapRegistryStats,
 } from "./text";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Resource Loading
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // ResourceLoader
+  AuthenticationError,
+  createResourceLoader,
+  FileReadError,
+  InvalidFileTypeError,
+  loadResource,
+  NetworkError,
+  ResourceLoader,
+  ResourceLoaderError,
+  type AuthConfig,
+  type LoadResourceOptions,
+  type LoadResourceResult,
+  type ResourceInput,
+} from "./resource-loader";
