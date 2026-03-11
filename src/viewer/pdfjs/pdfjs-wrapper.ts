@@ -134,9 +134,10 @@ export async function initializePDFJS(options: PDFJSWrapperOptions = {}): Promis
   if (options.workerSrc) {
     pdfjs.GlobalWorkerOptions.workerSrc = options.workerSrc;
   } else {
-    // Use the bundled worker or disable it
-    // When no worker is specified, PDF.js will use the main thread
-    pdfjs.GlobalWorkerOptions.workerSrc = "";
+    // Use CDN fallback with the installed version
+    // The version property may not be available in all builds
+    const version = (pdfjs as { version?: string }).version || "4.8.69";
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`;
   }
 
   state.initialized = true;

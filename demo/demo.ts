@@ -90,7 +90,10 @@ async function loadPDF(file: File): Promise<void> {
     state.pdfBytes = bytes;
 
     // Initialize PDF.js if not already done
-    await initializePDFJS();
+    // Use CDN worker for browser environment
+    await initializePDFJS({
+      workerSrc: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs",
+    });
 
     // Load the document using PDF.js
     state.pdfDocument = await loadPDFJSDocument(bytes);
