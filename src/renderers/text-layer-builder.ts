@@ -204,19 +204,26 @@ export class TextLayerBuilder {
     span.style.whiteSpace = "nowrap";
     span.style.overflow = "hidden";
 
-    // Prevent character overlap by controlling text rendering
-    // Use letter-spacing: 0 to prevent any default spacing
-    span.style.letterSpacing = "0";
-    // Use word-spacing: 0 for consistency
-    span.style.wordSpacing = "0";
-    // Set line-height to match height to prevent vertical overflow
-    span.style.lineHeight = `${screenRect.height}px`;
-    // Use transform to scale the character to fit the bounding box width exactly
-    // This prevents overlap when browser font metrics differ from PDF metrics
-    span.style.display = "inline-block";
-    span.style.textAlign = "left";
-    // Ensure the transform origin is at the top-left for consistent positioning
+    // Critical CSS properties to prevent character overlap:
+    // 1. Set transform origin to top-left for consistent positioning
     span.style.transformOrigin = "0 0";
+
+    // 2. Use scaleX to fit character exactly within its bounding box width
+    // The browser's native character width may differ from PDF's calculated width
+    // We estimate the natural rendered width and scale to match the target width
+    // Average character width is roughly 0.55 * fontSize for most fonts
+    const estimatedCharWidth = scaledFontSize * 0.55;
+    if (estimatedCharWidth > 0 && screenRect.width > 0) {
+      const scaleX = screenRect.width / estimatedCharWidth;
+      span.style.transform = `scaleX(${scaleX})`;
+    }
+
+    // 3. Reset spacing that could cause overlap between adjacent characters
+    span.style.letterSpacing = "0";
+    span.style.wordSpacing = "0";
+
+    // 4. Set line-height to control vertical positioning
+    span.style.lineHeight = `${screenRect.height}px`;
 
     // Add data attributes for debugging/accessibility
     span.setAttribute("data-char", char.char);
