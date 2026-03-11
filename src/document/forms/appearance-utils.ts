@@ -4,7 +4,7 @@
 
 import type { Operator } from "#src/content/operators";
 import { ContentStreamParser } from "#src/content/parsing/content-stream-parser";
-import { isParsedOperation } from "#src/content/parsing/types";
+import { isParsedOperation, type ContentToken } from "#src/content/parsing/types";
 import {
   closePath,
   curveTo,
@@ -29,7 +29,7 @@ import { PdfString } from "#src/objects/pdf-string";
 
 import type { ObjectRegistry } from "../object-registry";
 import type { AcroForm } from "./acro-form";
-import type { RgbColor } from "./fields";
+import type { FormField, RgbColor } from "./fields";
 import {
   ExistingFont,
   type FormFont,
@@ -392,15 +392,8 @@ export function resolveAppearanceFont(
 }
 
 /** Extract numeric value from a content token operand. */
-function num(token: unknown): number {
-  if (
-    token &&
-    typeof token === "object" &&
-    "type" in token &&
-    token.type === "number" &&
-    "value" in token &&
-    typeof token.value === "number"
-  ) {
+function num(token?: ContentToken): number {
+  if (token && token.type === "number" && typeof token.value === "number") {
     return token.value;
   }
 
@@ -408,15 +401,8 @@ function num(token: unknown): number {
 }
 
 /** Extract name string from a content token operand (strips leading slash). */
-function nameStr(token: unknown): string {
-  if (
-    token &&
-    typeof token === "object" &&
-    "type" in token &&
-    token.type === "name" &&
-    "value" in token &&
-    typeof token.value === "string"
-  ) {
+function nameStr(token: ContentToken): string {
+  if (token && token.type === "name" && typeof token.value === "string") {
     return token.value;
   }
 
@@ -676,14 +662,8 @@ export function getFontResourceName(
 /**
  * Resolve the default appearance string from field or form defaults, and parse it.
  */
-export function parseDefaultAppearance(
-  ctx: AppearanceContext,
-  field: { defaultAppearance?: string | null },
-): ParsedDA {
-  const da =
-    "defaultAppearance" in field
-      ? (field.defaultAppearance ?? ctx.acroForm.defaultAppearance)
-      : ctx.acroForm.defaultAppearance;
+export function parseDefaultAppearance(ctx: AppearanceContext, field: FormField): ParsedDA {
+  const da = field.defaultAppearance ?? ctx.acroForm.defaultAppearance ?? "";
 
   return parseDAString(da);
 }
