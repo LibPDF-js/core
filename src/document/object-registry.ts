@@ -5,6 +5,7 @@
  * tracks new objects, and assigns object numbers.
  */
 
+import { max } from "#src/helpers/math";
 import type { RefResolver } from "#src/helpers/types";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
@@ -47,9 +48,7 @@ export class ObjectRegistry {
    */
   constructor(xref?: Map<number, XRefEntry>) {
     if (xref && xref.size > 0) {
-      // Find max object number from xref
-      const maxObjNum = Math.max(...xref.keys());
-      this._nextObjNum = maxObjNum + 1;
+      this._nextObjNum = max(xref.keys()) + 1;
     } else {
       // Start from 1 (0 is reserved for free list head)
       this._nextObjNum = 1;

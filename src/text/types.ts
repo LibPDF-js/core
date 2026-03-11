@@ -5,6 +5,8 @@
  * including position information for searching and highlighting.
  */
 
+import { max, min } from "#src/helpers/math";
+
 /**
  * Rectangle in PDF coordinates (origin at bottom-left).
  */
@@ -128,10 +130,10 @@ export function mergeBboxes(boxes: BoundingBox[]): BoundingBox {
     return { x: 0, y: 0, width: 0, height: 0 };
   }
 
-  const minX = Math.min(...boxes.map(b => b.x));
-  const minY = Math.min(...boxes.map(b => b.y));
-  const maxX = Math.max(...boxes.map(b => b.x + b.width));
-  const maxY = Math.max(...boxes.map(b => b.y + b.height));
+  const minX = min(boxes.map(b => b.x));
+  const minY = min(boxes.map(b => b.y));
+  const maxX = max(boxes.map(b => b.x + b.width));
+  const maxY = max(boxes.map(b => b.y + b.height));
 
   return {
     x: minX,

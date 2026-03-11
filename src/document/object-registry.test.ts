@@ -26,6 +26,20 @@ describe("ObjectRegistry", () => {
 
       expect(registry.nextObjectNumber).toBe(6); // max(1,5,3) + 1
     });
+
+    it("handles very large xref maps without stack overflow", () => {
+      // Math.max(...keys) blows the call stack around ~200k args.
+      // Build a map with 250k entries to verify the iterative approach.
+      const xref = new Map<number, XRefEntry>();
+
+      for (let i = 0; i < 250_000; i++) {
+        xref.set(i, { type: "uncompressed", offset: i * 100, generation: 0 });
+      }
+
+      const registry = new ObjectRegistry(xref);
+
+      expect(registry.nextObjectNumber).toBe(250_000); // max key is 249999
+    });
   });
 
   describe("loaded objects", () => {
