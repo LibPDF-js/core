@@ -345,25 +345,29 @@ body {
   right: 0;
   bottom: 0;
   overflow: hidden;
-  opacity: 0.25;
+  opacity: 1;
   line-height: 1;
-  pointer-events: all;
+  pointer-events: none;
 }
 
-.text-layer span {
+.text-layer > span,
+.text-layer > div {
   position: absolute;
   white-space: pre;
   color: transparent;
-  pointer-events: all;
+  pointer-events: auto;
+  cursor: text;
 }
 
-.text-layer span::selection {
-  background: #2563eb;
+.text-layer > span::selection,
+.text-layer > div::selection {
+  background: rgba(37, 99, 235, 0.4);
   color: transparent;
 }
 
-.text-layer span::-moz-selection {
-  background: #2563eb;
+.text-layer > span::-moz-selection,
+.text-layer > div::-moz-selection {
+  background: rgba(37, 99, 235, 0.4);
   color: transparent;
 }
 

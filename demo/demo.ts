@@ -7,13 +7,13 @@
  */
 
 import {
+  buildPDFJSTextLayer,
   createPDFJSRenderer,
   createPDFJSSearchEngine,
   createVirtualScroller,
   createViewportManager,
   initializePDFJS,
   loadPDFJSDocument,
-  type ManagedPage,
   type PageDimensions,
   type PDFDocumentProxy,
   type PDFJSSearchEngine,
@@ -202,7 +202,7 @@ async function initializeViewer(): Promise<void> {
 
   // Set up viewport manager events
   state.viewportManager.addEventListener("pageRendered", event => {
-    if (event.element && state.virtualScroller) {
+    if (event.element && state.virtualScroller && state.pdfDocument) {
       // Get page layout from virtual scroller for positioning
       const layout = state.virtualScroller.getPageLayout(event.pageIndex);
       if (!layout) {
@@ -246,10 +246,44 @@ async function initializeViewer(): Promise<void> {
       container.innerHTML = "";
       clonedCanvas.style.width = "100%";
       clonedCanvas.style.height = "100%";
+      clonedCanvas.style.position = "absolute";
+      clonedCanvas.style.left = "0";
+      clonedCanvas.style.top = "0";
       container.appendChild(clonedCanvas);
 
-      // Highlight search results on this page
-      highlightSearchResults(event.pageIndex, container);
+      // Add text layer for text selection
+      const pdfDocument = state.pdfDocument;
+      const scale = state.scale;
+      void (async () => {
+        try {
+          const page = await pdfDocument.getPage(event.pageIndex + 1);
+          const viewport = page.getViewport({ scale });
+
+          // Create text layer container
+          const textLayerDiv = document.createElement("div");
+          textLayerDiv.className = "text-layer";
+          textLayerDiv.style.position = "absolute";
+          textLayerDiv.style.left = "0";
+          textLayerDiv.style.top = "0";
+          textLayerDiv.style.right = "0";
+          textLayerDiv.style.bottom = "0";
+          textLayerDiv.style.overflow = "hidden";
+          textLayerDiv.style.lineHeight = "1";
+
+          // Build text layer using PDF.js
+          await buildPDFJSTextLayer(page, {
+            container: textLayerDiv,
+            viewport: viewport as any,
+          });
+
+          container!.appendChild(textLayerDiv);
+
+          // Highlight search results on this page
+          await highlightSearchResults(event.pageIndex, container!);
+        } catch (err) {
+          console.error(`Failed to build text layer for page ${event.pageIndex}:`, err);
+        }
+      })();
     }
   });
 
@@ -495,12 +529,12 @@ function updateSearchResults(): void {
 
   // Update highlights on visible pages
   for (const [pageIndex, container] of state.pageElements) {
-    highlightSearchResults(pageIndex, container);
+    void highlightSearchResults(pageIndex, container);
   }
 }
 
-function highlightSearchResults(pageIndex: number, container: HTMLElement): void {
-  if (!state.searchEngine) {
+async function highlightSearchResults(pageIndex: number, container: HTMLElement): Promise<void> {
+  if (!state.searchEngine || !state.pdfDocument) {
     return;
   }
 
@@ -509,6 +543,14 @@ function highlightSearchResults(pageIndex: number, container: HTMLElement): void
 
   const results = state.searchEngine.getResultsForPage(pageIndex);
   const currentResult = state.searchEngine.currentResult;
+
+  if (results.length === 0) {
+    return;
+  }
+
+  // Get the page to access viewport for coordinate conversion
+  const page = await state.pdfDocument.getPage(pageIndex + 1);
+  const viewport = page.getViewport({ scale: state.scale });
 
   for (const result of results) {
     const highlight = document.createElement("div");
@@ -519,11 +561,19 @@ function highlightSearchResults(pageIndex: number, container: HTMLElement): void
     }
 
     // Position highlight based on bounds
+    // PDF coordinates have origin at bottom-left, need to convert to top-left
     if (result.bounds) {
-      highlight.style.left = `${result.bounds.x * state.scale}px`;
-      highlight.style.top = `${result.bounds.y * state.scale}px`;
-      highlight.style.width = `${result.bounds.width * state.scale}px`;
-      highlight.style.height = `${result.bounds.height * state.scale}px`;
+      // Convert PDF coordinates to viewport coordinates
+      const x = result.bounds.x * state.scale;
+      // Flip Y coordinate: viewport.height - (y + height) * scale
+      const y = viewport.height - (result.bounds.y + result.bounds.height) * state.scale;
+      const width = result.bounds.width * state.scale;
+      const height = result.bounds.height * state.scale;
+
+      highlight.style.left = `${x}px`;
+      highlight.style.top = `${y}px`;
+      highlight.style.width = `${Math.max(width, 20)}px`;
+      highlight.style.height = `${Math.max(height, 14)}px`;
       container.appendChild(highlight);
     }
   }
