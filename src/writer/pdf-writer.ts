@@ -284,44 +284,45 @@ function collectReachableRefs(
   encrypt?: PdfRef,
 ): Set<string> {
   const visited = new Set<string>();
+  const stack: PdfObject[] = [root];
 
-  const walk = (obj: PdfObject | null): void => {
-    if (obj === null) {
-      return;
-    }
+  if (info) {
+    stack.push(info);
+  }
+
+  if (encrypt) {
+    stack.push(encrypt);
+  }
+
+  while (stack.length > 0) {
+    const obj = stack.pop()!;
 
     if (obj instanceof PdfRef) {
       const key = `${obj.objectNumber} ${obj.generation}`;
 
       if (visited.has(key)) {
-        return;
+        continue;
       }
 
       visited.add(key);
 
       const resolved = registry.resolve(obj);
 
-      walk(resolved);
+      if (resolved !== null) {
+        stack.push(resolved);
+      }
     } else if (obj instanceof PdfDict) {
       // PdfStream extends PdfDict, so this handles both
       for (const [, value] of obj) {
-        walk(value);
+        if (value != null) {
+          stack.push(value);
+        }
       }
     } else if (obj instanceof PdfArray) {
       for (const item of obj) {
-        walk(item);
+        stack.push(item);
       }
     }
-  };
-
-  walk(root);
-
-  if (info) {
-    walk(info);
-  }
-
-  if (encrypt) {
-    walk(encrypt);
   }
 
   return visited;
