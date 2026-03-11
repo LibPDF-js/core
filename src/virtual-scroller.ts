@@ -115,6 +115,12 @@ export interface ContainerInfo {
  */
 export interface VirtualScrollerOptions {
   /**
+   * Initial page dimensions.
+   * If provided, the layout is calculated immediately.
+   */
+  pageDimensions?: PageDimensions[];
+
+  /**
    * Gap between pages in pixels.
    * @default 10
    */
@@ -252,6 +258,12 @@ export class VirtualScroller {
     this._bufferSize = options.bufferSize ?? 1;
     this._horizontalPadding = options.horizontalPadding ?? 20;
     this._verticalPadding = options.verticalPadding ?? 20;
+
+    // Initialize page dimensions if provided
+    if (options.pageDimensions && options.pageDimensions.length > 0) {
+      this._pageDimensions = [...options.pageDimensions];
+      this.calculateLayout();
+    }
   }
 
   // ============================================================================

@@ -337,9 +337,12 @@ export class PDFJSRenderer implements BaseRenderer {
       await new Promise(resolve => setTimeout(resolve, 10));
     }
 
-    // Resize canvas to match viewport
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
+    // Use devicePixelRatio for high-DPI rendering
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+
+    // Resize canvas to match viewport at high-DPI resolution
+    canvas.width = Math.floor(viewport.width * dpr);
+    canvas.height = Math.floor(viewport.height * dpr);
 
     // Clear canvas
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -363,8 +366,8 @@ export class PDFJSRenderer implements BaseRenderer {
       throw new Error("Render task cancelled");
     }
 
-    // Create PDF.js viewport
-    const pdfViewport = createPageViewport(pdfPage, viewport.scale, viewport.rotation);
+    // Create PDF.js viewport at high-DPI scale
+    const pdfViewport = createPageViewport(pdfPage, viewport.scale * dpr, viewport.rotation);
 
     // Render using PDF.js
     const renderContext = {
