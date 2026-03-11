@@ -1,0 +1,22 @@
+2026-03-11T10:16:53+01:00 Debug setup complete - ViewportManager fix applied to demo.ts
+
+=== FIX APPLIED ===
+Root cause: demo/demo.ts was calling createViewportManager() with incorrect parameters.
+- Missing required 'scroller' parameter (VirtualScroller)
+- Missing required 'renderer' parameter (BaseRenderer) 
+- Using non-existent 'maxConcurrent' instead of 'maxConcurrentRenders'
+- Using non-existent 'prerenderAhead' parameter
+
+Fix applied:
+1. Added 'scroller: state.virtualScroller' parameter
+2. Created renderer with createCanvasRenderer() and added 'renderer' parameter
+3. Changed 'maxConcurrent' to 'maxConcurrentRenders'
+4. Removed non-existent 'prerenderAhead' parameter
+5. Fixed method calls: destroy() -> dispose(), invalidateAll() -> invalidateVisiblePages()
+6. Fixed event listener: 'pageready' -> 'pageRendered'
+
+Console logging instrumentation added with [DEBUG_INSTRUMENTATION] marker for browser testing.
+2026-03-11T10:19:25+01:00 Fixed: state.virtualScroller.update() -> await state.viewportManager.initialize()
+2026-03-11T10:25:36+01:00 Fixed: Added missing getPageRotation() method to createPageSource() in demo.ts
+2026-03-11T10:28:34+01:00 Fixed pageRendered handler - now clones canvas since renderer reuses internal canvas
+2026-03-11T10:35:50+01:00 Demo now creates visible page containers with placeholders. Renderer is a stub - actual PDF content rendering not yet implemented.
