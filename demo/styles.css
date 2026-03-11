@@ -369,15 +369,17 @@ body {
   color: transparent;
 }
 
-/* Search highlight - green with transparency like mouse selection */
+/* Search highlight - green background with visible text */
 .text-layer .highlight {
-  background: rgba(197, 217, 195, 0.5);
+  background-color: #c5d9c3;
+  color: #000;
   border-radius: 3px;
 }
 
-/* Current/selected search result - slightly darker/more opaque */
+/* Current/selected search result - slightly darker */
 .text-layer .highlight.selected {
-  background: rgba(168, 201, 165, 0.6);
+  background-color: #a8c9a5;
+  color: #000;
 }
 
 
