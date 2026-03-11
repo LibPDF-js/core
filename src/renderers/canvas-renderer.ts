@@ -362,13 +362,17 @@ export class CanvasRenderer implements BaseRenderer {
   }
 
   render(pageIndex: number, viewport: Viewport): RenderTask {
+    require("fs").appendFileSync(
+      "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
+      `${new Date().toISOString()} CanvasRenderer.render() called with pageIndex=${pageIndex}, viewport.width=${viewport.width}, viewport.height=${viewport.height}\n`,
+    ); // [DEBUG_INSTRUMENTATION]
     if (!this._initialized) {
       throw new Error("Renderer must be initialized before rendering");
     }
 
     let cancelled = false;
 
-    // Store pageIndex for potential future use
+    // Store pageIndex for potential future use - NOTE: This is the root cause - pageIndex is ignored and no PDF content is rendered
     void pageIndex;
 
     if (this._headless) {
@@ -451,6 +455,11 @@ export class CanvasRenderer implements BaseRenderer {
           // Note: Actual PDF content rendering will be implemented in future tasks.
           // This foundation sets up the canvas transformation pipeline.
           // The page content stream operators will be executed here.
+          // BUG: No PDF content is being rendered - this is just creating a blank canvas with correct dimensions!
+          require("fs").appendFileSync(
+            "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
+            `${new Date().toISOString()} CanvasRenderer.render() STUB: No PDF content rendered, just blank canvas ${canvas.width}x${canvas.height}\n`,
+          ); // [DEBUG_INSTRUMENTATION]
 
           context.restore();
 

@@ -104,6 +104,12 @@ async function loadPDF(file: File): Promise<void> {
 
 async function initializeViewer(): Promise<void> {
   console.log(`[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} initializeViewer called`); // [DEBUG_INSTRUMENTATION]
+  try {
+    require("fs").appendFileSync(
+      "/Volumes/dvve/Documents/TheZig/core2/core/.raid/debug_564ac3ff-9ce6-451b-83a8-ab68d91f9ac1.log",
+      `${new Date().toISOString()} demo.ts initializeViewer() called, pdf loaded=${!!state.pdf}\n`,
+    );
+  } catch {} // [DEBUG_INSTRUMENTATION]
   if (!state.pdf) {
     return;
   }
