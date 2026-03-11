@@ -105,33 +105,45 @@ export async function buildPDFJSTextLayer(
   let charOffset = 0;
   const textSpans: PDFJSTextLayerResult["textSpans"] = [];
 
-  // Process each text item
-  for (const item of textContent.items) {
-    if (!isTextItem(item)) {
-      // Skip marked content
-      continue;
+  // Create a reusable measurement element for text width calculations
+  const measureSpan = document.createElement("span");
+  measureSpan.style.position = "absolute";
+  measureSpan.style.visibility = "hidden";
+  measureSpan.style.whiteSpace = "pre";
+  document.body.appendChild(measureSpan);
+
+  try {
+    // Process each text item
+    for (const item of textContent.items) {
+      if (!isTextItem(item)) {
+        // Skip marked content
+        continue;
+      }
+
+      const textItem = item as TextItem;
+
+      // Skip empty strings
+      if (!textItem.str) {
+        continue;
+      }
+
+      const span = createTextSpan(textItem, viewport, enhanceTextAccessibility, measureSpan);
+      container.appendChild(span);
+
+      // Store span info for highlighting
+      textSpans.push({
+        element: span,
+        text: textItem.str,
+        startOffset: charOffset,
+        endOffset: charOffset + textItem.str.length,
+      });
+
+      charOffset += textItem.str.length;
+      divCount++;
     }
-
-    const textItem = item as TextItem;
-
-    // Skip empty strings
-    if (!textItem.str) {
-      continue;
-    }
-
-    const span = createTextSpan(textItem, viewport, enhanceTextAccessibility);
-    container.appendChild(span);
-
-    // Store span info for highlighting
-    textSpans.push({
-      element: span,
-      text: textItem.str,
-      startOffset: charOffset,
-      endOffset: charOffset + textItem.str.length,
-    });
-
-    charOffset += textItem.str.length;
-    divCount++;
+  } finally {
+    // Clean up measurement element
+    document.body.removeChild(measureSpan);
   }
 
   return {
@@ -149,6 +161,7 @@ function createTextSpan(
   item: TextItem,
   viewport: PageViewport,
   enhanceAccessibility: boolean,
+  measureSpan: HTMLSpanElement,
 ): HTMLSpanElement {
   const span = document.createElement("span");
 
@@ -165,28 +178,48 @@ function createTextSpan(
   // Convert to viewport coordinates
   const [x, y] = viewport.convertToViewportPoint(tx[4], tx[5]);
 
+  // Calculate font size in pixels
+  const fontSize = fontHeight * viewport.scale;
+  const fontFamily = item.fontName ? mapFontName(item.fontName) : "sans-serif";
+
   // Apply styles
   span.style.position = "absolute";
   span.style.left = `${x}px`;
   span.style.top = `${y - fontAscent * viewport.scale}px`;
-  span.style.fontSize = `${fontHeight * viewport.scale}px`;
-  span.style.fontFamily = item.fontName ? mapFontName(item.fontName) : "sans-serif";
-
-  // Apply rotation if needed
-  if (angle !== 0) {
-    span.style.transform = `rotate(${angle}rad)`;
-    span.style.transformOrigin = "left bottom";
-  }
+  span.style.fontSize = `${fontSize}px`;
+  span.style.fontFamily = fontFamily;
 
   // Make text transparent but selectable
   span.style.color = "transparent";
   span.style.whiteSpace = "pre";
   span.style.pointerEvents = "auto";
 
-  // Apply width if available - use letter-spacing to stretch text to match PDF width
+  // Calculate horizontal scale to match PDF text width
+  // This is critical for accurate text selection alignment
   if (item.width && item.str.length > 0) {
     const targetWidth = item.width * viewport.scale;
-    span.style.width = `${targetWidth}px`;
+
+    // Measure the actual rendered width using the reusable measurement span
+    measureSpan.style.fontSize = `${fontSize}px`;
+    measureSpan.style.fontFamily = fontFamily;
+    measureSpan.textContent = item.str;
+
+    const actualWidth = measureSpan.getBoundingClientRect().width;
+
+    if (actualWidth > 0) {
+      const scaleX = targetWidth / actualWidth;
+      // Apply horizontal scaling to stretch text to match PDF width
+      if (angle !== 0) {
+        span.style.transform = `rotate(${angle}rad) scaleX(${scaleX})`;
+      } else {
+        span.style.transform = `scaleX(${scaleX})`;
+      }
+      span.style.transformOrigin = "left top";
+    }
+  } else if (angle !== 0) {
+    // Apply rotation only if no width scaling needed
+    span.style.transform = `rotate(${angle}rad)`;
+    span.style.transformOrigin = "left bottom";
   }
 
   // Accessibility enhancements
