@@ -382,7 +382,7 @@ export class VirtualScroller {
       return;
     }
 
-    // Calculate the point to keep centered
+    // Calculate the center point in the current viewport
     let centerX = this._scrollLeft + this._viewportWidth / 2;
     let centerY = this._scrollTop + this._viewportHeight / 2;
 
@@ -391,23 +391,42 @@ export class VirtualScroller {
       centerY = centerOnPoint.y;
     }
 
-    // Calculate the position in document space
-    const docX = centerX / oldScale;
-    const docY = centerY / oldScale;
+    // Convert the center point to document space (unscaled page coordinates)
+    // The layout uses scaled coordinates, but padding doesn't scale.
+    // We need to find which page we're on and the relative position within it.
 
-    // Update scale and recalculate layout
-    this._scale = scale;
-    this.calculateLayout();
+    // Find the page at the center point
+    const pageIndex = this.findFirstVisiblePage(centerY);
+    const layout = this._pageLayouts[pageIndex];
 
-    // Calculate new scroll position to keep the same point centered
-    const newCenterX = docX * scale;
-    const newCenterY = docY * scale;
+    if (layout) {
+      // Calculate relative position within the page content area
+      // Subtract padding from position to get position relative to content
+      const relativeY = (centerY - layout.top) / oldScale;
+      const relativeX = (centerX - layout.left) / oldScale;
 
-    const newScrollLeft = newCenterX - this._viewportWidth / 2;
-    const newScrollTop = newCenterY - this._viewportHeight / 2;
+      // Update scale and recalculate layout
+      this._scale = scale;
+      this.calculateLayout();
 
-    this._scrollLeft = this.clampScrollLeft(newScrollLeft);
-    this._scrollTop = this.clampScrollTop(newScrollTop);
+      // Get the new layout for the same page
+      const newLayout = this._pageLayouts[pageIndex];
+      if (newLayout) {
+        // Calculate new center position using the same relative position
+        const newCenterX = newLayout.left + relativeX * scale;
+        const newCenterY = newLayout.top + relativeY * scale;
+
+        const newScrollLeft = newCenterX - this._viewportWidth / 2;
+        const newScrollTop = newCenterY - this._viewportHeight / 2;
+
+        this._scrollLeft = this.clampScrollLeft(newScrollLeft);
+        this._scrollTop = this.clampScrollTop(newScrollTop);
+      }
+    } else {
+      // No pages yet, just update scale
+      this._scale = scale;
+      this.calculateLayout();
+    }
 
     this.emitEvent({ type: "scaleChange", scale });
     this.emitEvent({ type: "layoutChange" });
@@ -750,10 +769,13 @@ export class VirtualScroller {
     }
 
     // Calculate total dimensions
-    this._totalWidth = maxWidth + this._horizontalPadding * 2;
+    // Total width should be at least viewport width to ensure proper centering
+    const contentWidth = maxWidth + this._horizontalPadding * 2;
+    this._totalWidth = Math.max(contentWidth, this._viewportWidth);
     this._totalHeight = currentTop - this._pageGap + this._verticalPadding;
 
-    // Center pages horizontally
+    // Center pages horizontally within the total width
+    // This ensures pages are centered whether viewport is wider or narrower than content
     for (const layout of layouts) {
       layout.left = (this._totalWidth - layout.width) / 2;
     }

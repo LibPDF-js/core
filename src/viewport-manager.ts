@@ -573,9 +573,18 @@ export class ViewportManager {
   // ============================================================================
 
   /**
+   * Flag to prevent redundant updates during scale change.
+   */
+  private _scaleChangePending = false;
+
+  /**
    * Handle visible range changes from the scroller.
    */
   private handleVisibleRangeChange = (_event: { visibleRange?: VisibleRange }): void => {
+    // Skip if a scale change is pending - it will trigger its own update
+    if (this._scaleChangePending) {
+      return;
+    }
     if (this._options.autoRender) {
       this.updateVisiblePages();
     }
@@ -586,8 +595,16 @@ export class ViewportManager {
    * Handle scale changes from the scroller.
    */
   private handleScaleChange = async (_event: { scale?: number }): Promise<void> => {
-    // Invalidate all rendered pages since scale changed
-    await this.invalidateVisiblePages();
+    // Set flag to prevent redundant visible range updates
+    this._scaleChangePending = true;
+    try {
+      // Invalidate all rendered pages since scale changed
+      await this.invalidateVisiblePages();
+    } finally {
+      this._scaleChangePending = false;
+    }
+    // Clean up pages that are no longer visible after scale change
+    this.cleanupOffscreenPages();
   };
 
   /**
