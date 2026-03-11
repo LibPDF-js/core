@@ -1348,21 +1348,109 @@ export class CanvasRenderer implements TypeAwareRenderer {
     const { textRenderMode, charSpacing, wordSpacing, horizontalScale, textRise, fontSize } =
       this._graphicsState;
 
-    // Decode character codes to Unicode using the font's encoding
-    let decodedText = "";
-    for (const code of codes) {
-      if (this._currentFont) {
-        // Use the font's toUnicode method for proper decoding
-        const unicode = this._currentFont.toUnicode(code);
-        decodedText += unicode || String.fromCharCode(code);
-      } else {
-        // Fallback: treat as Latin-1 (direct byte-to-char mapping)
-        decodedText += String.fromCharCode(code);
-      }
+    // Get the text matrix
+    const tm = this._textState.textMatrix;
+
+    // Calculate effective font size from the text matrix vertical scale
+    const effectiveFontSize = Math.abs(fontSize * tm.d);
+
+    // Calculate the position in PDF coordinates
+    const pdfX = tm.e;
+    const pdfY = tm.f;
+
+    // Apply text matrix and CTM
+    this._context.save();
+
+    // Move to text position
+    this._context.translate(pdfX, pdfY);
+
+    // Apply the text matrix 2x2 part (a, b, c, d) for rotation/scaling
+    const scaleX = tm.a;
+    const shearX = tm.b;
+    const shearY = tm.c;
+    const scaleY = tm.d;
+
+    // Apply text matrix transformation, then flip to counteract global flip
+    this._context.transform(scaleX, shearX, -shearY, -scaleY, 0, 0);
+
+    // Set up the context for text rendering
+    this._context.font = `${effectiveFontSize}px ${mapPdfFontToCanvas(this._graphicsState.fontName)}`;
+    this._context.fillStyle = this._graphicsState.fillColor;
+    this._context.strokeStyle = this._graphicsState.strokeColor;
+
+    // Apply horizontal scaling if needed
+    if (horizontalScale !== 100) {
+      this._context.scale(horizontalScale / 100, 1);
     }
 
-    // Render the decoded text
-    this.showTextString(decodedText);
+    // Apply text rise (vertical offset)
+    const adjustedY = textRise;
+
+    // Track position in text space units (1/1000 em) for proper advancement
+    let textSpaceAdvance = 0;
+    let canvasXOffset = 0;
+
+    // Process each character code
+    for (const code of codes) {
+      // Decode to Unicode for rendering
+      let unicode: string;
+      if (this._currentFont) {
+        unicode = this._currentFont.toUnicode(code) || String.fromCharCode(code);
+      } else {
+        unicode = String.fromCharCode(code);
+      }
+
+      // Get character width from PDF font (in glyph units, 1000 = 1 em)
+      let glyphWidth: number;
+      if (this._currentFont) {
+        glyphWidth = this._currentFont.getWidth(code);
+      } else {
+        // Fallback: estimate width as 500 (half em) for unknown fonts
+        glyphWidth = 500;
+      }
+
+      // Calculate the PDF-specified width for this character in the transformed coordinate system
+      // We use effectiveFontSize because the font is rendered at that size after transformation
+      const pdfCharWidth = (glyphWidth / 1000) * effectiveFontSize;
+
+      // Measure what the browser actually renders
+      const measuredWidth = this._context.measureText(unicode).width;
+
+      // Scale factor to make the browser glyph match the PDF width
+      // This ensures characters don't overlap or have gaps
+      const scaleX = measuredWidth > 0 ? pdfCharWidth / measuredWidth : 1;
+
+      // Apply scale transform for this character, render, then restore
+      this._context.save();
+      this._context.translate(canvasXOffset, 0);
+      this._context.scale(scaleX, 1);
+
+      if (textRenderMode === TextRenderMode.Fill || textRenderMode === TextRenderMode.FillStroke) {
+        this._context.fillText(unicode, 0, adjustedY);
+      }
+      if (
+        textRenderMode === TextRenderMode.Stroke ||
+        textRenderMode === TextRenderMode.FillStroke
+      ) {
+        this._context.strokeText(unicode, 0, adjustedY);
+      }
+
+      this._context.restore();
+
+      // Advance position by the PDF-specified width
+      const isSpace = unicode === " ";
+      const pdfAdvance =
+        (pdfCharWidth + charSpacing + (isSpace ? wordSpacing : 0)) * (horizontalScale / 100);
+      canvasXOffset += pdfAdvance;
+
+      // Track total text space advance for matrix update
+      textSpaceAdvance += pdfAdvance;
+    }
+
+    this._context.restore();
+
+    // Update text matrix by the total advance
+    this._textState.textMatrix = this._textState.textMatrix.translate(textSpaceAdvance, 0);
   }
 
   /**
@@ -1534,11 +1622,11 @@ export class CanvasRenderer implements TypeAwareRenderer {
       if (item instanceof Uint8Array) {
         this.showTextFromCodes(item);
       } else {
-        // TJ adjustment is in thousandths of em, negative = move right
-        // Formula: tx = (-adjustment / 1000) * Tfs * Th
-        const tx = (-item / 1000) * fontSize * (horizontalScale / 100);
-        // Translate in text space (divide by fontSize to get text space units)
-        this._textState.textMatrix = this._textState.textMatrix.translate(tx / fontSize, 0);
+        // TJ adjustments are in thousandths of an em
+        // Negative values move text position to the right (positive direction)
+        // Formula: adjustment = -item / 1000 * fontSize * horizontalScale
+        const adjustment = (-item / 1000) * fontSize * (horizontalScale / 100);
+        this._textState.textMatrix = this._textState.textMatrix.translate(adjustment, 0);
       }
     }
   }

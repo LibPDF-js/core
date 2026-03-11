@@ -128,8 +128,12 @@ export class CIDFont {
       if (gid !== 0 || cid === 0) {
         const width = this.embeddedProgram.getAdvanceWidth(gid);
 
-        // Convert from font units to 1000 units
-        return Math.round((width * 1000) / this.embeddedProgram.unitsPerEm);
+        // Only use embedded width if it's valid (> 0)
+        // Otherwise fall back to defaultWidth
+        if (width > 0) {
+          // Convert from font units to 1000 units
+          return Math.round((width * 1000) / this.embeddedProgram.unitsPerEm);
+        }
       }
     }
 
