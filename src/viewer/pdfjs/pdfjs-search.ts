@@ -109,14 +109,25 @@ export interface PDFJSSearchState {
 }
 
 /**
+ * Text item with position information.
+ */
+interface PositionedTextItem {
+  text: string;
+  transform: number[];
+  width: number;
+  height: number;
+  charWidth: number; // Average character width
+}
+
+/**
  * Extract text from a PDF page with position information.
  */
 async function extractPageText(page: PDFPageProxy): Promise<{
   text: string;
-  items: Array<{ text: string; transform: number[]; width: number; height: number }>;
+  items: PositionedTextItem[];
 }> {
   const textContent = await getTextContent(page);
-  const items: Array<{ text: string; transform: number[]; width: number; height: number }> = [];
+  const items: PositionedTextItem[] = [];
   let fullText = "";
 
   for (const item of textContent.items) {
@@ -126,11 +137,13 @@ async function extractPageText(page: PDFPageProxy): Promise<{
 
     const textItem = item as TextItem;
     if (textItem.str) {
+      const charWidth = textItem.str.length > 0 ? (textItem.width || 0) / textItem.str.length : 0;
       items.push({
         text: textItem.str,
         transform: textItem.transform,
         width: textItem.width,
         height: textItem.height,
+        charWidth,
       });
       fullText += textItem.str;
     }
@@ -230,17 +243,27 @@ export async function searchDocument(
         break;
       }
 
-      // Try to find bounds for this match
+      // Calculate precise bounds for the matched text
       let bounds: PDFJSSearchResult["bounds"];
       let charOffset = 0;
+
       for (const item of items) {
         const itemEnd = charOffset + item.text.length;
+
         if (match.start >= charOffset && match.start < itemEnd) {
           // Match starts in this item
+          const offsetInItem = match.start - charOffset;
+          const matchLength = Math.min(match.end - match.start, item.text.length - offsetInItem);
+
+          // Calculate x offset based on character position
+          const xOffset = offsetInItem * item.charWidth;
+          // Calculate width based on matched text length
+          const matchWidth = matchLength * item.charWidth;
+
           bounds = {
-            x: item.transform[4],
+            x: item.transform[4] + xOffset,
             y: item.transform[5],
-            width: item.width || 50,
+            width: matchWidth > 0 ? matchWidth : item.charWidth * query.length,
             height: item.height || 12,
           };
           break;

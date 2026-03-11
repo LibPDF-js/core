@@ -377,16 +377,29 @@ body {
 
 .search-highlight {
   position: absolute;
-  background: rgba(255, 235, 59, 0.5);
-  border: 1px solid rgba(255, 193, 7, 0.8);
-  border-radius: 2px;
+  background: rgba(255, 235, 59, 0.6);
+  border: 2px solid rgba(255, 193, 7, 0.9);
+  border-radius: 3px;
   pointer-events: none;
   mix-blend-mode: multiply;
+  transition: all 0.2s ease-out;
 }
 
 .search-highlight.current {
-  background: rgba(255, 152, 0, 0.6);
-  border-color: rgba(255, 87, 34, 0.8);
+  background: rgba(255, 87, 34, 0.7);
+  border-color: rgba(244, 67, 54, 1);
+  box-shadow: 0 0 8px rgba(255, 87, 34, 0.8), 0 0 16px rgba(255, 87, 34, 0.4);
+  animation: pulse-highlight 1.5s ease-in-out infinite;
+  z-index: 10;
+}
+
+@keyframes pulse-highlight {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(255, 87, 34, 0.8), 0 0 16px rgba(255, 87, 34, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(255, 87, 34, 1), 0 0 24px rgba(255, 87, 34, 0.6);
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

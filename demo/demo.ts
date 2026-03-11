@@ -579,22 +579,65 @@ async function highlightSearchResults(pageIndex: number, container: HTMLElement)
   }
 }
 
-function scrollToCurrentResult(): void {
+async function scrollToCurrentResult(): Promise<void> {
   const result = state.searchEngine?.currentResult;
-  if (!result || !state.virtualScroller) {
+  if (!result || !state.virtualScroller || !state.pdfDocument) {
     return;
   }
 
-  // Scroll to the page containing the result
-  goToPage(result.pageIndex + 1);
+  // Get the page layout to calculate absolute position
+  const layout = state.virtualScroller.getPageLayout(result.pageIndex);
+  if (!layout) {
+    // Fallback to just going to the page
+    goToPage(result.pageIndex + 1);
+    return;
+  }
+
+  // Get viewport info for coordinate conversion
+  const page = await state.pdfDocument.getPage(result.pageIndex + 1);
+  const viewport = page.getViewport({ scale: state.scale });
+
+  // Calculate the position of the result within the page
+  let resultY = 0;
+  if (result.bounds) {
+    // Convert PDF coordinates to screen coordinates
+    resultY = viewport.height - (result.bounds.y + result.bounds.height) * state.scale;
+  }
+
+  // Calculate absolute scroll position
+  // Position the result in the center of the viewport
+  const viewerRect = elements.viewer.getBoundingClientRect();
+  const targetScrollTop = layout.top + resultY - viewerRect.height / 2 + 50;
+  const targetScrollLeft = Math.max(0, layout.left - (viewerRect.width - layout.width) / 2);
+
+  // Smooth scroll to the result
+  elements.viewer.scrollTo({
+    top: Math.max(0, targetScrollTop),
+    left: targetScrollLeft,
+    behavior: "smooth",
+  });
+
+  // Update current page
+  state.currentPage = result.pageIndex + 1;
+  updatePageControls();
+
+  // Update highlights after scrolling
+  const container = state.pageElements.get(result.pageIndex);
+  if (container) {
+    await highlightSearchResults(result.pageIndex, container);
+  }
 }
 
 function searchNext(): void {
   state.searchEngine?.findNext();
+  updateSearchResults();
+  void scrollToCurrentResult();
 }
 
 function searchPrev(): void {
   state.searchEngine?.findPrevious();
+  updateSearchResults();
+  void scrollToCurrentResult();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
