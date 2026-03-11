@@ -211,12 +211,16 @@ async function initializeViewer(): Promise<void> {
 function createPageSource() {
   return {
     getPageCount: () => state.pdf?.getPageCount() ?? 0,
-    getPageDimensions: (pageIndex: number) => {
+    getPageDimensions: async (pageIndex: number) => {
       const page = state.pdf?.getPage(pageIndex);
       if (!page) {
         return { width: 0, height: 0 };
       }
       return { width: page.width, height: page.height };
+    },
+    getPageRotation: async (pageIndex: number) => {
+      const page = state.pdf?.getPage(pageIndex);
+      return page?.rotate ?? 0;
     },
     createPageElement: (pageIndex: number): HTMLElement => {
       const container = document.createElement("div");
