@@ -6,6 +6,9 @@
  */
 
 import type { PdfFont } from "#src/fonts/pdf-font";
+import type { PdfDict } from "#src/objects/pdf-dict";
+
+import type { PdfTypeDetectionResult, RenderingStrategy } from "./pdf-types";
 
 /**
  * Renderer type identifier.
@@ -45,6 +48,17 @@ export interface RendererOptions {
    * @default true
    */
   annotationLayer?: boolean;
+
+  /**
+   * Whether to enable automatic PDF type detection for rendering optimization.
+   * @default false
+   */
+  enableTypeDetection?: boolean;
+
+  /**
+   * Custom rendering strategy override (takes precedence over detected type).
+   */
+  renderingStrategy?: Partial<RenderingStrategy>;
 }
 
 /**
@@ -65,6 +79,36 @@ export interface RenderResult {
    * The rendered output element (HTMLCanvasElement for canvas, SVGElement for SVG).
    */
   element: unknown;
+
+  /**
+   * PDF type detection result (if type detection was enabled).
+   */
+  typeDetection?: PdfTypeDetectionResult;
+
+  /**
+   * Rendering strategy used (if type detection was enabled).
+   */
+  strategyUsed?: RenderingStrategy;
+}
+
+/**
+ * Extended render options with type detection support.
+ */
+export interface RenderOptionsWithTypeDetection {
+  /**
+   * Page resources dictionary for type detection.
+   */
+  resources?: PdfDict;
+
+  /**
+   * Page width in points (for image analysis).
+   */
+  pageWidth?: number;
+
+  /**
+   * Page height in points (for image analysis).
+   */
+  pageHeight?: number;
 }
 
 /**
@@ -185,6 +229,53 @@ export interface BaseRenderer {
    * Should be called when the renderer is no longer needed.
    */
   destroy(): void;
+}
+
+/**
+ * Extended renderer interface with PDF type detection support.
+ *
+ * Renderers implementing this interface can analyze PDF content
+ * to optimize rendering based on detected PDF type.
+ */
+export interface TypeAwareRenderer extends BaseRenderer {
+  /**
+   * Render a PDF page with type detection.
+   *
+   * @param pageIndex - The 0-indexed page number
+   * @param viewport - The viewport to render into
+   * @param contentBytes - Raw content stream bytes to render
+   * @param fontResolver - Optional function to resolve font names
+   * @param options - Additional options including resources for type detection
+   * @returns A render task with type detection results
+   */
+  renderWithTypeDetection(
+    pageIndex: number,
+    viewport: Viewport,
+    contentBytes: Uint8Array,
+    fontResolver?: FontResolver | null,
+    options?: RenderOptionsWithTypeDetection,
+  ): RenderTask;
+
+  /**
+   * Detect the PDF type from content without rendering.
+   *
+   * @param contentBytes - Raw content stream bytes
+   * @param resources - Page resources dictionary
+   * @param pageWidth - Page width in points
+   * @param pageHeight - Page height in points
+   * @returns Detection result with type and strategy
+   */
+  detectPdfType(
+    contentBytes: Uint8Array,
+    resources?: PdfDict,
+    pageWidth?: number,
+    pageHeight?: number,
+  ): PdfTypeDetectionResult;
+
+  /**
+   * Get the current rendering strategy.
+   */
+  readonly renderingStrategy: RenderingStrategy | null;
 }
 
 /**

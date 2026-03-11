@@ -10,8 +10,10 @@ export type {
   RendererFactory,
   RendererOptions,
   RendererType,
+  RenderOptionsWithTypeDetection,
   RenderResult,
   RenderTask,
+  TypeAwareRenderer,
   Viewport,
 } from "./base-renderer";
 
@@ -34,3 +36,45 @@ export {
   type TextLayerBuilderOptions,
   type TextLayerResult,
 } from "./text-layer-builder";
+
+// PDF type detection
+export {
+  ContentType,
+  createDefaultContentStats,
+  createDefaultFontAnalysis,
+  createDefaultImageAnalysis,
+  getDefaultRenderingStrategy,
+  PdfType,
+  type ContentStats,
+  type DocumentTypeInfo,
+  type FontAnalysis,
+  type ImageAnalysis,
+  type PageTypeInfo,
+  type PdfTypeDetectionResult,
+  type RenderingStrategy,
+} from "./pdf-types";
+
+export {
+  createPdfTypeDetector,
+  detectPdfType,
+  getRenderingStrategy,
+  PdfTypeDetector,
+  type PageAnalysisInput,
+  type PdfTypeDetectorOptions,
+} from "./pdf-type-detector";
+
+export {
+  analyzeContentStream,
+  appearsScanned,
+  getPrimaryContentType,
+  mergeContentStats,
+  type ContentAnalysisResult,
+} from "./content-analyzer";
+
+export {
+  analyzeFonts,
+  analyzeImages,
+  countFormXObjects,
+  getImageDimensions,
+  isFormXObject,
+} from "./resource-analyzer";

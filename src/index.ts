@@ -340,8 +340,10 @@ export type {
   RendererFactory,
   RendererOptions,
   RendererType,
+  RenderOptionsWithTypeDetection,
   RenderResult,
   RenderTask,
+  TypeAwareRenderer,
   Viewport,
 } from "./renderers/base-renderer";
 
@@ -368,6 +370,46 @@ export {
   type TextLayerBuilderOptions,
   type TextLayerResult,
 } from "./renderers/text-layer-builder";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PDF Type Detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Type detection
+  ContentType,
+  createDefaultContentStats,
+  createDefaultFontAnalysis,
+  createDefaultImageAnalysis,
+  createPdfTypeDetector,
+  detectPdfType,
+  getDefaultRenderingStrategy,
+  getRenderingStrategy,
+  PdfType,
+  PdfTypeDetector,
+  // Content analysis
+  analyzeContentStream,
+  appearsScanned,
+  getPrimaryContentType,
+  mergeContentStats,
+  // Resource analysis
+  analyzeFonts,
+  analyzeImages,
+  countFormXObjects,
+  getImageDimensions,
+  isFormXObject,
+  // Types
+  type ContentAnalysisResult,
+  type ContentStats,
+  type DocumentTypeInfo,
+  type FontAnalysis,
+  type ImageAnalysis,
+  type PageAnalysisInput,
+  type PageTypeInfo,
+  type PdfTypeDetectionResult,
+  type PdfTypeDetectorOptions,
+  type RenderingStrategy,
+} from "./renderers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Virtual Scrolling

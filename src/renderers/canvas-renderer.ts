@@ -16,6 +16,7 @@ import {
 import type { PdfFont } from "#src/fonts/pdf-font";
 import { Matrix } from "#src/helpers/matrix";
 import { PdfArray } from "#src/objects/pdf-array";
+import type { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfString } from "#src/objects/pdf-string";
 import { ContentStreamProcessor } from "#src/viewer/ContentStreamProcessor";
@@ -25,10 +26,23 @@ import type {
   BaseRenderer,
   FontResolver,
   RendererOptions,
+  RenderOptionsWithTypeDetection,
   RenderResult,
   RenderTask,
+  TypeAwareRenderer,
   Viewport,
 } from "./base-renderer";
+import {
+  createPdfTypeDetector,
+  detectPdfType as detectPdfTypeUtil,
+  type PdfTypeDetectorOptions,
+} from "./pdf-type-detector";
+import {
+  getDefaultRenderingStrategy,
+  PdfType,
+  type PdfTypeDetectionResult,
+  type RenderingStrategy,
+} from "./pdf-types";
 
 /**
  * Line cap style values (PDF Table 54).
@@ -168,6 +182,11 @@ export interface CanvasRendererOptions extends RendererOptions {
    * @default false in browser, true in non-browser environments
    */
   headless?: boolean;
+
+  /**
+   * Options for PDF type detection.
+   */
+  typeDetectorOptions?: PdfTypeDetectorOptions;
 }
 
 /**
@@ -220,7 +239,7 @@ function createDefaultTextState(): TextState {
 /**
  * Canvas-based PDF renderer implementation.
  */
-export class CanvasRenderer implements BaseRenderer {
+export class CanvasRenderer implements TypeAwareRenderer {
   readonly type = "canvas" as const;
 
   private _initialized = false;
@@ -257,8 +276,21 @@ export class CanvasRenderer implements BaseRenderer {
   /** Current font object (resolved from font name) */
   private _currentFont: PdfFont | null = null;
 
+  /** Current rendering strategy (from type detection) */
+  private _renderingStrategy: RenderingStrategy | null = null;
+
+  /** Last detected PDF type */
+  private _lastDetection: PdfTypeDetectionResult | null = null;
+
   get initialized(): boolean {
     return this._initialized;
+  }
+
+  /**
+   * Get the current rendering strategy.
+   */
+  get renderingStrategy(): RenderingStrategy | null {
+    return this._renderingStrategy;
   }
 
   /**
@@ -1715,6 +1747,122 @@ export class CanvasRenderer implements BaseRenderer {
    */
   private parseContentToOperators(bytes: Uint8Array): Operator[] {
     return ContentStreamProcessor.parseToOperators(bytes);
+  }
+
+  // ============================================================================
+  // Type Detection Methods (TypeAwareRenderer implementation)
+  // ============================================================================
+
+  /**
+   * Detect the PDF type from content without rendering.
+   */
+  detectPdfType(
+    contentBytes: Uint8Array,
+    resources?: PdfDict,
+    pageWidth = 612,
+    pageHeight = 792,
+  ): PdfTypeDetectionResult {
+    const detector = createPdfTypeDetector(this._options.typeDetectorOptions);
+    const result = detector.quickDetect(contentBytes, resources, pageWidth, pageHeight);
+    this._lastDetection = result;
+    return result;
+  }
+
+  /**
+   * Render a PDF page with type detection and optimized strategy.
+   */
+  renderWithTypeDetection(
+    pageIndex: number,
+    viewport: Viewport,
+    contentBytes: Uint8Array,
+    fontResolver?: FontResolver | null,
+    options?: RenderOptionsWithTypeDetection,
+  ): RenderTask {
+    if (!this._initialized) {
+      throw new Error("Renderer must be initialized before rendering");
+    }
+
+    // Detect PDF type
+    const pageWidth = options?.pageWidth ?? viewport.width / viewport.scale;
+    const pageHeight = options?.pageHeight ?? viewport.height / viewport.scale;
+    const detection = this.detectPdfType(contentBytes, options?.resources, pageWidth, pageHeight);
+
+    // Get rendering strategy
+    let strategy = getDefaultRenderingStrategy(detection.type);
+
+    // Apply custom strategy overrides from options
+    if (this._options.renderingStrategy) {
+      strategy = { ...strategy, ...this._options.renderingStrategy };
+    }
+
+    this._renderingStrategy = strategy;
+
+    // Apply strategy-specific optimizations
+    this.applyRenderingStrategy(strategy);
+
+    // Adjust viewport based on strategy
+    const adjustedViewport = this.adjustViewportForStrategy(viewport, strategy);
+
+    // Perform the actual render
+    const task = this.render(pageIndex, adjustedViewport, contentBytes, fontResolver);
+
+    // Wrap the task to include detection results
+    const originalPromise = task.promise;
+    const enhancedPromise = originalPromise.then(result => ({
+      ...result,
+      typeDetection: detection,
+      strategyUsed: strategy,
+    }));
+
+    return {
+      promise: enhancedPromise,
+      cancel: task.cancel,
+      get cancelled() {
+        return task.cancelled;
+      },
+    };
+  }
+
+  /**
+   * Apply rendering strategy optimizations to the canvas context.
+   */
+  private applyRenderingStrategy(strategy: RenderingStrategy): void {
+    if (!this._context) {
+      return;
+    }
+
+    // Apply image smoothing settings
+    if ("imageSmoothingEnabled" in this._context) {
+      this._context.imageSmoothingEnabled = strategy.enableImageSmoothing;
+    }
+
+    if (strategy.enableImageSmoothing && "imageSmoothingQuality" in this._context) {
+      // Use higher quality for scanned documents, lower for programmatic
+      this._context.imageSmoothingQuality = strategy.prioritizeTextClarity ? "medium" : "high";
+    }
+  }
+
+  /**
+   * Adjust viewport based on rendering strategy.
+   */
+  private adjustViewportForStrategy(viewport: Viewport, strategy: RenderingStrategy): Viewport {
+    // Apply DPI multiplier if needed
+    if (strategy.dpiMultiplier !== 1) {
+      return {
+        ...viewport,
+        width: viewport.width * strategy.dpiMultiplier,
+        height: viewport.height * strategy.dpiMultiplier,
+        scale: viewport.scale * strategy.dpiMultiplier,
+      };
+    }
+    return viewport;
+  }
+
+  /**
+   * Get the last detected PDF type.
+   */
+  getLastDetection(): PdfTypeDetectionResult | null {
+    return this._lastDetection;
   }
 }
 
