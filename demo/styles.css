@@ -347,6 +347,7 @@ body {
   opacity: 1;
   line-height: 1;
   pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
 .text-layer > span,
@@ -369,17 +370,15 @@ body {
   color: transparent;
 }
 
-/* Search highlight - green background with multiply blend */
+/* Search highlight - green background */
 .text-layer .highlight {
   background-color: #c5d9c3;
   border-radius: 3px;
-  mix-blend-mode: multiply;
 }
 
 /* Current/selected search result - slightly darker */
 .text-layer .highlight.selected {
   background-color: #a8c9a5;
-  mix-blend-mode: multiply;
 }
 
 
