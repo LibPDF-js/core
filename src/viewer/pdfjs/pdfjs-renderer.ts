@@ -77,6 +77,15 @@ export class PDFJSRenderer implements BaseRenderer {
   private _headlessHeight = 0;
   private _document: PDFDocumentProxy | null = null;
   private _pageCache: Map<number, PDFPageProxy> = new Map();
+  private _activeRenderTask: { pageIndex: number; task: any } | null = null;
+  private _renderQueue: Array<{
+    pageIndex: number;
+    viewport: Viewport;
+    resolve: (result: RenderResult) => void;
+    reject: (error: Error) => void;
+    cancelled: { value: boolean };
+  }> = [];
+  private _isProcessingQueue = false;
 
   get initialized(): boolean {
     return this._initialized;
@@ -200,12 +209,12 @@ export class PDFJSRenderer implements BaseRenderer {
       throw new Error("Renderer must be initialized before rendering");
     }
 
-    let cancelled = false;
+    const cancelled = { value: false };
 
     if (this._headless) {
       const promise = new Promise<RenderResult>((resolve, reject) => {
         queueMicrotask(() => {
-          if (cancelled) {
+          if (cancelled.value) {
             reject(new Error("Render task cancelled"));
             return;
           }
@@ -224,87 +233,199 @@ export class PDFJSRenderer implements BaseRenderer {
       return {
         promise,
         cancel: () => {
-          cancelled = true;
+          cancelled.value = true;
         },
         get cancelled() {
-          return cancelled;
+          return cancelled.value;
         },
       };
     }
 
-    const canvas = this._canvas!;
-    const context = this._context!;
-    const options = this._options;
+    // Queue-based rendering to prevent canvas conflicts
+    const promise = new Promise<RenderResult>((resolve, reject) => {
+      // Add to queue
+      this._renderQueue.push({
+        pageIndex,
+        viewport,
+        resolve,
+        reject,
+        cancelled,
+      });
 
-    const promise = (async (): Promise<RenderResult> => {
-      if (cancelled) {
-        throw new Error("Render task cancelled");
+      // Start processing if not already
+      if (!this._isProcessingQueue) {
+        void this.processRenderQueue();
       }
-
-      // Resize canvas to match viewport
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-
-      // Clear canvas
-      context.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Apply background
-      context.fillStyle = options.background ?? "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Get the PDF.js page
-      let pdfPage: PDFPageProxy;
-      if (this._document) {
-        // Use the loaded document
-        pdfPage = this._pageCache.get(pageIndex) ?? (await this._document.getPage(pageIndex + 1));
-        this._pageCache.set(pageIndex, pdfPage);
-      } else {
-        // Try to get page from global wrapper state
-        pdfPage = await getPage(pageIndex);
-      }
-
-      if (cancelled) {
-        throw new Error("Render task cancelled");
-      }
-
-      // Create PDF.js viewport
-      const pdfViewport = createPageViewport(pdfPage, viewport.scale, viewport.rotation);
-
-      // Render using PDF.js
-      const renderContext = {
-        canvasContext: context as CanvasRenderingContext2D,
-        viewport: pdfViewport,
-        background: options.background,
-      };
-
-      const renderTask = pdfPage.render(renderContext);
-
-      // Wait for rendering to complete
-      await renderTask.promise;
-
-      if (cancelled) {
-        throw new Error("Render task cancelled");
-      }
-
-      return {
-        width: canvas.width,
-        height: canvas.height,
-        element: canvas,
-      };
-    })();
+    });
 
     return {
       promise,
       cancel: () => {
-        cancelled = true;
+        cancelled.value = true;
+        // If this is the active render, cancel the PDF.js task
+        if (this._activeRenderTask?.pageIndex === pageIndex) {
+          try {
+            this._activeRenderTask.task?.cancel();
+          } catch {
+            // Ignore cancellation errors
+          }
+        }
       },
       get cancelled() {
-        return cancelled;
+        return cancelled.value;
       },
     };
   }
 
+  /**
+   * Process the render queue one item at a time.
+   */
+  private async processRenderQueue(): Promise<void> {
+    if (this._isProcessingQueue) {
+      return;
+    }
+
+    this._isProcessingQueue = true;
+
+    while (this._renderQueue.length > 0) {
+      const item = this._renderQueue.shift()!;
+
+      if (item.cancelled.value) {
+        item.reject(new Error("Render task cancelled"));
+        continue;
+      }
+
+      try {
+        const result = await this.renderPage(item.pageIndex, item.viewport, item.cancelled);
+        if (!item.cancelled.value) {
+          item.resolve(result);
+        } else {
+          item.reject(new Error("Render task cancelled"));
+        }
+      } catch (error) {
+        item.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+
+    this._isProcessingQueue = false;
+  }
+
+  /**
+   * Actually render a single page.
+   */
+  private async renderPage(
+    pageIndex: number,
+    viewport: Viewport,
+    cancelled: { value: boolean },
+  ): Promise<RenderResult> {
+    const canvas = this._canvas!;
+    const context = this._context!;
+    const options = this._options;
+
+    if (cancelled.value) {
+      throw new Error("Render task cancelled");
+    }
+
+    // Wait for any active render to complete (defensive, should not happen with queue)
+    while (this._activeRenderTask) {
+      try {
+        this._activeRenderTask.task?.cancel();
+      } catch {
+        // Ignore cancellation errors
+      }
+      // Brief wait for PDF.js to release the canvas
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+
+    // Resize canvas to match viewport
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+
+    // Clear canvas
+    context.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Apply background
+    context.fillStyle = options.background ?? "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Get the PDF.js page
+    let pdfPage: PDFPageProxy;
+    if (this._document) {
+      // Use the loaded document
+      pdfPage = this._pageCache.get(pageIndex) ?? (await this._document.getPage(pageIndex + 1));
+      this._pageCache.set(pageIndex, pdfPage);
+    } else {
+      // Try to get page from global wrapper state
+      pdfPage = await getPage(pageIndex);
+    }
+
+    if (cancelled.value) {
+      throw new Error("Render task cancelled");
+    }
+
+    // Create PDF.js viewport
+    const pdfViewport = createPageViewport(pdfPage, viewport.scale, viewport.rotation);
+
+    // Render using PDF.js
+    const renderContext = {
+      canvasContext: context as CanvasRenderingContext2D,
+      viewport: pdfViewport,
+      background: options.background,
+    };
+
+    const renderTask = pdfPage.render(renderContext);
+    this._activeRenderTask = { pageIndex, task: renderTask };
+
+    try {
+      // Wait for rendering to complete
+      await renderTask.promise;
+    } catch (error) {
+      // Ignore render cancelled errors from PDF.js
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("Rendering cancelled") && !cancelled.value) {
+        throw error;
+      }
+    } finally {
+      this._activeRenderTask = null;
+    }
+
+    if (cancelled.value) {
+      throw new Error("Render task cancelled");
+    }
+
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      element: canvas,
+    };
+  }
+
+  /**
+   * Cancel all pending and active renders.
+   */
+  cancelAllRenders(): void {
+    // Cancel active render
+    if (this._activeRenderTask) {
+      try {
+        this._activeRenderTask.task?.cancel();
+      } catch {
+        // Ignore cancellation errors
+      }
+      this._activeRenderTask = null;
+    }
+
+    // Cancel all queued renders
+    for (const item of this._renderQueue) {
+      item.cancelled.value = true;
+      item.reject(new Error("Render task cancelled"));
+    }
+    this._renderQueue = [];
+  }
+
   destroy(): void {
+    // Cancel any pending renders first
+    this.cancelAllRenders();
+
     if (this._context) {
       if (this._canvas) {
         this._context.clearRect(0, 0, this._canvas.width, this._canvas.height);
