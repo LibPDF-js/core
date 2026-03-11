@@ -175,8 +175,12 @@ export async function loadDocument(
 ): Promise<PDFDocumentProxy> {
   const pdfjs = getPDFJS();
 
+  // Create a copy of the data to avoid ArrayBuffer detachment issues
+  // when the worker transfers the buffer
+  const dataCopy = new Uint8Array(data);
+
   const loadingTask = pdfjs.getDocument({
-    data,
+    data: dataCopy,
     password: options.password,
     disableFontFace: options.disableFontFace,
     maxImageSize: options.maxImageSize,
