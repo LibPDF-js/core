@@ -103,6 +103,7 @@ async function loadPDF(file: File): Promise<void> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function initializeViewer(): Promise<void> {
+  console.log(`[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} initializeViewer called`); // [DEBUG_INSTRUMENTATION]
   if (!state.pdf) {
     return;
   }
@@ -137,23 +138,31 @@ async function initializeViewer(): Promise<void> {
     overscan: 1,
   });
 
-  // Create viewport manager for page rendering
-  state.viewportManager = createViewportManager({
-    pageSource: createPageSource(),
-    maxConcurrent: 3,
-    prerenderAhead: 1,
-  });
+  // Create shared renderer for viewport manager
+  const renderer = createCanvasRenderer();
+  console.log(
+    `[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} createCanvasRenderer done, initializing...`,
+  ); // [DEBUG_INSTRUMENTATION]
+  await renderer.initialize();
+  console.log(`[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} renderer initialized`); // [DEBUG_INSTRUMENTATION]
 
-  // Set up scroller events
+  // Create viewport manager for page rendering
+  console.log(
+    `[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} creating ViewportManager with scroller=${!!state.virtualScroller}, renderer=${!!renderer}`,
+  ); // [DEBUG_INSTRUMENTATION]
+  state.viewportManager = createViewportManager({
+    scroller: state.virtualScroller,
+    renderer: renderer,
+    pageSource: createPageSource(),
+    maxConcurrentRenders: 3,
+  });
+  console.log(
+    `[DEBUG_INSTRUMENTATION] ${new Date().toISOString()} ViewportManager created successfully`,
+  ); // [DEBUG_INSTRUMENTATION]
+
+  // Set up scroller events for page tracking
   state.virtualScroller.addEventListener("visiblechange", event => {
     if (event.range) {
-      // Update viewport manager with visible pages
-      const visibleIndices = Array.from(
-        { length: event.range.endIndex - event.range.startIndex + 1 },
-        (_, i) => event.range!.startIndex + i,
-      );
-      state.viewportManager?.setVisiblePages(visibleIndices);
-
       // Update current page
       if (event.range.startIndex + 1 !== state.currentPage) {
         state.currentPage = event.range.startIndex + 1;
@@ -163,9 +172,9 @@ async function initializeViewer(): Promise<void> {
   });
 
   // Set up viewport manager events
-  state.viewportManager.addEventListener("pageready", event => {
+  state.viewportManager.addEventListener("pageRendered", event => {
     if (event.element) {
-      renderPage(event.pageIndex, event.element);
+      renderPage(event.pageIndex, event.element as HTMLElement);
     }
   });
 
@@ -271,7 +280,7 @@ function cleanupViewer(): void {
     state.virtualScroller = null;
   }
   if (state.viewportManager) {
-    state.viewportManager.destroy();
+    state.viewportManager.dispose();
     state.viewportManager = null;
   }
   if (state.searchEngine) {
@@ -391,7 +400,7 @@ function rotate(degrees: number): void {
 
   // Re-render all visible pages
   if (state.viewportManager) {
-    state.viewportManager.invalidateAll();
+    void state.viewportManager.invalidateVisiblePages();
   }
 }
 

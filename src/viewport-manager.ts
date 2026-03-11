@@ -201,6 +201,9 @@ export class ViewportManager {
     priorityMode?: "visible" | "sequential";
     maxConcurrentRenders?: number;
   }) {
+    console.log(
+      `[DEBUG_INSTRUMENTATION] ViewportManager constructor: scroller=${!!options.scroller}, renderer=${!!options.renderer}, pageSource=${!!options.pageSource}`,
+    ); // [DEBUG_INSTRUMENTATION]
     this._scroller = options.scroller;
     this._renderer = options.renderer;
     this._pageSource = options.pageSource;
@@ -212,8 +215,12 @@ export class ViewportManager {
     };
 
     // Subscribe to scroller events
+    console.log(
+      `[DEBUG_INSTRUMENTATION] ViewportManager subscribing to scroller events, scroller.addEventListener=${typeof this._scroller.addEventListener}`,
+    ); // [DEBUG_INSTRUMENTATION]
     this._scroller.addEventListener("visibleRangeChange", this.handleVisibleRangeChange);
     this._scroller.addEventListener("scaleChange", this.handleScaleChange);
+    console.log(`[DEBUG_INSTRUMENTATION] ViewportManager constructor complete`); // [DEBUG_INSTRUMENTATION]
   }
 
   // ============================================================================
