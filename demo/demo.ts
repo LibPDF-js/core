@@ -456,7 +456,7 @@ async function setScale(scale: number): Promise<void> {
     }
 
     // Clear existing page elements and text spans, then re-render
-    for (const [pageIndex, container] of state.pageElements) {
+    for (const [, container] of state.pageElements) {
       container.remove();
     }
     state.pageTextSpans.clear();
@@ -470,6 +470,13 @@ async function setScale(scale: number): Promise<void> {
     if (state.viewportManager) {
       await state.viewportManager.invalidateVisiblePages();
     }
+
+    // Re-apply search highlights after a short delay to ensure text layers are built
+    setTimeout(() => {
+      for (const pageIndex of state.pageTextSpans.keys()) {
+        highlightSearchResults(pageIndex);
+      }
+    }, 100);
   }
 }
 
