@@ -361,12 +361,12 @@ body {
 /* Mouse text selection - purple */
 ::selection {
   background: rgba(140, 150, 255, 0.5);
-  color: #1a1a1a;
+  color: transparent;
 }
 
 ::-moz-selection {
   background: rgba(140, 150, 255, 0.5);
-  color: #1a1a1a;
+  color: transparent;
 }
 
 /* Search highlight - green #c5d9c3 applied via .highlight class on spans */
