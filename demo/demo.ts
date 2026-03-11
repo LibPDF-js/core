@@ -262,7 +262,23 @@ async function initializeViewer(): Promise<void> {
           const page = await pdfDocument.getPage(pageIndex + 1);
           const viewport = page.getViewport({ scale });
 
-          // Create text layer container
+          // Create highlight layer (sits between canvas and text layer)
+          const highlightLayerDiv = document.createElement("div");
+          highlightLayerDiv.className = "highlight-layer";
+          highlightLayerDiv.style.position = "absolute";
+          highlightLayerDiv.style.left = "0";
+          highlightLayerDiv.style.top = "0";
+          highlightLayerDiv.style.right = "0";
+          highlightLayerDiv.style.bottom = "0";
+          highlightLayerDiv.style.overflow = "hidden";
+          highlightLayerDiv.style.pointerEvents = "none";
+          container!.appendChild(highlightLayerDiv);
+
+          // Store highlight layer reference
+          (state as any).pageHighlightLayers = (state as any).pageHighlightLayers || new Map();
+          (state as any).pageHighlightLayers.set(pageIndex, highlightLayerDiv);
+
+          // Create text layer container (on top for selection)
           const textLayerDiv = document.createElement("div");
           textLayerDiv.className = "text-layer";
           textLayerDiv.style.position = "absolute";
@@ -598,18 +614,17 @@ function highlightSearchResults(pageIndex: number): void {
     return;
   }
 
-  // Clear existing highlights from all spans on this page
-  for (const spanInfo of textSpans) {
-    spanInfo.element.classList.remove("highlight", "selected");
-    // Remove any highlight wrapper spans we may have created
-    const parent = spanInfo.element.parentElement;
-    if (parent) {
-      const highlightSpans = spanInfo.element.querySelectorAll(".highlight");
-      highlightSpans.forEach(el => el.remove());
-    }
-    // Reset inner HTML to just the text
-    spanInfo.element.textContent = spanInfo.text;
+  // Get the highlight layer for this page
+  const highlightLayers = (state as any).pageHighlightLayers as
+    | Map<number, HTMLElement>
+    | undefined;
+  const highlightLayer = highlightLayers?.get(pageIndex);
+  if (!highlightLayer) {
+    return;
   }
+
+  // Clear existing highlights
+  highlightLayer.innerHTML = "";
 
   const results = state.searchEngine.getResultsForPage(pageIndex);
   const currentResult = state.searchEngine.currentResult;
@@ -618,7 +633,7 @@ function highlightSearchResults(pageIndex: number): void {
     return;
   }
 
-  // For each result, find overlapping text spans and add highlight class
+  // For each result, find overlapping text spans and create highlight divs
   for (const result of results) {
     const isCurrent = currentResult && currentResult.resultIndex === result.resultIndex;
 
@@ -626,42 +641,28 @@ function highlightSearchResults(pageIndex: number): void {
     for (const spanInfo of textSpans) {
       // Check if this span overlaps with the search result
       if (spanInfo.endOffset > result.startOffset && spanInfo.startOffset < result.endOffset) {
-        // Calculate the overlap within this span
-        const overlapStart =
-          Math.max(result.startOffset, spanInfo.startOffset) - spanInfo.startOffset;
-        const overlapEnd = Math.min(result.endOffset, spanInfo.endOffset) - spanInfo.startOffset;
+        // Get the bounding rect of the text span
+        const rect = spanInfo.element.getBoundingClientRect();
+        const containerRect = highlightLayer.parentElement?.getBoundingClientRect();
 
-        // If the entire span is highlighted
-        if (overlapStart === 0 && overlapEnd === spanInfo.text.length) {
-          spanInfo.element.classList.add("highlight");
-          if (isCurrent) {
-            spanInfo.element.classList.add("selected");
-          }
-        } else {
-          // Partial highlight - need to wrap the highlighted portion in a span
-          const beforeText = spanInfo.text.slice(0, overlapStart);
-          const highlightText = spanInfo.text.slice(overlapStart, overlapEnd);
-          const afterText = spanInfo.text.slice(overlapEnd);
-
-          // Clear the span and rebuild with highlight
-          spanInfo.element.textContent = "";
-
-          if (beforeText) {
-            spanInfo.element.appendChild(document.createTextNode(beforeText));
-          }
-
-          const highlightSpan = document.createElement("span");
-          highlightSpan.className = "highlight";
-          if (isCurrent) {
-            highlightSpan.classList.add("selected");
-          }
-          highlightSpan.textContent = highlightText;
-          spanInfo.element.appendChild(highlightSpan);
-
-          if (afterText) {
-            spanInfo.element.appendChild(document.createTextNode(afterText));
-          }
+        if (!containerRect) {
+          continue;
         }
+
+        // Calculate relative position within the container
+        const left = rect.left - containerRect.left;
+        const top = rect.top - containerRect.top;
+
+        // Create highlight div
+        const highlightDiv = document.createElement("div");
+        highlightDiv.className = isCurrent ? "search-highlight selected" : "search-highlight";
+        highlightDiv.style.position = "absolute";
+        highlightDiv.style.left = `${left}px`;
+        highlightDiv.style.top = `${top}px`;
+        highlightDiv.style.width = `${rect.width}px`;
+        highlightDiv.style.height = `${rect.height}px`;
+
+        highlightLayer.appendChild(highlightDiv);
       }
     }
   }
