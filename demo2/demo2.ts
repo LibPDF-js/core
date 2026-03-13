@@ -50,6 +50,9 @@ interface DemoState {
   currentSearchIndex: number;
 }
 
+// Device pixel ratio for high-DPI rendering
+const DPR = window.devicePixelRatio || 1;
+
 const state: DemoState = {
   pdf: null,
   pdfBytes: null,
@@ -206,8 +209,8 @@ async function initializeViewer(): Promise<void> {
   });
 
   // Set up viewport manager events
-  state.viewportManager.addEventListener("pageRendered", event => {
-    if (event.element && state.virtualScroller && state.pdf) {
+  state.viewportManager.addEventListener("pageRendered", async event => {
+    if (event.element && state.virtualScroller && state.pdf && state.renderer) {
       const layout = state.virtualScroller.getPageLayout(event.pageIndex);
       if (!layout) {
         console.error(`No layout for page ${event.pageIndex}`);
@@ -228,36 +231,79 @@ async function initializeViewer(): Promise<void> {
         return;
       }
 
-      // Clone the canvas to display it
-      const canvas = event.element as HTMLCanvasElement;
-      const displayCanvas = canvas.cloneNode(true) as HTMLCanvasElement;
-      const srcCtx = canvas.getContext("2d");
-      const dstCtx = displayCanvas.getContext("2d");
-      if (srcCtx && dstCtx) {
-        dstCtx.drawImage(canvas, 0, 0);
+      // For high-DPI displays, re-render at higher resolution
+      const page = state.pdf.getPage(event.pageIndex);
+      const pageWidth = page.width;
+      const pageHeight = page.height;
+      const rotation = page.rotation;
+
+      // Create a high-DPI viewport (scale includes DPR)
+      const highDpiScale = state.scale * DPR;
+      const highDpiViewport = state.renderer.createViewport(
+        pageWidth,
+        pageHeight,
+        rotation,
+        highDpiScale,
+        state.rotation,
+      );
+
+      // Get content bytes and font resolver for high-quality render
+      const contentBytes = page.getContentBytes();
+      const fontResolver = page.createFontResolver();
+
+      // Render at high DPI
+      const renderTask = state.renderer.render(
+        event.pageIndex,
+        highDpiViewport,
+        contentBytes,
+        fontResolver,
+      );
+
+      try {
+        const result = await renderTask.promise;
+        const highDpiCanvas = result.element as HTMLCanvasElement;
+
+        // Create display canvas with high-DPI dimensions
+        const displayCanvas = document.createElement("canvas");
+        const displayWidth = layout.width;
+        const displayHeight = layout.height;
+
+        // Canvas internal size matches high-DPI render
+        displayCanvas.width = highDpiCanvas.width;
+        displayCanvas.height = highDpiCanvas.height;
+
+        // CSS size is the layout size (DPR is handled by canvas resolution)
+        displayCanvas.style.width = `${displayWidth}px`;
+        displayCanvas.style.height = `${displayHeight}px`;
+
+        // Copy the high-DPI rendered content
+        const dstCtx = displayCanvas.getContext("2d");
+        if (dstCtx) {
+          dstCtx.drawImage(highDpiCanvas, 0, 0);
+        }
+
+        // Position and size the container based on layout
+        container.style.position = "absolute";
+        container.style.left = `${layout.left}px`;
+        container.style.top = `${layout.top}px`;
+        container.style.width = `${layout.width}px`;
+        container.style.height = `${layout.height}px`;
+
+        // Clear container and add the canvas
+        container.innerHTML = "";
+        displayCanvas.style.position = "absolute";
+        displayCanvas.style.left = "0";
+        displayCanvas.style.top = "0";
+        container.appendChild(displayCanvas);
+
+        // Build text layer for text selection
+        buildTextLayer(event.pageIndex, container);
+
+        // Emit page rendered event
+        emitEvent("page:rendered", { pageIndex: event.pageIndex });
+      } catch (err) {
+        console.error(`Failed to render high-DPI page ${event.pageIndex}:`, err);
       }
-
-      // Position and size the container based on layout
-      container.style.position = "absolute";
-      container.style.left = `${layout.left}px`;
-      container.style.top = `${layout.top}px`;
-      container.style.width = `${layout.width}px`;
-      container.style.height = `${layout.height}px`;
-
-      // Clear container and add the canvas
-      container.innerHTML = "";
-      displayCanvas.style.width = "100%";
-      displayCanvas.style.height = "100%";
-      displayCanvas.style.position = "absolute";
-      displayCanvas.style.left = "0";
-      displayCanvas.style.top = "0";
-      container.appendChild(displayCanvas);
-
-      // Build text layer for text selection
-      buildTextLayer(event.pageIndex, container);
-
-      // Emit page rendered event
-      emitEvent("page:rendered", { pageIndex: event.pageIndex });
     }
   });
 
@@ -349,6 +395,7 @@ async function buildTextLayer(pageIndex: number, container: HTMLElement): Promis
     textLayerDiv.style.bottom = "0";
     textLayerDiv.style.overflow = "hidden";
     textLayerDiv.style.lineHeight = "1";
+    textLayerDiv.style.zIndex = "2"; // Above the canvas
 
     // Create coordinate transformer for positioning text spans
     const transformer = createCoordinateTransformer({
@@ -398,17 +445,25 @@ async function buildTextLayer(pageIndex: number, container: HTMLElement): Promis
       const text = pageText.text;
       if (text) {
         const lines = text.split("\n");
-        let y = 20;
+        // Scale the font size and positioning with the current scale
+        const baseFontSize = 12;
+        const scaledFontSize = baseFontSize * state.scale;
+        const lineHeight = scaledFontSize * 1.4;
+        const leftMargin = 10 * state.scale;
+        let y = 20 * state.scale;
+
         for (const line of lines) {
           if (line.trim()) {
             const span = document.createElement("span");
             span.textContent = line;
             span.style.position = "absolute";
-            span.style.left = "10px";
+            span.style.left = `${leftMargin}px`;
             span.style.top = `${y}px`;
+            span.style.fontSize = `${scaledFontSize}px`;
             span.style.color = "transparent";
             span.style.pointerEvents = "auto";
             span.style.cursor = "text";
+            span.style.userSelect = "text";
             textLayerDiv.appendChild(span);
 
             textSpans.push({
@@ -418,7 +473,7 @@ async function buildTextLayer(pageIndex: number, container: HTMLElement): Promis
               endOffset: currentOffset + line.length,
             });
             currentOffset += line.length + 1; // +1 for newline
-            y += 16;
+            y += lineHeight;
           }
         }
       }

@@ -359,7 +359,11 @@ body {
   opacity: 1;
   line-height: 1;
   pointer-events: none;
-  mix-blend-mode: multiply;
+  /* Allow text selection */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
 .text-layer > span,
@@ -369,17 +373,31 @@ body {
   color: transparent;
   pointer-events: auto;
   cursor: text;
+  /* Ensure text is selectable */
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
-/* Mouse text selection - purple */
-::selection {
-  background: #bfbfff;
+/* Mouse text selection - blue/purple highlight */
+.text-layer span::selection {
+  background: rgba(0, 100, 255, 0.3);
   color: transparent;
+}
+
+.text-layer span::-moz-selection {
+  background: rgba(0, 100, 255, 0.3);
+  color: transparent;
+}
+
+/* General selection */
+::selection {
+  background: rgba(0, 100, 255, 0.3);
 }
 
 ::-moz-selection {
-  background: #bfbfff;
-  color: transparent;
+  background: rgba(0, 100, 255, 0.3);
 }
 
 /* Search highlight - green background */
