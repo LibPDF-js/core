@@ -14,6 +14,7 @@ import {
   createViewportManager,
   createVirtualScroller,
   PDF,
+  TextExtractor,
   type CanvasRenderer,
   type PageDimensions,
   type SearchEngine,
@@ -111,7 +112,7 @@ async function loadPDF(file: File): Promise<void> {
 
     setStatus(`Loaded: ${file.name}`);
     setProgress("");
-    emitEvent("pdf:ready", { pageCount: state.pdf.pageCount, fileName: file.name });
+    emitEvent("pdf:ready", { pageCount: state.pdf.getPageCount(), fileName: file.name });
     await initializeViewer();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -140,15 +141,14 @@ async function initializeViewer(): Promise<void> {
   }
 
   // Get page dimensions for virtual scroller
-  const pageCount = state.pdf.pageCount;
+  const pageCount = state.pdf.getPageCount();
   const pageDimensions: PageDimensions[] = [];
 
   for (let i = 0; i < pageCount; i++) {
     const page = state.pdf.getPage(i);
-    const size = page.getSize();
     pageDimensions.push({
-      width: size.width,
-      height: size.height,
+      width: page.width,
+      height: page.height,
     });
   }
 
@@ -288,21 +288,20 @@ function handleScroll(): void {
 
 function createPageSource() {
   return {
-    getPageCount: () => state.pdf?.pageCount ?? 0,
+    getPageCount: () => state.pdf?.getPageCount() ?? 0,
     getPageDimensions: async (pageIndex: number) => {
       if (!state.pdf) {
         return { width: 0, height: 0 };
       }
       const page = state.pdf.getPage(pageIndex);
-      const size = page.getSize();
-      return { width: size.width, height: size.height };
+      return { width: page.width, height: page.height };
     },
     getPageRotation: async (pageIndex: number) => {
       if (!state.pdf) {
         return 0;
       }
       const page = state.pdf.getPage(pageIndex);
-      return page.getRotation().angle;
+      return page.rotation;
     },
     getPageContentBytes: async (pageIndex: number): Promise<Uint8Array | null> => {
       if (!state.pdf) {
@@ -321,7 +320,7 @@ function createPageSource() {
       }
       try {
         const page = state.pdf.getPage(pageIndex);
-        return page.getFontResolver();
+        return page.createFontResolver();
       } catch {
         return null;
       }
@@ -336,8 +335,9 @@ async function buildTextLayer(pageIndex: number, container: HTMLElement): Promis
 
   try {
     const page = state.pdf.getPage(pageIndex);
-    const size = page.getSize();
-    const rotation = page.getRotation().angle;
+    const pageWidth = page.width;
+    const pageHeight = page.height;
+    const rotation = page.rotation;
 
     // Create text layer container
     const textLayerDiv = document.createElement("div");
@@ -352,15 +352,14 @@ async function buildTextLayer(pageIndex: number, container: HTMLElement): Promis
 
     // Create coordinate transformer for positioning text spans
     const transformer = createCoordinateTransformer({
-      pageWidth: size.width,
-      pageHeight: size.height,
+      pageWidth,
+      pageHeight,
       pageRotation: rotation as 0 | 90 | 180 | 270,
       viewerRotation: state.rotation as 0 | 90 | 180 | 270,
       scale: state.scale,
     });
 
-    // Extract text from page
-    const text = page.getTextContent();
+    // Extract text from page using TextExtractor
     const textSpans: TextSpanInfo[] = [];
     let currentOffset = 0;
 
@@ -372,7 +371,11 @@ async function buildTextLayer(pageIndex: number, container: HTMLElement): Promis
 
     // Extract characters for text layer
     try {
-      const chars = page.extractChars();
+      const contentBytes = page.getContentBytes();
+      const fontResolver = page.createFontResolver();
+      const extractor = new TextExtractor({ resolveFont: fontResolver });
+      const chars = extractor.extract(contentBytes);
+
       if (chars.length > 0) {
         builder.buildTextLayer(chars);
 
@@ -391,6 +394,8 @@ async function buildTextLayer(pageIndex: number, container: HTMLElement): Promis
       }
     } catch {
       // Fallback: create simple text spans from plain text
+      const pageText = page.extractText();
+      const text = pageText.text;
       if (text) {
         const lines = text.split("\n");
         let y = 20;
@@ -460,7 +465,7 @@ function goToPage(pageNumber: number): void {
     return;
   }
 
-  const pageCount = state.pdf.pageCount;
+  const pageCount = state.pdf.getPageCount();
   const clampedPage = Math.max(1, Math.min(pageNumber, pageCount));
 
   const previousPage = state.currentPage;
@@ -488,7 +493,7 @@ function updatePageControls(): void {
     return;
   }
 
-  const pageCount = state.pdf.pageCount;
+  const pageCount = state.pdf.getPageCount();
   elements.pageInput.value = String(state.currentPage);
   elements.pageInput.max = String(pageCount);
   elements.pageCount.textContent = String(pageCount);
@@ -591,9 +596,8 @@ async function fitWidth(): Promise<void> {
   }
 
   const page = state.pdf.getPage(state.currentPage - 1);
-  const size = page.getSize();
   const containerWidth = elements.viewer.clientWidth - 40;
-  const newScale = containerWidth / size.width;
+  const newScale = containerWidth / page.width;
   await setScale(newScale);
 }
 
@@ -603,12 +607,11 @@ async function fitPage(): Promise<void> {
   }
 
   const page = state.pdf.getPage(state.currentPage - 1);
-  const size = page.getSize();
   const containerWidth = elements.viewer.clientWidth - 40;
   const containerHeight = elements.viewer.clientHeight - 40;
 
-  const scaleX = containerWidth / size.width;
-  const scaleY = containerHeight / size.height;
+  const scaleX = containerWidth / page.width;
+  const scaleY = containerHeight / page.height;
   await setScale(Math.min(scaleX, scaleY));
 }
 
@@ -637,14 +640,15 @@ function initializeSearch(): void {
   // Create search engine with text provider
   state.searchEngine = createSearchEngine({
     textProvider: {
-      getPageCount: () => state.pdf?.pageCount ?? 0,
+      getPageCount: () => state.pdf?.getPageCount() ?? 0,
       getPageText: async (pageIndex: number) => {
         if (!state.pdf) {
           return "";
         }
         try {
           const page = state.pdf.getPage(pageIndex);
-          return page.getTextContent() || "";
+          const pageText = page.extractText();
+          return pageText.text || "";
         } catch {
           return "";
         }
@@ -958,7 +962,7 @@ function setupEventHandlers(): void {
   elements.btnFirst.addEventListener("click", () => goToPage(1));
   elements.btnPrev.addEventListener("click", () => goToPage(state.currentPage - 1));
   elements.btnNext.addEventListener("click", () => goToPage(state.currentPage + 1));
-  elements.btnLast.addEventListener("click", () => goToPage(state.pdf?.pageCount ?? 1));
+  elements.btnLast.addEventListener("click", () => goToPage(state.pdf?.getPageCount() ?? 1));
 
   elements.pageInput.addEventListener("change", () => {
     const page = parseInt(elements.pageInput.value, 10);
@@ -1046,7 +1050,7 @@ function setupEventHandlers(): void {
         event.preventDefault();
         break;
       case "End":
-        goToPage(state.pdf?.pageCount ?? 1);
+        goToPage(state.pdf?.getPageCount() ?? 1);
         event.preventDefault();
         break;
       case "+":
@@ -1156,8 +1160,8 @@ function setupShowcasePanel(): void {
 
   // Test Navigation button
   showcaseElements.btnTestNavigation.addEventListener("click", async () => {
-    if (state.pdf && state.pdf.pageCount > 1) {
-      const pageCount = state.pdf.pageCount;
+    if (state.pdf && state.pdf.getPageCount() > 1) {
+      const pageCount = state.pdf.getPageCount();
       goToPage(1);
       await new Promise(resolve => setTimeout(resolve, 500));
       goToPage(Math.min(3, pageCount));
