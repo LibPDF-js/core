@@ -1238,9 +1238,10 @@ export class CanvasRenderer implements TypeAwareRenderer {
     }
 
     if (this._context) {
-      // Map PDF font names to canvas-compatible names
-      const fontFamily = mapPdfFontToCanvas(name);
-      this._context.font = `${size}px ${fontFamily}`;
+      // Use the actual font name (e.g., "Helvetica-Bold") instead of the reference key (e.g., "F1")
+      // This ensures bold/italic styles are properly applied
+      const actualFontName = this._currentFont?.baseFontName ?? name;
+      this._context.font = buildCanvasFontString(actualFontName, size);
     }
   }
 
@@ -1351,8 +1352,10 @@ export class CanvasRenderer implements TypeAwareRenderer {
     // Apply text matrix transformation, then flip to counteract global flip
     this._context.transform(scaleX, shearX, -shearY, -scaleY, 0, 0);
 
-    // Set up the context for text rendering
-    this._context.font = `${effectiveFontSize}px ${mapPdfFontToCanvas(this._graphicsState.fontName)}`;
+    // Set up the context for text rendering with proper bold/italic handling
+    // Use actual font name (e.g., "Helvetica-Bold") instead of reference key (e.g., "F1")
+    const actualFontName = this._currentFont?.baseFontName ?? this._graphicsState.fontName;
+    this._context.font = buildCanvasFontString(actualFontName, effectiveFontSize);
     this._context.fillStyle = this._graphicsState.fillColor;
     this._context.strokeStyle = this._graphicsState.strokeColor;
 
@@ -1489,8 +1492,10 @@ export class CanvasRenderer implements TypeAwareRenderer {
       // Apply text matrix transformation, then flip to counteract global flip
       this._context.transform(scaleX, shearX, -shearY, -scaleY, 0, 0);
 
-      // Set up the context for text rendering
-      this._context.font = `${effectiveFontSize}px ${mapPdfFontToCanvas(this._graphicsState.fontName)}`;
+      // Set up the context for text rendering with proper bold/italic handling
+      // Use actual font name (e.g., "Helvetica-Bold") instead of reference key (e.g., "F1")
+      const actualFontName = this._currentFont?.baseFontName ?? this._graphicsState.fontName;
+      this._context.font = buildCanvasFontString(actualFontName, effectiveFontSize);
       this._context.fillStyle = this._graphicsState.fillColor;
       this._context.strokeStyle = this._graphicsState.strokeColor;
 
@@ -1666,6 +1671,9 @@ export class CanvasRenderer implements TypeAwareRenderer {
         break;
       case Op.SetMiterLimit:
         this.setMiterLimit(operands[0] as number);
+        break;
+      case Op.SetDashPattern:
+        this.setDashPattern(extractDashArray(operands[0] as PdfArray), operands[1] as number);
         break;
 
       // Path construction
@@ -2007,6 +2015,29 @@ function cmykToRgb(c: number, m: number, y: number, k: number): [number, number,
 const fontManagerInstance = new FontManager();
 function mapPdfFontToCanvas(pdfFontName: string): string {
   return fontManagerInstance.getFontFamily(pdfFontName);
+}
+
+/**
+ * Build a complete CSS font string with size, weight, style, and family.
+ * This properly handles bold, italic, and other font variations.
+ */
+function buildCanvasFontString(pdfFontName: string, size: number): string {
+  return fontManagerInstance.buildFontString(pdfFontName, size);
+}
+
+/**
+ * Extract dash array from PdfArray operand.
+ */
+function extractDashArray(array: PdfArray): number[] {
+  const result: number[] = [];
+  for (const item of array) {
+    if (typeof item === "number") {
+      result.push(item);
+    } else if (item && typeof item === "object" && "value" in item) {
+      result.push((item as { value: number }).value);
+    }
+  }
+  return result;
 }
 
 /**
