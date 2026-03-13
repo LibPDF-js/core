@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LibPDF Viewer Demo (From Scratch)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Header with file input and toolbar -->
+      <header class="header">
+        <div class="header-left">
+          <h1 class="logo">LibPDF <span class="logo-sub">(Native)</span></h1>
+          <div class="file-controls">
+            <input type="file" id="file-input" accept=".pdf" />
+            <label for="file-input" class="file-label">Open PDF</label>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <!-- Navigation -->
+          <div class="toolbar-group">
+            <button id="btn-first" class="toolbar-btn" title="First Page" disabled>
+              <span class="icon">⏮</span>
+            </button>
+            <button id="btn-prev" class="toolbar-btn" title="Previous Page" disabled>
+              <span class="icon">◀</span>
+            </button>
+            <span class="page-indicator">
+              <input
+                type="number"
+                id="page-input"
+                class="page-input"
+                min="1"
+                value="1"
+                disabled
+              />
+              <span class="page-separator">/</span>
+              <span id="page-count">0</span>
+            </span>
+            <button id="btn-next" class="toolbar-btn" title="Next Page" disabled>
+              <span class="icon">▶</span>
+            </button>
+            <button id="btn-last" class="toolbar-btn" title="Last Page" disabled>
+              <span class="icon">⏭</span>
+            </button>
+          </div>
+
+          <!-- Zoom -->
+          <div class="toolbar-group">
+            <button id="btn-zoom-out" class="toolbar-btn" title="Zoom Out" disabled>
+              <span class="icon">−</span>
+            </button>
+            <select id="zoom-select" class="zoom-select" disabled>
+              <option value="0.5">50%</option>
+              <option value="0.75">75%</option>
+              <option value="1" selected>100%</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+              <option value="2">200%</option>
+              <option value="fit-width">Fit Width</option>
+              <option value="fit-page">Fit Page</option>
+            </select>
+            <button id="btn-zoom-in" class="toolbar-btn" title="Zoom In" disabled>
+              <span class="icon">+</span>
+            </button>
+          </div>
+
+          <!-- Rotation -->
+          <div class="toolbar-group">
+            <button id="btn-rotate-ccw" class="toolbar-btn" title="Rotate Counter-Clockwise" disabled>
+              <span class="icon">↺</span>
+            </button>
+            <button id="btn-rotate-cw" class="toolbar-btn" title="Rotate Clockwise" disabled>
+              <span class="icon">↻</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="search-controls">
+          <div class="search-box">
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="Search..."
+              disabled
+            />
+            <span id="search-results" class="search-results"></span>
+          </div>
+          <button id="btn-search-prev" class="toolbar-btn" title="Previous Match" disabled>
+            <span class="icon">▲</span>
+          </button>
+          <button id="btn-search-next" class="toolbar-btn" title="Next Match" disabled>
+            <span class="icon">▼</span>
+          </button>
+          <div class="search-options">
+            <label class="checkbox-label">
+              <input type="checkbox" id="search-case" disabled />
+              <span>Match case</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="search-whole" disabled />
+              <span>Whole words</span>
+            </label>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main viewer area -->
+      <main class="viewer-container">
+        <div id="viewer" class="viewer">
+          <div class="viewer-placeholder">
+            <p>Open a PDF file to view it here</p>
+            <p class="placeholder-sub">Using LibPDF native rendering (no PDF.js)</p>
+          </div>
+        </div>
+      </main>
+
+      <!-- Status bar -->
+      <footer class="status-bar">
+        <span id="status-text">Ready</span>
+        <span id="status-progress"></span>
+      </footer>
+
+      <!-- Feature Showcase Panel (collapsible) -->
+      <aside id="feature-panel" class="feature-panel">
+        <button id="toggle-panel" class="toggle-panel-btn">Features</button>
+        <div class="panel-content">
+          <h3>Native LibPDF Demo</h3>
+
+          <!-- Info -->
+          <section class="feature-section">
+            <h4>About This Demo</h4>
+            <p class="feature-desc">
+              This demo uses LibPDF's native rendering pipeline without PDF.js.
+              It uses CanvasRenderer, VirtualScroller, and ViewportManager for
+              pure LibPDF-based PDF viewing.
+            </p>
+          </section>
+
+          <!-- Event Log -->
+          <section class="feature-section">
+            <h4>Event System</h4>
+            <div class="event-log-container">
+              <div id="event-log" class="event-log"></div>
+              <button id="btn-clear-log" class="btn-small">Clear Log</button>
+            </div>
+          </section>
+
+          <!-- Feature Status -->
+          <section class="feature-section">
+            <h4>Implemented Features</h4>
+            <ul class="feature-list">
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>Native CanvasRenderer</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>VirtualScroller Integration</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>ViewportManager</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>Coordinate Transformation</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>DOM Text Layer</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>Text Search & Highlighting</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>Zoom Controls</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>Page Navigation</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>Rotation Support</span>
+              </li>
+              <li class="feature-item">
+                <span class="status-icon active">✓</span>
+                <span>Keyboard Shortcuts</span>
+              </li>
+            </ul>
+          </section>
+
+          <!-- Test Actions -->
+          <section class="feature-section">
+            <h4>Test Actions</h4>
+            <div class="test-actions">
+              <button id="btn-test-events" class="btn-small">Test Events</button>
+              <button id="btn-test-zoom" class="btn-small">Test Zoom</button>
+              <button id="btn-test-navigation" class="btn-small">Test Navigation</button>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </div>
+
+    <script type="module" src="demo2.ts"></script>
+  </body>
+</html>
