@@ -53,6 +53,7 @@ interface DemoState {
   boundingBoxOverlay: BoundingBoxOverlay | null;
   boundingBoxControls: BoundingBoxControls | null;
   pageDimensions: Map<number, { width: number; height: number }>;
+  searchHighlightOverlays: Map<number, HTMLElement>;
 }
 
 const state: DemoState = {
@@ -70,6 +71,7 @@ const state: DemoState = {
   boundingBoxOverlay: null,
   boundingBoxControls: null,
   pageDimensions: new Map(),
+  searchHighlightOverlays: new Map(),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,6 +456,8 @@ function cleanupViewer(): void {
     state.boundingBoxOverlay.removeAllOverlays();
     state.boundingBoxOverlay.clearAllBoundingBoxes();
   }
+  // Clean up search highlight overlays
+  clearAllSearchHighlightOverlays();
   state.pageElements.clear();
   state.pageTextSpans.clear();
   state.pageDimensions.clear();
@@ -574,6 +578,7 @@ async function setScale(scale: number): Promise<void> {
     }
     state.pageTextSpans.clear();
     state.pageElements.clear();
+    state.searchHighlightOverlays.clear();
 
     // Update bounding box overlay scale
     if (state.boundingBoxOverlay) {
@@ -737,6 +742,8 @@ function highlightSearchResults(pageIndex: number): void {
   const currentResult = state.searchEngine.currentResult;
 
   if (results.length === 0) {
+    // Clear bounding box overlay when no results
+    clearSearchHighlightOverlay(pageIndex);
     return;
   }
 
@@ -787,6 +794,118 @@ function highlightSearchResults(pageIndex: number): void {
       }
     }
   }
+
+  // Render bounding box overlays for search results
+  renderSearchHighlightOverlay(pageIndex, results, currentResult?.resultIndex ?? -1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Search Bounding Box Overlays
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Creates or updates the search highlight overlay for a page.
+ * This renders semi-transparent rectangles over all search matches,
+ * with the current match having a distinct appearance.
+ */
+function renderSearchHighlightOverlay(
+  pageIndex: number,
+  results: {
+    bounds?: { x: number; y: number; width: number; height: number };
+    boundsArray?: { x: number; y: number; width: number; height: number }[];
+    resultIndex: number;
+  }[],
+  currentResultIndex: number,
+): void {
+  const container = state.pageElements.get(pageIndex);
+  if (!container) {
+    return;
+  }
+
+  const pageDims = state.pageDimensions.get(pageIndex);
+  if (!pageDims) {
+    return;
+  }
+
+  // Get or create the search highlight overlay
+  let overlay = state.searchHighlightOverlays.get(pageIndex);
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.className = "search-highlight-overlay";
+    overlay.style.position = "absolute";
+    overlay.style.top = "0";
+    overlay.style.left = "0";
+    overlay.style.right = "0";
+    overlay.style.bottom = "0";
+    overlay.style.pointerEvents = "none";
+    overlay.style.overflow = "hidden";
+    overlay.style.zIndex = "5"; // Above canvas but below text layer
+    state.searchHighlightOverlays.set(pageIndex, overlay);
+  }
+
+  // Clear existing content
+  overlay.innerHTML = "";
+
+  // Append to container if not already there
+  if (overlay.parentElement !== container) {
+    // Insert before text layer if present, otherwise append
+    const textLayer = container.querySelector(".text-layer");
+    if (textLayer) {
+      container.insertBefore(overlay, textLayer);
+    } else {
+      container.appendChild(overlay);
+    }
+  }
+
+  const scale = state.scale;
+  const pageHeight = pageDims.height;
+
+  // Create highlight rectangles for each result
+  const fragment = document.createDocumentFragment();
+
+  for (const result of results) {
+    const isCurrent = result.resultIndex === currentResultIndex;
+    const boundsArray = result.boundsArray ?? (result.bounds ? [result.bounds] : []);
+
+    for (const bounds of boundsArray) {
+      const rect = document.createElement("div");
+      rect.className = isCurrent ? "search-highlight current" : "search-highlight";
+
+      // Convert PDF coordinates to screen coordinates
+      // PDF coordinates have origin at bottom-left, screen at top-left
+      // The bounds.y is the baseline Y position in PDF coordinates
+      const screenY = pageHeight - bounds.y - bounds.height;
+
+      rect.style.left = `${bounds.x * scale}px`;
+      rect.style.top = `${screenY * scale}px`;
+      rect.style.width = `${bounds.width * scale}px`;
+      rect.style.height = `${bounds.height * scale}px`;
+
+      fragment.appendChild(rect);
+    }
+  }
+
+  overlay.appendChild(fragment);
+}
+
+/**
+ * Clears the search highlight overlay for a specific page.
+ */
+function clearSearchHighlightOverlay(pageIndex: number): void {
+  const overlay = state.searchHighlightOverlays.get(pageIndex);
+  if (overlay) {
+    overlay.innerHTML = "";
+  }
+}
+
+/**
+ * Clears all search highlight overlays.
+ */
+function clearAllSearchHighlightOverlays(): void {
+  for (const overlay of state.searchHighlightOverlays.values()) {
+    overlay.remove();
+  }
+  state.searchHighlightOverlays.clear();
 }
 
 async function scrollToCurrentResult(): Promise<void> {
@@ -846,10 +965,7 @@ async function scrollToCurrentResult(): Promise<void> {
   updatePageControls();
 
   // Update highlights after scrolling
-  const container = state.pageElements.get(result.pageIndex);
-  if (container) {
-    await highlightSearchResults(result.pageIndex, container);
-  }
+  highlightSearchResults(result.pageIndex);
 }
 
 function searchNext(): void {

@@ -381,6 +381,37 @@ body {
   background-color: #a8c9a5;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Search Highlight Overlay (Bounding Box Visualization)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.search-highlight-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.search-highlight {
+  position: absolute;
+  background-color: rgba(255, 255, 0, 0.35);
+  border: 1px solid rgba(255, 200, 0, 0.6);
+  border-radius: 1px;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease;
+}
+
+.search-highlight.current {
+  background-color: rgba(255, 165, 0, 0.5);
+  border: 2px solid rgba(255, 140, 0, 0.9);
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(255, 140, 0, 0.4);
+}
+
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Status Bar
