@@ -8,12 +8,17 @@
 
 import {
   buildPDFJSTextLayer,
+  createBoundingBoxControls,
+  createBoundingBoxOverlay,
   createPDFJSRenderer,
   createPDFJSSearchEngine,
   createPDFResourceLoader,
   createVirtualScroller,
   createViewportManager,
   initializePDFJS,
+  type BoundingBoxControls,
+  type BoundingBoxOverlay,
+  type OverlayBoundingBox,
   type PageDimensions,
   type PDFDocumentProxy,
   type PDFJSSearchEngine,
@@ -45,6 +50,9 @@ interface DemoState {
   resourceLoader: PDFResourceLoader | null;
   pageElements: Map<number, HTMLElement>;
   pageTextSpans: Map<number, TextSpanInfo[]>;
+  boundingBoxOverlay: BoundingBoxOverlay | null;
+  boundingBoxControls: BoundingBoxControls | null;
+  pageDimensions: Map<number, { width: number; height: number }>;
 }
 
 const state: DemoState = {
@@ -59,6 +67,9 @@ const state: DemoState = {
   resourceLoader: null,
   pageElements: new Map(),
   pageTextSpans: new Map(),
+  boundingBoxOverlay: null,
+  boundingBoxControls: null,
+  pageDimensions: new Map(),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -211,10 +222,13 @@ async function initializeViewer(): Promise<void> {
     // PDF.js uses 1-based page numbers
     const page = await state.pdfDocument.getPage(i + 1);
     const viewport = page.getViewport({ scale: 1 });
-    pageDimensions.push({
+    const dims = {
       width: viewport.width,
       height: viewport.height,
-    });
+    };
+    pageDimensions.push(dims);
+    // Store dimensions for bounding box overlay
+    state.pageDimensions.set(i, dims);
   }
 
   // Create virtual scroller
@@ -359,6 +373,14 @@ async function initializeViewer(): Promise<void> {
           // Highlight search results on this page
           highlightSearchResults(pageIndex);
 
+          // Render bounding box overlay if available
+          if (state.boundingBoxOverlay && container) {
+            const pageDims = state.pageDimensions.get(pageIndex);
+            if (pageDims) {
+              state.boundingBoxOverlay.renderToPage(pageIndex, container, scale, pageDims.height);
+            }
+          }
+
           // Emit page rendered event
           emitEvent("page:rendered", { pageIndex });
         } catch (err) {
@@ -427,8 +449,14 @@ function cleanupViewer(): void {
     state.searchEngine.clearSearch();
     state.searchEngine = null;
   }
+  // Clean up bounding box overlay
+  if (state.boundingBoxOverlay) {
+    state.boundingBoxOverlay.removeAllOverlays();
+    state.boundingBoxOverlay.clearAllBoundingBoxes();
+  }
   state.pageElements.clear();
   state.pageTextSpans.clear();
+  state.pageDimensions.clear();
   elements.viewer.innerHTML = "";
 }
 
@@ -546,6 +574,11 @@ async function setScale(scale: number): Promise<void> {
     }
     state.pageTextSpans.clear();
     state.pageElements.clear();
+
+    // Update bounding box overlay scale
+    if (state.boundingBoxOverlay) {
+      state.boundingBoxOverlay.removeAllOverlays();
+    }
 
     // Restore scroll position proportionally
     elements.viewer.scrollTop = scrollRatioY * state.virtualScroller.totalHeight;
@@ -1236,12 +1269,276 @@ function updateResourceLoaderStatus(status: string): void {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bounding Box Visualization
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Generate mock bounding box data for demonstration purposes.
+ * Creates realistic character, word, line, and paragraph boundaries
+ * based on text layer spans.
+ */
+function generateMockBoundingBoxes(
+  pageIndex: number,
+  textSpans: TextSpanInfo[],
+  pageHeight: number,
+  scale: number,
+): OverlayBoundingBox[] {
+  const boxes: OverlayBoundingBox[] = [];
+
+  if (textSpans.length === 0) {
+    return boxes;
+  }
+
+  // Group spans into lines based on vertical position
+  const lineGroups: Map<number, TextSpanInfo[]> = new Map();
+  for (const span of textSpans) {
+    const rect = span.element.getBoundingClientRect();
+    // Round to nearest 5 pixels to group spans on same line
+    const lineKey = Math.round(rect.top / 5) * 5;
+    if (!lineGroups.has(lineKey)) {
+      lineGroups.set(lineKey, []);
+    }
+    lineGroups.get(lineKey)!.push(span);
+  }
+
+  // Sort lines by vertical position
+  const sortedLines = Array.from(lineGroups.entries()).sort((a, b) => a[0] - b[0]);
+
+  // Track paragraph bounds
+  let paragraphStartY = 0;
+  let paragraphEndY = 0;
+  let paragraphMinX = Infinity;
+  let paragraphMaxX = 0;
+  let lastLineBottom = 0;
+  const paragraphBoxes: OverlayBoundingBox[] = [];
+
+  for (const [lineTop, lineSpans] of sortedLines) {
+    if (lineSpans.length === 0) {
+      continue;
+    }
+
+    // Sort spans by horizontal position
+    lineSpans.sort((a, b) => {
+      const rectA = a.element.getBoundingClientRect();
+      const rectB = b.element.getBoundingClientRect();
+      return rectA.left - rectB.left;
+    });
+
+    // Get page container for coordinate conversion
+    const pageContainer = lineSpans[0].element.closest(".page-container");
+    if (!pageContainer) {
+      continue;
+    }
+    const containerRect = pageContainer.getBoundingClientRect();
+
+    // Calculate line bounds
+    let lineMinX = Infinity;
+    let lineMaxX = 0;
+    let lineMinY = Infinity;
+    let lineMaxY = 0;
+
+    for (const span of lineSpans) {
+      const rect = span.element.getBoundingClientRect();
+      const relX = (rect.left - containerRect.left) / scale;
+      const relY = (rect.top - containerRect.top) / scale;
+      const relWidth = rect.width / scale;
+      const relHeight = rect.height / scale;
+
+      lineMinX = Math.min(lineMinX, relX);
+      lineMaxX = Math.max(lineMaxX, relX + relWidth);
+      lineMinY = Math.min(lineMinY, relY);
+      lineMaxY = Math.max(lineMaxY, relY + relHeight);
+
+      // Generate word boxes by splitting text on whitespace
+      const words = span.text.split(/\s+/).filter(w => w.length > 0);
+      if (words.length > 0) {
+        const charWidth = relWidth / span.text.length;
+        let charOffset = 0;
+
+        for (const word of words) {
+          // Find the word position in the span text
+          const wordStart = span.text.indexOf(word, charOffset);
+          if (wordStart === -1) {
+            continue;
+          }
+
+          const wordX = relX + wordStart * charWidth;
+          const wordWidth = word.length * charWidth;
+
+          // Word bounding box (convert to PDF coordinates - y from bottom)
+          boxes.push({
+            type: "word",
+            pageIndex,
+            x: wordX,
+            y: pageHeight - relY - relHeight,
+            width: wordWidth,
+            height: relHeight,
+            text: word,
+          });
+
+          // Character bounding boxes
+          for (let i = 0; i < word.length; i++) {
+            boxes.push({
+              type: "character",
+              pageIndex,
+              x: wordX + i * charWidth,
+              y: pageHeight - relY - relHeight,
+              width: charWidth,
+              height: relHeight,
+              text: word[i],
+            });
+          }
+
+          charOffset = wordStart + word.length;
+        }
+      }
+    }
+
+    // Line bounding box (convert to PDF coordinates)
+    if (lineMinX !== Infinity) {
+      boxes.push({
+        type: "line",
+        pageIndex,
+        x: lineMinX,
+        y: pageHeight - lineMaxY,
+        width: lineMaxX - lineMinX,
+        height: lineMaxY - lineMinY,
+      });
+
+      // Check for paragraph break (large vertical gap between lines)
+      const lineGap = lineMinY - lastLineBottom;
+      const isNewParagraph = lastLineBottom > 0 && lineGap > 20 / scale;
+
+      if (isNewParagraph && paragraphMaxX > 0) {
+        // Save previous paragraph
+        paragraphBoxes.push({
+          type: "paragraph",
+          pageIndex,
+          x: paragraphMinX,
+          y: pageHeight - paragraphEndY,
+          width: paragraphMaxX - paragraphMinX,
+          height: paragraphEndY - paragraphStartY,
+        });
+
+        // Start new paragraph
+        paragraphStartY = lineMinY;
+        paragraphMinX = lineMinX;
+        paragraphMaxX = lineMaxX;
+      } else {
+        // Extend current paragraph
+        if (paragraphStartY === 0) {
+          paragraphStartY = lineMinY;
+        }
+        paragraphMinX = Math.min(paragraphMinX, lineMinX);
+        paragraphMaxX = Math.max(paragraphMaxX, lineMaxX);
+      }
+
+      paragraphEndY = lineMaxY;
+      lastLineBottom = lineMaxY;
+    }
+  }
+
+  // Add final paragraph
+  if (paragraphMaxX > 0) {
+    paragraphBoxes.push({
+      type: "paragraph",
+      pageIndex,
+      x: paragraphMinX,
+      y: pageHeight - paragraphEndY,
+      width: paragraphMaxX - paragraphMinX,
+      height: paragraphEndY - paragraphStartY,
+    });
+  }
+
+  boxes.push(...paragraphBoxes);
+
+  return boxes;
+}
+
+/**
+ * Set up bounding box visualization components.
+ */
+function setupBoundingBoxVisualization(): void {
+  // Create bounding box overlay
+  state.boundingBoxOverlay = createBoundingBoxOverlay();
+
+  // Create bounding box controls
+  state.boundingBoxControls = createBoundingBoxControls({
+    enableKeyboardShortcuts: true,
+  });
+
+  // Wire up controls to overlay
+  state.boundingBoxControls.addEventListener("toggle", event => {
+    if (event.boxType !== undefined && event.visible !== undefined) {
+      state.boundingBoxOverlay?.setVisibility(event.boxType, event.visible);
+      logEvent("boundingBox:toggle", { type: event.boxType, visible: event.visible });
+    }
+  });
+
+  state.boundingBoxControls.addEventListener("toggleAll", event => {
+    if (event.visibility) {
+      state.boundingBoxOverlay?.setAllVisibility(event.visibility);
+      logEvent("boundingBox:toggleAll", { visibility: event.visibility });
+    }
+  });
+
+  // Add controls to the feature panel
+  const featurePanel = document.getElementById("feature-panel");
+  if (featurePanel) {
+    const panelContent = featurePanel.querySelector(".panel-content");
+    if (panelContent) {
+      // Create a new section for bounding box controls
+      const section = document.createElement("section");
+      section.className = "feature-section";
+      section.innerHTML = "<h4>Bounding Box Visualization</h4>";
+      section.appendChild(state.boundingBoxControls.element);
+
+      // Add a help text
+      const helpText = document.createElement("p");
+      helpText.style.fontSize = "11px";
+      helpText.style.color = "#666";
+      helpText.style.marginTop = "8px";
+      helpText.style.marginBottom = "0";
+      helpText.textContent = "Press 1-4 to toggle boxes, 0 to hide all";
+      section.appendChild(helpText);
+
+      // Insert after the first section (URL loading)
+      const firstSection = panelContent.querySelector(".feature-section");
+      if (firstSection && firstSection.nextSibling) {
+        panelContent.insertBefore(section, firstSection.nextSibling);
+      } else {
+        panelContent.appendChild(section);
+      }
+    }
+  }
+
+  // Listen for page rendered events to generate mock bounding boxes
+  addEventListener("page:rendered", payload => {
+    const pageIndex = payload.pageIndex;
+    const textSpans = state.pageTextSpans.get(pageIndex);
+    const pageDims = state.pageDimensions.get(pageIndex);
+
+    if (textSpans && pageDims && state.boundingBoxOverlay) {
+      const boxes = generateMockBoundingBoxes(pageIndex, textSpans, pageDims.height, state.scale);
+      state.boundingBoxOverlay.setBoundingBoxes(pageIndex, boxes);
+
+      // Re-render the overlay for this page
+      const container = state.pageElements.get(pageIndex);
+      if (container) {
+        state.boundingBoxOverlay.renderToPage(pageIndex, container, state.scale, pageDims.height);
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Initialization
 // ─────────────────────────────────────────────────────────────────────────────
 
 function init(): void {
   setupEventHandlers();
   setupShowcasePanel();
+  setupBoundingBoxVisualization();
   disableControls();
   setStatus("Ready - Open a PDF file to begin");
 
@@ -1258,6 +1555,7 @@ function init(): void {
       "Auth & 403 Recovery",
       "Event System",
       "Toolbar Controls",
+      "Bounding Box Visualization",
     ],
   });
 }

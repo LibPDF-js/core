@@ -724,6 +724,36 @@ export {
 } from "./frontend";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bounding Box Visualization
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Overlay component
+  BoundingBoxOverlay,
+  createBoundingBoxOverlay,
+  DEFAULT_BOUNDING_BOX_COLORS,
+  DEFAULT_BOUNDING_BOX_BORDER_COLORS,
+  // Controls component
+  BoundingBoxControls,
+  createBoundingBoxControls,
+  DEFAULT_TOGGLE_CONFIGS,
+  // Types
+  type OverlayBoundingBox,
+  type BoundingBoxType,
+  type BoundingBoxColors,
+  type BoundingBoxVisibility,
+  type BoundingBoxOverlayOptions,
+  type BoundingBoxOverlayEventType,
+  type BoundingBoxOverlayEvent,
+  type BoundingBoxOverlayEventListener,
+  type BoundingBoxToggleConfig,
+  type BoundingBoxControlsOptions,
+  type BoundingBoxControlsEventType,
+  type BoundingBoxControlsEvent,
+  type BoundingBoxControlsEventListener,
+} from "./frontend";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Content Stream Processing
 // ─────────────────────────────────────────────────────────────────────────────
 
