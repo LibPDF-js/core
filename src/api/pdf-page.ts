@@ -104,6 +104,7 @@ import { parseToUnicode } from "#src/fonts/to-unicode";
 import { concatBytes } from "#src/helpers/buffer";
 import { black } from "#src/helpers/colors";
 import { ColorSpace } from "#src/helpers/colorspace";
+import { max } from "#src/helpers/math";
 import {
   beginText,
   concatMatrix,
@@ -1131,7 +1132,7 @@ export class PDFPage {
     // Apply rotation if specified
     if (options.rotate) {
       // Calculate text bounds for named origins using font metrics
-      const textWidth = options.maxWidth ?? Math.max(...lines.map(l => l.width));
+      const textWidth = options.maxWidth ?? max(lines.map(l => l.width));
 
       // Get font metrics for accurate bounds
       let ascent: number;

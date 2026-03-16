@@ -147,6 +147,33 @@ export class Type1FontProgram implements FontProgram {
     return this.font.hasGlyph(name);
   }
 
+  hasRenderableGlyph(glyphId: number): boolean {
+    if (glyphId <= 0) {
+      return false;
+    }
+
+    const glyphNames = this.font.getGlyphNames();
+    const glyphName = glyphNames[glyphId];
+
+    if (!glyphName) {
+      return false;
+    }
+
+    return (this.font.charstrings.get(glyphName)?.length ?? 0) > 0;
+  }
+
+  hasRenderableGlyphs(): boolean {
+    const glyphNames = this.font.getGlyphNames();
+
+    for (let glyphId = 1; glyphId < glyphNames.length; glyphId++) {
+      if (this.hasRenderableGlyph(glyphId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   getData(): Uint8Array {
     return this.data;
   }

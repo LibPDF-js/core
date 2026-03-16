@@ -2,6 +2,7 @@
  * TrueType/OpenType font program wrapper.
  */
 
+import { parseCFF } from "#src/fontbox/cff/parser.ts";
 import type { TrueTypeFont } from "#src/fontbox/ttf/truetype-font.ts";
 
 import type { FontProgram } from "./base.ts";
@@ -84,6 +85,56 @@ export class TrueTypeFontProgram implements FontProgram {
 
   hasGlyph(codePoint: number): boolean {
     return this.font.hasGlyph(codePoint);
+  }
+
+  hasRenderableGlyph(glyphId: number): boolean {
+    if (glyphId <= 0) {
+      return false;
+    }
+
+    if (!this.font.glyf) {
+      const cffData = this.font.getTableBytes("CFF ") ?? this.font.getTableBytes("CFF2");
+
+      if (!cffData) {
+        return false;
+      }
+
+      try {
+        const [cffFont] = parseCFF(cffData);
+
+        return (
+          !!cffFont &&
+          glyphId < cffFont.charStrings.length &&
+          cffFont.charStrings[glyphId].length > 0
+        );
+      } catch {
+        return false;
+      }
+    }
+
+    const glyph = this.font.glyf?.getGlyph(glyphId);
+
+    if (!glyph) {
+      return false;
+    }
+
+    const { description } = glyph;
+
+    if (description.isComposite) {
+      return (description.components?.length ?? 0) > 0;
+    }
+
+    return description.numberOfContours !== 0;
+  }
+
+  hasRenderableGlyphs(): boolean {
+    for (let glyphId = 1; glyphId < this.font.numGlyphs; glyphId++) {
+      if (this.hasRenderableGlyph(glyphId)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   getData(): Uint8Array {

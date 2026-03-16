@@ -31,6 +31,7 @@ import {
 import { serializeOperators } from "#src/drawing/serialize";
 import type { EmbeddedFont, EmbedFontOptions } from "#src/fonts/embedded-font";
 import { formatPdfDate, parsePdfDate } from "#src/helpers/format";
+import { min } from "#src/helpers/math";
 import { resolvePageSize } from "#src/helpers/page-size";
 import { checkIncrementalSaveBlocker, type IncrementalSaveBlocker } from "#src/helpers/save-utils";
 import { isJpeg, parseJpegHeader } from "#src/images/jpeg";
@@ -385,7 +386,7 @@ export class PDF {
 
     try {
       // Find the first object (lowest object number)
-      const firstObjNum = Math.min(...parsed.xref.keys());
+      const firstObjNum = min(parsed.xref.keys(), 0);
 
       if (firstObjNum > 0) {
         const firstObj = parsed.getObject(PdfRef.of(firstObjNum, 0));
@@ -485,7 +486,7 @@ export class PDF {
     let isLinearized = false;
 
     try {
-      const firstObjNum = Math.min(...parsed.xref.keys());
+      const firstObjNum = min(parsed.xref.keys(), 0);
 
       if (firstObjNum > 0) {
         const firstObj = parsed.getObject(PdfRef.of(firstObjNum, 0));

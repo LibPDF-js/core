@@ -172,6 +172,13 @@ describe("parseFontProgram", () => {
     expect(program.numGlyphs).toBeGreaterThan(0);
   });
 
+  it("treats OpenType CFF fonts as renderable", async () => {
+    const fontBytes = await loadFixture("fonts", "otf/FoglihtenNo07.otf");
+    const program = parseFontProgram(fontBytes);
+
+    expect(program.hasRenderableGlyphs()).toBe(true);
+  });
+
   it("should reject invalid data", () => {
     const invalidData = new Uint8Array([0, 0, 0, 0]);
     expect(() => parseFontProgram(invalidData)).toThrow();

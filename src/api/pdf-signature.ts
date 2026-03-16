@@ -182,7 +182,7 @@ export class PDFSignature {
 
     // Extract bytes to sign and hash them
     const signedBytes = extractSignedBytes(pdfBytes, byteRange);
-    const documentHash = hashData(signedBytes, resolved.digestAlgorithm);
+    const documentHash = await hashData(signedBytes, resolved.digestAlgorithm);
 
     // Build CMS signature
     const formatBuilder = this.getFormatBuilder(resolved.subFilter);
@@ -202,7 +202,7 @@ export class PDFSignature {
     if (resolved.timestampAuthority) {
       // Hash the signature value for timestamping
       const signatureValue = signedData.getSignatureValue();
-      const signatureHash = hashData(signatureValue, resolved.digestAlgorithm);
+      const signatureHash = await hashData(signatureValue, resolved.digestAlgorithm);
 
       // Request timestamp from TSA
       const timestampToken = await resolved.timestampAuthority.timestamp(
@@ -476,7 +476,7 @@ export class PDFSignature {
 
     // Hash and get timestamp
     const signedBytes = extractSignedBytes(savedBytes, byteRange);
-    const documentHash = hashData(signedBytes, digestAlgorithm);
+    const documentHash = await hashData(signedBytes, digestAlgorithm);
     const timestampToken = await timestampAuthority.timestamp(documentHash, digestAlgorithm);
 
     // Patch Contents

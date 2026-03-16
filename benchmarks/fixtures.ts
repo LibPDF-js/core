@@ -162,3 +162,4 @@ export async function getSynthetic2000(): Promise<Uint8Array> {
 export const smallPdfPath = "fixtures/basic/rot0.pdf";
 export const mediumPdfPath = "fixtures/basic/sample.pdf";
 export const formPdfPath = "fixtures/forms/sample_form.pdf";
+export const fintracPdfPath = "fixtures/issues/form-filling/FINTRAC.pdf";

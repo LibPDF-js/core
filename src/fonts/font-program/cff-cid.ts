@@ -85,11 +85,15 @@ export class CFFCIDFontProgram implements FontProgram {
     return 80;
   }
 
-  getGlyphId(_codePoint: number): number {
-    // CID fonts map CID to GID via charset
-    // Without a CMap, we can't map Unicode to CID
-    // Return 0 (notdef) - caller should use CMap
-    return 0;
+  getGlyphId(codePoint: number): number {
+    // CID fonts usually need the parent Type0 font's CMap/ToUnicode to map
+    // Unicode to character codes. As a fallback, support cases where the CID
+    // itself is the Unicode BMP code point.
+    if (codePoint < 0 || codePoint > 0xffff) {
+      return 0;
+    }
+
+    return this.getGlyphIdForCID(codePoint);
   }
 
   /**
@@ -111,7 +115,24 @@ export class CFFCIDFontProgram implements FontProgram {
   }
 
   hasGlyph(_codePoint: number): boolean {
-    // CID fonts need CMap for proper lookup
+    return this.getGlyphId(_codePoint) !== 0;
+  }
+
+  hasRenderableGlyph(glyphId: number): boolean {
+    return (
+      glyphId > 0 &&
+      glyphId < this.font.charStrings.length &&
+      this.font.charStrings[glyphId].length > 0
+    );
+  }
+
+  hasRenderableGlyphs(): boolean {
+    for (let glyphId = 1; glyphId < this.font.charStrings.length; glyphId++) {
+      if (this.hasRenderableGlyph(glyphId)) {
+        return true;
+      }
+    }
+
     return false;
   }
 

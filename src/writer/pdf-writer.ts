@@ -11,6 +11,7 @@ import { clearAllDirtyFlags, collectChanges } from "#src/document/change-collect
 import type { ObjectRegistry } from "#src/document/object-registry";
 import { FilterPipeline } from "#src/filters/filter-pipeline";
 import { CR, LF } from "#src/helpers/chars";
+import { max } from "#src/helpers/math";
 import { ByteWriter } from "#src/io/byte-writer";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -284,44 +285,45 @@ function collectReachableRefs(
   encrypt?: PdfRef,
 ): Set<string> {
   const visited = new Set<string>();
+  const stack: PdfObject[] = [root];
 
-  const walk = (obj: PdfObject | null): void => {
-    if (obj === null) {
-      return;
-    }
+  if (info) {
+    stack.push(info);
+  }
+
+  if (encrypt) {
+    stack.push(encrypt);
+  }
+
+  while (stack.length > 0) {
+    const obj = stack.pop()!;
 
     if (obj instanceof PdfRef) {
       const key = `${obj.objectNumber} ${obj.generation}`;
 
       if (visited.has(key)) {
-        return;
+        continue;
       }
 
       visited.add(key);
 
       const resolved = registry.resolve(obj);
 
-      walk(resolved);
+      if (resolved !== null) {
+        stack.push(resolved);
+      }
     } else if (obj instanceof PdfDict) {
       // PdfStream extends PdfDict, so this handles both
       for (const [, value] of obj) {
-        walk(value);
+        if (value != null) {
+          stack.push(value);
+        }
       }
     } else if (obj instanceof PdfArray) {
       for (const item of obj) {
-        walk(item);
+        stack.push(item);
       }
     }
-  };
-
-  walk(root);
-
-  if (info) {
-    walk(info);
-  }
-
-  if (encrypt) {
-    walk(encrypt);
   }
 
   return visited;
@@ -430,7 +432,11 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
     });
 
     // Size is max object number + 1
-    const size = Math.max(0, ...entries.map(e => e.objectNumber)) + 1;
+    const size =
+      max(
+        entries.map(e => e.objectNumber),
+        0,
+      ) + 1;
 
     writeXRefStream(writer, {
       entries,
@@ -444,7 +450,11 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
     });
   } else {
     // Size is max object number + 1
-    const size = Math.max(0, ...entries.map(e => e.objectNumber)) + 1;
+    const size =
+      max(
+        entries.map(e => e.objectNumber),
+        0,
+      ) + 1;
 
     writeXRefTable(writer, {
       entries,

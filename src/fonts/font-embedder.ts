@@ -11,6 +11,7 @@
 
 import { CFFSubsetter } from "#src/fontbox/cff/subsetter.ts";
 import { TTFSubsetter } from "#src/fontbox/ttf/subsetter.ts";
+import { max } from "#src/helpers/math";
 import { PdfArray } from "#src/objects/pdf-array.ts";
 import { PdfDict } from "#src/objects/pdf-dict.ts";
 import { PdfName } from "#src/objects/pdf-name.ts";
@@ -546,7 +547,7 @@ function buildFullToUnicodeCMap(program: FontProgram): Uint8Array {
  */
 function buildCidToGidMapStream(oldToNewGidMap: Map<number, number>): PdfStream {
   // Find the maximum old GID (CID) we need to map
-  const maxOldGid = Math.max(...oldToNewGidMap.keys());
+  const maxOldGid = max(oldToNewGidMap.keys());
 
   // Create array of 2-byte entries (one per CID from 0 to maxOldGid)
   const data = new Uint8Array((maxOldGid + 1) * 2);

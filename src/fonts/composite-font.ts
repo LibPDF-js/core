@@ -198,7 +198,10 @@ export function parseCompositeFont(
     const firstDescendant = descendantsArray.at(0, options.resolver);
 
     if (firstDescendant instanceof PdfDict) {
-      cidFont = parseCIDFont(firstDescendant, options);
+      cidFont = parseCIDFont(firstDescendant, {
+        resolver: options.resolver,
+        toUnicodeMap: options.toUnicodeMap,
+      });
     } else {
       cidFont = createDefaultCIDFont(baseFontName);
     }
