@@ -1,5 +1,5 @@
 {
-  "name": "@libpdf/core",
+  "name": "@dvvebond/core",
   "version": "0.2.12",
   "description": "A modern PDF library for TypeScript - parsing and generation",
   "keywords": [
@@ -59,7 +59,7 @@
     "format": "oxfmt",
     "lint": "oxlint --type-aware && oxfmt --check",
     "lint:fix": "oxlint --type-aware --fix && oxfmt",
-    "prepare": "husky",
+    "prepare": "echo skip-prepare",
     "prepublishOnly": "bun run build",
     "release": "./scripts/release.sh",
     "test": "bun --env-file=.env.local vitest",
