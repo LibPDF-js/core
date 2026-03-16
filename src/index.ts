@@ -792,6 +792,30 @@ export {
 } from "./frontend";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Frontend Coordinate Transformation
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Frontend-specific coordinate utilities
+  getMousePdfCoordinates,
+  getTouchPdfCoordinates,
+  transformBoundingBoxes,
+  transformScreenRectToPdf,
+  createTransformerForPageContainer,
+  calculateCenteredOffset,
+  hitTestBoundingBoxes,
+  findAllBoxesAtPoint,
+  createSelectionRect,
+  findBoxesInSelection,
+  // Frontend types
+  type MouseCoordinateOptions,
+  type MousePdfCoordinateResult,
+  type PdfBoundingBox,
+  type ScreenBoundingBox,
+  type PageContainerTransformerOptions,
+} from "./frontend";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Content Stream Processing
 // ─────────────────────────────────────────────────────────────────────────────
 

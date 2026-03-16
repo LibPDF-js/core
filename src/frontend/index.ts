@@ -73,3 +73,36 @@ export {
   type BoundingBoxControlsEvent,
   type BoundingBoxControlsEventListener,
 } from "./bounding-box-controls";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coordinate Transformation
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  // Core transformer (re-exported)
+  CoordinateTransformer,
+  createCoordinateTransformer,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  type CoordinateTransformerOptions,
+  type Point2D,
+  type Rect2D,
+  type RotationAngle,
+  // Frontend-specific utilities
+  getMousePdfCoordinates,
+  getTouchPdfCoordinates,
+  transformBoundingBoxes,
+  transformScreenRectToPdf,
+  createTransformerForPageContainer,
+  calculateCenteredOffset,
+  hitTestBoundingBoxes,
+  findAllBoxesAtPoint,
+  createSelectionRect,
+  findBoxesInSelection,
+  // Frontend types
+  type MouseCoordinateOptions,
+  type MousePdfCoordinateResult,
+  type PdfBoundingBox,
+  type ScreenBoundingBox,
+  type PageContainerTransformerOptions,
+} from "./coordinate-transformer";
