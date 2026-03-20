@@ -391,7 +391,20 @@ export class FormFlattener {
    * This isolates the original page's graphics state from our additions.
    */
   private wrapAndAppendContent(page: PdfDict, newContent: Uint8Array): void {
-    const existing = page.get("Contents");
+    let existing = page.get("Contents");
+
+    // Resolve indirect reference — /Contents may be a PdfRef pointing to a PdfArray
+    // of stream refs. Without resolving, we'd wrap the ref as-is, producing a
+    // nested array reference that PDF viewers cannot interpret.
+    // Only unwrap if the ref points to an array; if it points to a single stream,
+    // keep the PdfRef so it can be placed directly in the new contents array.
+    if (existing instanceof PdfRef) {
+      const resolved = this.registry.resolve(existing);
+
+      if (resolved instanceof PdfArray) {
+        existing = resolved;
+      }
+    }
 
     // Create prefix stream with "q\n"
     const prefixBytes = new Uint8Array([0x71, 0x0a]); // "q\n"

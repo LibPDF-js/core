@@ -85,7 +85,7 @@ export class DropdownField extends TerminalField {
    * Get available options.
    */
   getOptions(): ChoiceOption[] {
-    return parseChoiceOptions(this.dict.getArray("Opt"));
+    return parseChoiceOptions(this.dict.getArray("Opt", this.registry.resolve.bind(this.registry)));
   }
 
   /**
@@ -199,7 +199,7 @@ export class ListBoxField extends TerminalField {
    * Get available options.
    */
   getOptions(): ChoiceOption[] {
-    return parseChoiceOptions(this.dict.getArray("Opt"));
+    return parseChoiceOptions(this.dict.getArray("Opt", this.registry.resolve.bind(this.registry)));
   }
 
   /**
@@ -208,7 +208,7 @@ export class ListBoxField extends TerminalField {
    */
   getValue(): string[] {
     // /I (selection indices) takes precedence for multi-select
-    const indices = this.dict.getArray("I");
+    const indices = this.dict.getArray("I", this.registry.resolve.bind(this.registry));
 
     if (indices && indices.length > 0) {
       const options = this.getOptions();
@@ -297,7 +297,9 @@ export class ListBoxField extends TerminalField {
       this.dict.set("V", PdfArray.of(...values.map(v => PdfString.fromString(v))));
     }
 
-    // Set /I (indices) for multi-select
+    // Set /I (indices) to stay in sync with /V.
+    // For multi-select, /I stores the selected indices.
+    // For single-select, clear /I so it doesn't shadow /V.
     if (this.isMultiSelect) {
       const indices = values
         .map(v => options.findIndex(o => o.value === v))
@@ -309,6 +311,8 @@ export class ListBoxField extends TerminalField {
       } else {
         this.dict.delete("I");
       }
+    } else {
+      this.dict.delete("I");
     }
 
     this.needsAppearanceUpdate = true;

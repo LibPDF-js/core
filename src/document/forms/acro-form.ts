@@ -138,7 +138,7 @@ export class AcroForm implements AcroFormLike {
       return this.fieldsCache;
     }
 
-    const fieldsArray = this.dict.getArray("Fields");
+    const fieldsArray = this.dict.getArray("Fields", this.registry.resolve.bind(this.registry));
 
     if (!fieldsArray) {
       return [];
@@ -592,7 +592,7 @@ export class AcroForm implements AcroFormLike {
         fields.push(field);
       } else {
         // Non-terminal: recurse into children
-        const childKids = dict.getArray("Kids");
+        const childKids = dict.getArray("Kids", this.registry.resolve.bind(this.registry));
 
         if (childKids) {
           fields.push(...this.collectFields(childKids, visited, fullName));
@@ -611,7 +611,7 @@ export class AcroForm implements AcroFormLike {
    * - Its /Kids contain widgets (no /T) rather than child fields (have /T)
    */
   private isTerminalField(dict: PdfDict): boolean {
-    const kids = dict.getArray("Kids");
+    const kids = dict.getArray("Kids", this.registry.resolve.bind(this.registry));
 
     if (!kids || kids.length === 0) {
       return true;
@@ -722,7 +722,7 @@ export class AcroForm implements AcroFormLike {
    * @param fieldRef Reference to the field dictionary
    */
   addField(fieldRef: PdfRef): void {
-    let fieldsArray = this.dict.getArray("Fields");
+    let fieldsArray = this.dict.getArray("Fields", this.registry.resolve.bind(this.registry));
 
     if (!fieldsArray) {
       fieldsArray = new PdfArray([]);
@@ -752,7 +752,7 @@ export class AcroForm implements AcroFormLike {
    * @returns true if the field was found and removed, false otherwise
    */
   removeField(fieldRef: PdfRef): boolean {
-    const fieldsArray = this.dict.getArray("Fields");
+    const fieldsArray = this.dict.getArray("Fields", this.registry.resolve.bind(this.registry));
 
     if (!fieldsArray) {
       return false;

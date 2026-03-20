@@ -86,7 +86,7 @@ export class NameTree {
         return null;
       }
 
-      const kids = node.getArray("Kids");
+      const kids = node.getArray("Kids", this.resolver);
 
       if (!kids || kids.length === 0) {
         return null;
@@ -146,7 +146,7 @@ export class NameTree {
     }
 
     // We're at a leaf node - search the /Names array
-    const names = node.getArray("Names");
+    const names = node.getArray("Names", this.resolver);
 
     if (!names) {
       return null;
@@ -220,7 +220,7 @@ export class NameTree {
 
       if (node.has("Kids")) {
         // Intermediate node - queue children
-        const kids = node.getArray("Kids");
+        const kids = node.getArray("Kids", this.resolver);
 
         if (kids) {
           for (let i = 0; i < kids.length; i++) {
@@ -247,7 +247,7 @@ export class NameTree {
         }
       } else if (node.has("Names")) {
         // Leaf node - yield entries
-        const names = node.getArray("Names");
+        const names = node.getArray("Names", this.resolver);
 
         if (names) {
           for (let i = 0; i < names.length; i += 2) {

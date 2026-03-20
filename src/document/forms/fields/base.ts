@@ -394,7 +394,7 @@ export abstract class TerminalField extends FormField {
       return this._widgets;
     }
 
-    const kids = this.dict.getArray("Kids");
+    const kids = this.dict.getArray("Kids", this.registry.resolve.bind(this.registry));
 
     if (!kids) {
       this._widgets = [];
@@ -438,7 +438,7 @@ export abstract class TerminalField extends FormField {
     }
 
     // Otherwise, /Kids contains widgets
-    const kids = this.dict.getArray("Kids");
+    const kids = this.dict.getArray("Kids", this.registry.resolve.bind(this.registry));
 
     if (!kids) {
       this._widgets = [];
@@ -493,7 +493,7 @@ export abstract class TerminalField extends FormField {
     const widgetRef = this.registry.register(widgetDict);
 
     // Ensure /Kids array exists
-    let kids = this.dict.getArray("Kids");
+    let kids = this.dict.getArray("Kids", this.registry.resolve.bind(this.registry));
 
     if (!kids) {
       kids = new PdfArray([]);

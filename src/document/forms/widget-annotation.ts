@@ -129,7 +129,8 @@ export class WidgetAnnotation {
    * @param state Optional state name for stateful widgets
    */
   setNormalAppearance(stream: PdfStream, state?: string): void {
-    let ap = this.dict.getDict("AP");
+    const resolve = this.registry.resolve.bind(this.registry);
+    let ap = this.dict.getDict("AP", resolve);
 
     if (!ap) {
       ap = new PdfDict();
@@ -138,7 +139,7 @@ export class WidgetAnnotation {
 
     if (state) {
       // Stateful: AP.N is a dict of state -> stream
-      const nEntry = ap.get("N");
+      const nEntry = ap.get("N", resolve);
       let nDict: PdfDict;
 
       if (nEntry instanceof PdfDict && !(nEntry instanceof PdfStream)) {
@@ -183,7 +184,7 @@ export class WidgetAnnotation {
    * For checkboxes/radios, this is the value when checked.
    */
   getOnValue(): string | null {
-    const ap = this.dict.getDict("AP");
+    const ap = this.dict.getDict("AP", this.registry.resolve.bind(this.registry));
 
     if (!ap) {
       return null;
@@ -215,7 +216,7 @@ export class WidgetAnnotation {
    * @returns True if all states have appearance streams
    */
   hasAppearancesForStates(states: string[]): boolean {
-    const ap = this.dict.getDict("AP");
+    const ap = this.dict.getDict("AP", this.registry.resolve.bind(this.registry));
 
     if (!ap) {
       return false;
@@ -247,13 +248,14 @@ export class WidgetAnnotation {
    * Check if this widget has any normal appearance stream.
    */
   hasNormalAppearance(): boolean {
-    const ap = this.dict.getDict("AP");
+    const resolve = this.registry.resolve.bind(this.registry);
+    const ap = this.dict.getDict("AP", resolve);
 
     if (!ap) {
       return false;
     }
 
-    const n = ap.get("N");
+    const n = ap.get("N", resolve);
 
     return n !== null && n !== undefined;
   }
@@ -263,7 +265,7 @@ export class WidgetAnnotation {
    * For stateful widgets (checkbox/radio), pass the state name.
    */
   getNormalAppearance(state?: string): PdfStream | null {
-    const ap = this.dict.getDict("AP");
+    const ap = this.dict.getDict("AP", this.registry.resolve.bind(this.registry));
 
     if (!ap) {
       return null;
@@ -298,7 +300,7 @@ export class WidgetAnnotation {
    * Get rollover appearance stream (shown on mouse hover).
    */
   getRolloverAppearance(state?: string): PdfStream | null {
-    const ap = this.dict.getDict("AP");
+    const ap = this.dict.getDict("AP", this.registry.resolve.bind(this.registry));
 
     if (!ap) {
       return null;
@@ -333,7 +335,7 @@ export class WidgetAnnotation {
    * Get down appearance stream (shown when clicked).
    */
   getDownAppearance(state?: string): PdfStream | null {
-    const ap = this.dict.getDict("AP");
+    const ap = this.dict.getDict("AP", this.registry.resolve.bind(this.registry));
 
     if (!ap) {
       return null;
@@ -368,7 +370,7 @@ export class WidgetAnnotation {
    * Get border style.
    */
   getBorderStyle(): BorderStyle | null {
-    const bs = this.dict.getDict("BS");
+    const bs = this.dict.getDict("BS", this.registry.resolve.bind(this.registry));
 
     if (!bs) {
       return null;
