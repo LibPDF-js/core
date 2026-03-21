@@ -1,4 +1,4 @@
-import { CR, DIGIT_0, DIGIT_9, LF, SPACE, TAB } from "#src/helpers/chars";
+import { CR, DIGIT_0, DIGIT_9, isWhitespace, LF, SPACE, TAB } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import { PdfNumber } from "#src/objects/pdf-number";
@@ -47,13 +47,21 @@ export class XRefParser {
     const bytes = this.scanner.bytes;
     const len = bytes.length;
 
-    // Search backwards from end, looking for "startxref"
-    // Usually within last 1024 bytes, but search more if needed
-    const searchStart = Math.max(0, len - 1024);
+    // Skip trailing whitespace/null bytes to find the effective end of file.
+    // Some systems pad PDFs with null bytes to block boundaries, which can
+    // push the actual %%EOF / startxref beyond the normal 1024-byte window.
+    let effectiveEnd = len;
+
+    while (effectiveEnd > 0 && isWhitespace(bytes[effectiveEnd - 1])) {
+      effectiveEnd--;
+    }
+
+    // Search backwards from effective end, looking for "startxref"
+    const searchStart = Math.max(0, effectiveEnd - 1024);
 
     let startxrefPos = -1;
 
-    for (let i = len - 9; i >= searchStart; i--) {
+    for (let i = effectiveEnd - 9; i >= searchStart; i--) {
       if (this.matchesAt(i, "startxref")) {
         startxrefPos = i;
         break;

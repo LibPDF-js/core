@@ -356,6 +356,48 @@ some content without startxref
 
       expect(() => p.findStartXRef()).toThrow(/startxref/i);
     });
+
+    it("skips trailing null bytes to find startxref", () => {
+      const content = `%PDF-1.4
+some content
+xref
+0 1
+0000000000 65535 f
+trailer
+<< /Size 1 /Root 1 0 R >>
+startxref
+23
+%%EOF`;
+      // Append 2048 null bytes (exceeds the 1024-byte search window)
+      const contentBytes = new TextEncoder().encode(content);
+      const padded = new Uint8Array(contentBytes.length + 2048);
+
+      padded.set(contentBytes);
+      // rest is already 0x00
+
+      const scanner = new Scanner(padded);
+      const p = new XRefParser(scanner);
+      const offset = p.findStartXRef();
+
+      expect(offset).toBe(23);
+    });
+
+    it("skips trailing whitespace mix to find startxref", () => {
+      const content = `%PDF-1.4\nstartxref\n50\n%%EOF`;
+      const contentBytes = new TextEncoder().encode(content);
+      // Append a mix of whitespace: spaces, newlines, tabs, nulls
+      const padding = new Uint8Array([0x20, 0x0a, 0x09, 0x00, 0x0d, 0x20, 0x00]);
+      const padded = new Uint8Array(contentBytes.length + padding.length);
+
+      padded.set(contentBytes);
+      padded.set(padding, contentBytes.length);
+
+      const scanner = new Scanner(padded);
+      const p = new XRefParser(scanner);
+      const offset = p.findStartXRef();
+
+      expect(offset).toBe(50);
+    });
   });
 
   describe("lenient parsing", () => {
