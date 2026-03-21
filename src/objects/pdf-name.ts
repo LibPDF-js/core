@@ -1,6 +1,5 @@
 import { HEX_TABLE } from "#src/helpers/buffer";
 import { CHAR_HASH, DELIMITERS, WHITESPACE } from "#src/helpers/chars";
-import { LRUCache } from "#src/helpers/lru-cache";
 import type { ByteWriter } from "#src/io/byte-writer";
 
 import type { PdfPrimitive } from "./pdf-primitive";
@@ -60,37 +59,52 @@ function escapeName(name: string): string {
 }
 
 /**
- * Default cache size for PdfName interning.
- * Can be overridden via PdfName.setCacheSize().
- */
-const DEFAULT_NAME_CACHE_SIZE = 10000;
-
-/**
- * PDF name object (interned).
+ * PDF name object (interned via WeakRef).
  *
  * In PDF: `/Type`, `/Page`, `/Length`
  *
- * Names are interned using an LRU cache to prevent unbounded memory growth.
- * `PdfName.of("Type") === PdfName.of("Type")` as long as both are in cache.
- * Use `.of()` to get or create instances.
+ * Names are interned using a WeakRef cache: as long as any live object
+ * (e.g. a PdfDict key) holds a strong reference to a PdfName, calling
+ * `PdfName.of()` with the same string returns the *same instance*.
+ * Once all strong references are dropped, the GC may collect the
+ * PdfName and a FinalizationRegistry cleans up the cache entry.
  *
- * Common PDF names (Type, Page, etc.) are pre-cached and always available.
+ * This avoids the correctness bug of LRU-based caching, where eviction
+ * of a still-referenced name would break Map key identity in PdfDict.
+ *
+ * Common PDF names (Type, Page, etc.) are held as static fields and
+ * therefore never collected.
  */
 export class PdfName implements PdfPrimitive {
   get type(): "name" {
     return "name";
   }
 
-  private static cache = new LRUCache<string, PdfName>({ max: DEFAULT_NAME_CACHE_SIZE });
+  /** WeakRef cache for interning. Entries are cleaned up by the FinalizationRegistry. */
+  private static cache = new Map<string, WeakRef<PdfName>>();
+
+  /** Cleans up dead WeakRef entries from the cache when a PdfName is GC'd. */
+  private static registry = new FinalizationRegistry<string>(name => {
+    const ref = PdfName.cache.get(name);
+
+    // Only delete if the entry is actually dead — a new instance for the
+    // same name may have been inserted since the old one was collected.
+    if (ref && ref.deref() === undefined) {
+      PdfName.cache.delete(name);
+    }
+  });
 
   /**
-   * Pre-cached common names that should never be evicted.
-   * These are stored separately from the LRU cache.
+   * Pre-cached common names that are always available.
+   * These are stored as static readonly fields, so they always have
+   * strong references and their WeakRefs never die.
    */
   private static readonly permanentCache = new Map<string, PdfName>();
 
   // Common PDF names (pre-cached in permanent cache)
+  // -- Document structure --
   static readonly Type = PdfName.createPermanent("Type");
+  static readonly Subtype = PdfName.createPermanent("Subtype");
   static readonly Page = PdfName.createPermanent("Page");
   static readonly Pages = PdfName.createPermanent("Pages");
   static readonly Catalog = PdfName.createPermanent("Catalog");
@@ -100,9 +114,25 @@ export class PdfName implements PdfPrimitive {
   static readonly MediaBox = PdfName.createPermanent("MediaBox");
   static readonly Resources = PdfName.createPermanent("Resources");
   static readonly Contents = PdfName.createPermanent("Contents");
+  static readonly Annots = PdfName.createPermanent("Annots");
+  // -- Trailer / xref --
+  static readonly Root = PdfName.createPermanent("Root");
+  static readonly Size = PdfName.createPermanent("Size");
+  static readonly Info = PdfName.createPermanent("Info");
+  static readonly Prev = PdfName.createPermanent("Prev");
+  static readonly ID = PdfName.createPermanent("ID");
+  static readonly Encrypt = PdfName.createPermanent("Encrypt");
+  // -- Streams --
   static readonly Length = PdfName.createPermanent("Length");
   static readonly Filter = PdfName.createPermanent("Filter");
   static readonly FlateDecode = PdfName.createPermanent("FlateDecode");
+  // -- Fonts / resources --
+  static readonly Font = PdfName.createPermanent("Font");
+  static readonly BaseFont = PdfName.createPermanent("BaseFont");
+  static readonly Encoding = PdfName.createPermanent("Encoding");
+  static readonly XObject = PdfName.createPermanent("XObject");
+  // -- Name trees --
+  static readonly Names = PdfName.createPermanent("Names");
 
   /** Cached serialized form (e.g. "/Type"). Computed lazily on first toBytes(). */
   private cachedBytes: Uint8Array | null = null;
@@ -114,21 +144,31 @@ export class PdfName implements PdfPrimitive {
    * The leading `/` should NOT be included.
    */
   static of(name: string): PdfName {
-    // Check permanent cache first (common names)
+    // Check permanent cache first (common names — always alive)
     const permanent = PdfName.permanentCache.get(name);
+
     if (permanent) {
       return permanent;
     }
 
-    // Check LRU cache
-    let cached = PdfName.cache.get(name);
+    // Check WeakRef cache
+    const ref = PdfName.cache.get(name);
 
-    if (!cached) {
-      cached = new PdfName(name);
-      PdfName.cache.set(name, cached);
+    if (ref) {
+      const existing = ref.deref();
+
+      if (existing) {
+        return existing;
+      }
     }
 
-    return cached;
+    // Create new instance, store WeakRef, register for cleanup
+    const instance = new PdfName(name);
+
+    PdfName.cache.set(name, new WeakRef(instance));
+    PdfName.registry.register(instance, name);
+
+    return instance;
   }
 
   /**
@@ -144,7 +184,9 @@ export class PdfName implements PdfPrimitive {
   }
 
   /**
-   * Get the current size of the LRU cache.
+   * Get the current number of entries in the WeakRef cache.
+   * This includes entries whose targets may have been GC'd but whose
+   * FinalizationRegistry callbacks haven't run yet.
    */
   static get cacheSize(): number {
     return PdfName.cache.size;

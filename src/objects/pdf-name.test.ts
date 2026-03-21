@@ -50,9 +50,9 @@ describe("PdfName", () => {
     expect(PdfName.of("")).toBe(empty);
   });
 
-  describe("LRU cache", () => {
+  describe("WeakRef cache", () => {
     it("clearCache clears non-permanent names", () => {
-      const custom = PdfName.of("CustomName");
+      PdfName.of("CustomName");
       expect(PdfName.cacheSize).toBeGreaterThan(0);
 
       PdfName.clearCache();
@@ -69,6 +69,14 @@ describe("PdfName", () => {
       // Common names should still be retrievable and be the same instance
       expect(PdfName.of("Type")).toBe(PdfName.Type);
       expect(PdfName.of("Page")).toBe(PdfName.Page);
+    });
+
+    it("returns same instance while strong reference is held", () => {
+      const held = PdfName.of("HeldName");
+
+      // As long as we hold the reference, .of() returns the same instance
+      expect(PdfName.of("HeldName")).toBe(held);
+      expect(PdfName.of("HeldName")).toBe(held);
     });
   });
 });
