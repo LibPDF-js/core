@@ -129,13 +129,26 @@ export class IndirectObjectParser {
     // Skip EOL after "stream" (required: LF or CRLF)
     this.skipStreamEOL();
 
-    // Get the stream length
-    const length = this.resolveLength(dict);
+    const startPos = this.scanner.position;
+
+    // Try to resolve /Length from the dict. If that fails (e.g. indirect
+    // ref during brute-force recovery with no resolver), fall back to
+    // scanning for the "endstream" keyword to determine the length.
+    let length: number;
+
+    try {
+      length = this.resolveLength(dict);
+    } catch {
+      length = this.findEndStream(startPos);
+
+      if (length < 0) {
+        throw new ObjectParseError("Stream missing /Length and no endstream found");
+      }
+    }
 
     // Read exactly `length` bytes.
     // Use subarray (zero-copy view) since the underlying PDF bytes
     // are kept alive by the PDF object for the document's lifetime.
-    const startPos = this.scanner.position;
     const data = this.scanner.bytes.subarray(startPos, startPos + length);
 
     this.scanner.moveTo(startPos + length);
@@ -218,6 +231,52 @@ export class IndirectObjectParser {
     } else if (byte === LF) {
       this.scanner.advance();
     }
+  }
+
+  /**
+   * Scan forward from startPos looking for the "endstream" keyword.
+   * Returns the stream data length (excluding any EOL before endstream),
+   * or -1 if not found.
+   */
+  private findEndStream(startPos: number): number {
+    const bytes = this.scanner.bytes;
+    const len = bytes.length;
+
+    // "endstream" as byte values
+    const sig = [0x65, 0x6e, 0x64, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d];
+    const sigLen = sig.length;
+
+    for (let i = startPos; i <= len - sigLen; i++) {
+      let match = true;
+
+      for (let j = 0; j < sigLen; j++) {
+        if (bytes[i + j] !== sig[j]) {
+          match = false;
+          break;
+        }
+      }
+
+      if (match) {
+        // Found "endstream" at position i.
+        // Strip the optional EOL that precedes it (part of stream framing,
+        // not stream data — per PDF spec 7.3.8.1).
+        let end = i;
+
+        if (end > startPos && bytes[end - 1] === LF) {
+          end--;
+
+          if (end > startPos && bytes[end - 1] === CR) {
+            end--;
+          }
+        } else if (end > startPos && bytes[end - 1] === CR) {
+          end--;
+        }
+
+        return end - startPos;
+      }
+    }
+
+    return -1;
   }
 
   /**

@@ -217,15 +217,51 @@ endobj`,
       expect(new TextDecoder().decode(stream.data)).toBe("Hello");
     });
 
-    it("throws if indirect /Length cannot be resolved", () => {
+    it("falls back to endstream scan when indirect /Length cannot be resolved", () => {
       const p = parser(`1 0 obj
 << /Length 99 0 R >>
 stream
 Hello
 endstream
 endobj`);
+      const result = p.parseObject();
 
-      expect(() => p.parseObject()).toThrow(/resolve.*length/i);
+      const stream = result.value as PdfStream;
+      expect(new TextDecoder().decode(stream.data)).toBe("Hello");
+    });
+
+    it("falls back to endstream scan when no resolver provided", () => {
+      // Build input with actual binary bytes in the stream data
+      const prefix = new TextEncoder().encode("1 0 obj\n<< /Length 99 0 R >>\nstream\n");
+      const binaryContent = new Uint8Array([0x00, 0x01, 0xff, 0xfe, 0x80]);
+      const suffix = new TextEncoder().encode("\nendstream\nendobj");
+
+      const fullBytes = new Uint8Array(prefix.length + binaryContent.length + suffix.length);
+      fullBytes.set(prefix);
+      fullBytes.set(binaryContent, prefix.length);
+      fullBytes.set(suffix, prefix.length + binaryContent.length);
+
+      const scanner = new Scanner(fullBytes);
+      const p = new IndirectObjectParser(scanner);
+      const result = p.parseObject();
+
+      const stream = result.value as PdfStream;
+      expect(stream.data.length).toBe(5);
+      expect(stream.data[0]).toBe(0x00);
+      expect(stream.data[2]).toBe(0xff);
+    });
+
+    it("falls back to endstream scan when /Length is missing", () => {
+      const p = parser(`1 0 obj
+<< /Filter /FlateDecode >>
+stream
+Hello
+endstream
+endobj`);
+      const result = p.parseObject();
+
+      const stream = result.value as PdfStream;
+      expect(new TextDecoder().decode(stream.data)).toBe("Hello");
     });
 
     it("preserves stream dict entries", () => {
@@ -281,15 +317,17 @@ endobj`);
       expect(() => p.parseObject()).toThrow(/obj/i);
     });
 
-    it("throws on missing /Length in stream", () => {
+    it("recovers stream with missing /Length via endstream scan", () => {
       const p = parser(`1 0 obj
 << /Type /XObject >>
 stream
 data
 endstream
 endobj`);
+      const result = p.parseObject();
 
-      expect(() => p.parseObject()).toThrow(/length/i);
+      const stream = result.value as PdfStream;
+      expect(new TextDecoder().decode(stream.data)).toBe("data");
     });
   });
 });
