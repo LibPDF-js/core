@@ -275,7 +275,7 @@ function encryptStreamDict(stream: PdfStream, ctx: EncryptionContext): PdfStream
  * Collect all refs reachable from the document root and trailer entries.
  *
  * Walks the object graph starting from Root, Info, and Encrypt (if present),
- * returning the set of all object keys (as "objNum gen" strings) that are reachable.
+ * returning the set of packed ref keys (see `PdfRef.key`) that are reachable.
  * This is used for garbage collection during full saves.
  */
 function collectReachableRefs(
@@ -283,8 +283,8 @@ function collectReachableRefs(
   root: PdfRef,
   info?: PdfRef,
   encrypt?: PdfRef,
-): Set<string> {
-  const visited = new Set<string>();
+): Set<number> {
+  const visited = new Set<number>();
   const stack: PdfObject[] = [root];
 
   if (info) {
@@ -299,7 +299,7 @@ function collectReachableRefs(
     const obj = stack.pop()!;
 
     if (obj instanceof PdfRef) {
-      const key = `${obj.objectNumber} ${obj.generation}`;
+      const key = obj.key;
 
       if (visited.has(key)) {
         continue;
@@ -375,9 +375,7 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
 
   // Write only reachable objects and record offsets
   for (const [ref, obj] of registry.entries()) {
-    const key = `${ref.objectNumber} ${ref.generation}`;
-
-    if (!reachableKeys.has(key)) {
+    if (!reachableKeys.has(ref.key)) {
       continue; // Skip orphan objects
     }
     // Prepare object (compress streams if needed)

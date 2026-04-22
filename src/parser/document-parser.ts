@@ -391,8 +391,8 @@ export class DocumentParser {
     trailer: PdfDict,
     recoveredViaBruteForce: boolean,
   ): ParsedDocument {
-    // Object cache: "objNum genNum" -> PdfObject
-    const cache = new Map<string, PdfObject>();
+    // Object cache: packed ref key (see PdfRef.key) -> PdfObject
+    const cache = new Map<number, PdfObject>();
 
     // Object stream cache: streamObjNum -> ObjectStreamParser
     const objectStreamCache = new Map<number, ObjectStreamParser>();
@@ -467,7 +467,7 @@ export class DocumentParser {
     // Create length resolver for stream objects with indirect /Length
     const lengthResolver: LengthResolver = (ref: PdfRef) => {
       // Check object cache first
-      const cacheKey = `${ref.objectNumber} ${ref.generation}`;
+      const cacheKey = ref.key;
       const cached = cache.get(cacheKey);
 
       if (cached instanceof PdfNumber) {
@@ -602,7 +602,7 @@ export class DocumentParser {
     };
 
     const getObject = (ref: PdfRef): PdfObject | null => {
-      const key = `${ref.objectNumber} ${ref.generation}`;
+      const key = ref.key;
 
       // Check cache
       if (cache.has(key)) {
@@ -704,19 +704,17 @@ export class DocumentParser {
      */
     const getPages = (): PdfRef[] => {
       const pages: PdfRef[] = [];
-      const visited = new Set<string>();
+      const visited = new Set<number>();
 
       const walkNode = (nodeOrRef: PdfObject | null, currentRef?: PdfRef): void => {
         // Handle references
         if (nodeOrRef instanceof PdfRef) {
-          const key = `${nodeOrRef.objectNumber} ${nodeOrRef.generation}`;
-
-          if (visited.has(key)) {
-            this.warnings.push(`Circular reference in page tree: ${key}`);
+          if (visited.has(nodeOrRef.key)) {
+            this.warnings.push(`Circular reference in page tree: ${nodeOrRef.toString()}`);
             return;
           }
 
-          visited.add(key);
+          visited.add(nodeOrRef.key);
 
           const resolved = getObject(nodeOrRef);
 
