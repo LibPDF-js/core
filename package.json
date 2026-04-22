@@ -73,6 +73,8 @@
     "pkijs": "^3.3.3"
   },
   "devDependencies": {
+    "@aws-sdk/client-kms": "^3.0.0",
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
     "@cantoo/pdf-lib": "^2.6.1",
     "@google-cloud/kms": "^5.0.0",
     "@google-cloud/secret-manager": "^6.0.0",
@@ -90,10 +92,18 @@
     "vitest": "^4.0.16"
   },
   "peerDependencies": {
+    "@aws-sdk/client-kms": "^3.0.0",
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
     "@google-cloud/kms": "^5.0.0",
     "@google-cloud/secret-manager": "^6.0.0"
   },
   "peerDependenciesMeta": {
+    "@aws-sdk/client-kms": {
+      "optional": true
+    },
+    "@aws-sdk/client-secrets-manager": {
+      "optional": true
+    },
     "@google-cloud/kms": {
       "optional": true
     },

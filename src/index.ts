@@ -118,6 +118,7 @@ export type {
   TimestampAuthority,
 } from "./signatures";
 export {
+  AwsKmsSigner,
   CertificateChainError,
   CryptoKeySigner,
   GoogleKmsSigner,
