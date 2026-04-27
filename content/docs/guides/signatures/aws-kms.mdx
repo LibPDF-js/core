@@ -1,0 +1,188 @@
+---
+title: AWS KMS
+description: Sign PDFs with asymmetric keys stored in AWS Key Management Service (KMS), including FIPS 140-2-validated HSM-backed keys.
+---
+
+# AWS KMS
+
+Sign PDFs using asymmetric keys stored in AWS Key Management Service (KMS). Ideal for AWS-native deployments where private keys must stay on FIPS-validated hardware for compliance reasons.
+
+<Callout type="info">
+  The private key never leaves KMS — only the digest is sent for signing.
+</Callout>
+
+## Installation
+
+The AWS KMS client is an optional peer dependency:
+
+```bash
+npm install @aws-sdk/client-kms
+```
+
+For loading certificates from AWS Secrets Manager:
+
+```bash
+npm install @aws-sdk/client-secrets-manager
+```
+
+## Quick Start
+
+```typescript
+import { PDF, AwsKmsSigner } from "@libpdf/core";
+import { readFile, writeFile } from "fs/promises";
+
+// Load your DER-encoded certificate (issued by your CA for the KMS key)
+const certificate = await readFile("certificate.der");
+
+// Create signer with KMS key reference
+const signer = await AwsKmsSigner.create({
+  keyId: "arn:aws:kms:us-east-1:123456789012:key/abcd1234-5678-...",
+  certificate,
+});
+
+// Sign the PDF
+const pdf = await PDF.load(await readFile("document.pdf"));
+const { bytes } = await pdf.sign({ signer });
+
+await writeFile("signed.pdf", bytes);
+```
+
+---
+
+## Authentication
+
+`AwsKmsSigner` uses the [AWS SDK default credential chain](https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/setting-credentials-node.html). Common authentication methods:
+
+| Method                  | Environment              | Setup                                                                  |
+| ----------------------- | ------------------------ | ---------------------------------------------------------------------- |
+| IAM Role                | EC2/ECS/Lambda/EKS       | Attach a role; credentials resolve automatically via instance metadata |
+| Environment Variables   | Any                      | Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`  |
+| Shared Credentials File | Local development        | `aws configure` writes `~/.aws/credentials`                            |
+| Web Identity (OIDC)     | EKS IRSA, GitHub Actions | Set `AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN`                   |
+
+### Required IAM Permissions
+
+The authenticating principal needs these IAM actions on the key:
+
+- `kms:Sign` — sign with the key
+- `kms:GetPublicKey` — read public key metadata for validation
+
+Minimal policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["kms:Sign", "kms:GetPublicKey"],
+      "Resource": "arn:aws:kms:us-east-1:123456789012:key/abcd1234-..."
+    }
+  ]
+}
+```
+
+If using the Secrets Manager helper, also grant `secretsmanager:GetSecretValue` on the cert secret.
+
+---
+
+## AwsKmsSigner.create(options)
+
+Create a new KMS signer instance. Calls `GetPublicKey` internally to determine supported algorithms, select one, and validate that the certificate's public key matches the KMS key.
+
+### Options
+
+```typescript
+const signer = await AwsKmsSigner.create({
+  keyId: "arn:aws:kms:us-east-1:123456789012:key/abcd1234-...",
+  region: "us-east-1",
+  certificate,
+  buildChain: true,
+});
+```
+
+| Option             | Type           | Description                                                                                                    |
+| ------------------ | -------------- | -------------------------------------------------------------------------------------------------------------- |
+| `keyId`            | `string`       | KMS key ARN, key ID, or alias (`alias/my-key`). Required.                                                      |
+| `region`           | `string`       | AWS region. Optional if `AWS_REGION` env var is set or a preconfigured `client` is supplied.                   |
+| `signingAlgorithm` | `string`       | Optional. Which `SigningAlgorithmSpec` to use when the key supports multiple. Defaults to the first supported. |
+| `certificate`      | `Uint8Array`   | DER-encoded X.509 signing certificate. Required.                                                               |
+| `certificateChain` | `Uint8Array[]` | Optional. DER-encoded intermediates `[intermediate, ..., root]`.                                               |
+| `buildChain`       | `boolean`      | Optional. Fetch missing chain certs via AIA extensions. Default `false`.                                       |
+| `chainTimeout`     | `number`       | Optional. Timeout (ms) for AIA chain building. Default `15000`.                                                |
+| `client`           | `KMSClient`    | Optional. Pre-configured KMS client instance.                                                                  |
+
+### Signing algorithm selection
+
+AWS KMS keys can support multiple signing algorithms (e.g. an `RSA_2048` key supports `RSASSA_PKCS1_V1_5_SHA_256/384/512` and `RSASSA_PSS_SHA_256/384/512`). `AwsKmsSigner.create()` reads `SigningAlgorithms` from the `GetPublicKey` response and uses the first one unless you pass `signingAlgorithm` explicitly.
+
+For maximum Adobe Reader compatibility, prefer PKCS#1 v1.5 over PSS:
+
+```typescript
+const signer = await AwsKmsSigner.create({
+  keyId: "alias/pdf-signing",
+  signingAlgorithm: "RSASSA_PKCS1_V1_5_SHA_256",
+  certificate,
+});
+```
+
+Supported algorithms:
+
+- `RSASSA_PKCS1_V1_5_SHA_256` / `SHA_384` / `SHA_512`
+- `RSASSA_PSS_SHA_256` / `SHA_384` / `SHA_512`
+- `ECDSA_SHA_256` / `SHA_384` / `SHA_512`
+
+---
+
+## AwsKmsSigner.getCertificateFromSecretsManager(secretId, options?)
+
+Load a PEM or DER-encoded signing certificate from AWS Secrets Manager:
+
+```typescript
+const { cert, chain } = await AwsKmsSigner.getCertificateFromSecretsManager(
+  "arn:aws:secretsmanager:us-east-1:123456789012:secret:signing-cert-AbCdEf",
+);
+
+const signer = await AwsKmsSigner.create({
+  keyId: "alias/pdf-signing",
+  certificate: cert,
+  certificateChain: chain,
+});
+```
+
+Cross-region is supported — pass `{ region: "..." }` if the secret lives in a different region than your default.
+
+<Callout type="warning">
+  Never store private keys in Secrets Manager. The private key lives in KMS and never leaves it.
+</Callout>
+
+---
+
+## Creating a signing key in AWS
+
+Minimal AWS CLI workflow for a new RSA 2048 signing key:
+
+```bash
+aws kms create-key \
+  --key-spec RSA_2048 \
+  --key-usage SIGN_VERIFY \
+  --description "PDF signing key"
+
+aws kms create-alias \
+  --alias-name alias/pdf-signing \
+  --target-key-id <key-id-from-above>
+```
+
+For an AATL-trusted signature, submit a CSR (signed with `kms:Sign` against the KMS public key) to an Adobe Approved Trust List CA that supports HSM attestation, then use the returned certificate as `certificate` above.
+
+---
+
+## Troubleshooting
+
+**`Certificate public key does not match KMS key`** — The certificate you supplied wasn't issued for the KMS key referenced by `keyId`. Re-issue the certificate against the KMS public key (retrieve it with `aws kms get-public-key --key-id ...`).
+
+**`Permission denied for key`** — Missing `kms:Sign` or `kms:GetPublicKey` on the key. Check the key policy _and_ the IAM policy of the signing principal.
+
+**`Key is disabled`** — Enable the KMS key in the AWS console or via `aws kms enable-key`.
+
+**`Requested signing algorithm is not supported by KMS key`** — The `signingAlgorithm` you passed isn't in `GetPublicKey`'s `SigningAlgorithms` list. Remove the `signingAlgorithm` option to use the default, or choose one from the supported set.
