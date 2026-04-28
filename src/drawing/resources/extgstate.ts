@@ -2,11 +2,13 @@
  * Extended graphics state resources.
  */
 
+import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfRef } from "#src/objects/pdf-ref";
 
+import type { PDFFormXObject, TransparencyGroupColorSpace } from "./form-xobject";
 import type { BlendMode } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,7 +25,22 @@ export interface ExtGStateOptions {
   strokeOpacity?: number;
   /** Blend mode for compositing */
   blendMode?: BlendMode;
+  /** Soft mask for alpha/luminosity compositing */
+  softMask?: ExtGStateSoftMask;
 }
+
+/** Soft mask using a transparency group source. */
+export interface SoftMaskOptions {
+  /** Soft mask subtype (/S) */
+  subtype: "Alpha" | "Luminosity";
+  /** Source transparency group form XObject (/G) */
+  group: PDFFormXObject;
+  /** Optional backdrop color (/BC) in the group's blending color space */
+  backdropColor?: number[];
+}
+
+/** ExtGState soft mask option. */
+export type ExtGStateSoftMask = SoftMaskOptions | "None";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Resource Class
@@ -83,6 +100,71 @@ export class PDFExtGState {
       dict.set("BM", PdfName.of(options.blendMode));
     }
 
+    if (options.softMask !== undefined) {
+      if (options.softMask === "None") {
+        dict.set("SMask", PdfName.of("None"));
+      } else {
+        validateSoftMaskOptions(options.softMask);
+
+        const smask = PdfDict.of({
+          S: PdfName.of(options.softMask.subtype),
+          G: options.softMask.group.ref,
+        });
+
+        if (options.softMask.backdropColor) {
+          smask.set(
+            "BC",
+            PdfArray.of(...options.softMask.backdropColor.map(value => PdfNumber.of(value))),
+          );
+        }
+
+        dict.set("SMask", smask);
+      }
+    }
+
     return dict;
+  }
+}
+
+function validateSoftMaskOptions(options: SoftMaskOptions): void {
+  if (options.subtype === "Luminosity") {
+    const groupColorSpace = options.group.group?.colorSpace;
+
+    if (!groupColorSpace) {
+      throw new Error(
+        "Luminosity soft mask requires a form XObject transparency group with a colorSpace",
+      );
+    }
+  }
+
+  if (!options.backdropColor) {
+    return;
+  }
+
+  const groupColorSpace = options.group.group?.colorSpace;
+
+  if (!groupColorSpace) {
+    throw new Error(
+      "softMask.backdropColor requires the mask form XObject to define group.colorSpace",
+    );
+  }
+
+  const expectedComponents = getColorSpaceComponentCount(groupColorSpace);
+
+  if (options.backdropColor.length !== expectedComponents) {
+    throw new Error(
+      `softMask.backdropColor must have ${expectedComponents} components for ${groupColorSpace}, got ${options.backdropColor.length}`,
+    );
+  }
+}
+
+function getColorSpaceComponentCount(colorSpace: TransparencyGroupColorSpace): number {
+  switch (colorSpace) {
+    case "DeviceGray":
+      return 1;
+    case "DeviceRGB":
+      return 3;
+    case "DeviceCMYK":
+      return 4;
   }
 }
