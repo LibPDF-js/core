@@ -108,7 +108,7 @@ Adds a document timestamp that covers the embedded validation data, enabling ind
 
 ## Sign with Cloud KMS
 
-For enterprise environments requiring HSM-backed keys, use `GoogleKmsSigner`:
+For enterprise environments requiring HSM-backed keys, use `GoogleKmsSigner` or `AwsKmsSigner`:
 
 ```ts
 import { PDF, GoogleKmsSigner } from "@libpdf/core";
@@ -123,7 +123,19 @@ const signer = await GoogleKmsSigner.create({
 const signed = await pdf.sign({ signer });
 ```
 
-See the [Google Cloud KMS guide](/docs/guides/signatures/google-kms) for complete setup instructions.
+```ts
+import { PDF, AwsKmsSigner } from "@libpdf/core";
+
+const signer = await AwsKmsSigner.create({
+  keyId: "arn:aws:kms:us-east-1:123456789012:key/abcd1234-...",
+  certificate: certificateDer, // DER-encoded certificate for this KMS key
+  buildChain: true, // Auto-fetch intermediate certificates
+});
+
+const signed = await pdf.sign({ signer });
+```
+
+See the [Google Cloud KMS guide](/docs/guides/signatures/google-kms) or [AWS KMS guide](/docs/guides/signatures/aws-kms) for complete setup instructions.
 
 ## Sign with Web Crypto API
 
