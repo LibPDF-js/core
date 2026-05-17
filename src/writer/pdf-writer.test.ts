@@ -260,12 +260,100 @@ describe("writeComplete", () => {
       const result = writeComplete(registry, { root: catalogRef });
       const text = new TextDecoder().decode(result.bytes);
 
-      // Should NOT include orphan object
+      // Orphan dropped entirely, catalog kept
       expect(text).not.toContain("/Type /Orphan");
-      expect(text).not.toContain("1 0 obj"); // Orphan was obj 1
-      // Should include catalog
       expect(text).toContain("/Type /Catalog");
-      expect(text).toContain("2 0 obj"); // Catalog is obj 2
+    });
+
+    it("renumbers reachable objects densely starting at 1", () => {
+      const registry = new ObjectRegistry();
+
+      // Orphan takes the first slot so renumbering visibly shifts the catalog.
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan") }));
+
+      const catalog = PdfDict.of({ Type: PdfName.Catalog });
+      const catalogRef = registry.register(catalog);
+
+      const result = writeComplete(registry, { root: catalogRef });
+      const text = new TextDecoder().decode(result.bytes);
+
+      // Catalog (originally object 2) gets renumbered to 1 so the xref is dense
+      expect(text).toContain("1 0 obj");
+      expect(text).not.toContain("2 0 obj");
+
+      // Dense xref: free entry + one in-use entry, /Root points at the new slot
+      expect(text).toContain("/Size 2");
+      expect(text).toContain("/Root 1 0 R");
+    });
+
+    it("produces dense xref when only the tail of the registry is reachable", () => {
+      const registry = new ObjectRegistry();
+
+      // Several orphan objects come before the reachable catalog
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan1") }));
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan2") }));
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan3") }));
+
+      const catalog = PdfDict.of({ Type: PdfName.Catalog });
+      const catalogRef = registry.register(catalog);
+
+      const result = writeComplete(registry, { root: catalogRef });
+      const text = new TextDecoder().decode(result.bytes);
+
+      // Only the catalog survives, renumbered to object 1
+      expect(text).toContain("1 0 obj");
+      expect(text).not.toContain("2 0 obj");
+      expect(text).not.toContain("3 0 obj");
+      expect(text).not.toContain("4 0 obj");
+
+      // /Size lines up with the actual number of in-use entries
+      expect(text).toContain("/Size 2");
+      expect(text).toContain("/Root 1 0 R");
+
+      // xref has a single subsection covering 0..1, no gaps
+      expect(text).toMatch(/xref\n0 2\n/);
+    });
+
+    it("rewrites internal refs to use the new numbering", () => {
+      const registry = new ObjectRegistry();
+
+      // Orphan padding so renumbering actually shifts the catalog/child.
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan1") }));
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan2") }));
+
+      const child = PdfDict.of({ Type: PdfName.of("Child") });
+      const childRef = registry.register(child);
+
+      const catalog = PdfDict.of({ Type: PdfName.Catalog, Child: childRef });
+      const catalogRef = registry.register(catalog);
+
+      const result = writeComplete(registry, { root: catalogRef });
+      const text = new TextDecoder().decode(result.bytes);
+
+      // child becomes object 1, catalog becomes object 2 (registry order)
+      expect(text).toContain("/Child 1 0 R");
+      expect(text).toContain("/Root 2 0 R");
+      expect(text).toContain("/Size 3");
+
+      // Old numbers must not leak through (childRef was originally 3)
+      expect(text).not.toContain("/Child 3 0 R");
+    });
+
+    it("replaces dangling refs with null", () => {
+      const registry = new ObjectRegistry();
+
+      // Catalog points at a ref whose target was never registered.
+      const dangling = PdfRef.of(99, 0);
+      const catalog = PdfDict.of({ Type: PdfName.Catalog, Stale: dangling });
+      const catalogRef = registry.register(catalog);
+
+      const result = writeComplete(registry, { root: catalogRef });
+      const text = new TextDecoder().decode(result.bytes);
+
+      // The dangling ref is replaced with literal null in the output
+      expect(text).toContain("/Stale null");
+      expect(text).not.toContain("99 0 R");
+      expect(text).toContain("/Size 2");
     });
 
     it("includes objects reachable through indirect references", () => {

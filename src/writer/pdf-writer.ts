@@ -11,11 +11,11 @@ import { clearAllDirtyFlags, collectChanges } from "#src/document/change-collect
 import type { ObjectRegistry } from "#src/document/object-registry";
 import { FilterPipeline } from "#src/filters/filter-pipeline";
 import { CR, LF } from "#src/helpers/chars";
-import { max } from "#src/helpers/math";
 import { ByteWriter } from "#src/io/byte-writer";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
+import { PdfNull } from "#src/objects/pdf-null";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
@@ -272,6 +272,18 @@ function encryptStreamDict(stream: PdfStream, ctx: EncryptionContext): PdfStream
 }
 
 /**
+ * Binary marker required after the %PDF-x.y header to flag the file as
+ * binary to text-mode tools (PDF 1.7 §7.5.2). Four high bytes after a `%`.
+ */
+const BINARY_MARKER = new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a]); // %âãÏÓ\n
+
+/**
+ * A ref remap built by phase 2 of the full save. Maps each reachable old
+ * ref (keyed by `PdfRef.key`) to its new dense object number.
+ */
+type RefRemap = Map<string, PdfRef>;
+
+/**
  * Collect all refs reachable from the document root and trailer entries.
  *
  * Walks the object graph starting from Root, Info, and Encrypt (if present),
@@ -299,7 +311,7 @@ function collectReachableRefs(
     const obj = stack.pop()!;
 
     if (obj instanceof PdfRef) {
-      const key = `${obj.objectNumber} ${obj.generation}`;
+      const key = obj.key();
 
       if (visited.has(key)) {
         continue;
@@ -330,6 +342,101 @@ function collectReachableRefs(
 }
 
 /**
+ * Build a dense ref remap.
+ *
+ * Iterates the registry in insertion order and assigns reachable objects new,
+ * sequential object numbers starting at 1 with generation 0. Orphan objects
+ * (not in `reachableKeys`) and dangling refs (in `reachableKeys` but not in
+ * the registry) are dropped — they receive no slot in the new file.
+ *
+ * Returns both the lookup map and the ordered list of objects to write, so
+ * callers can iterate once for the write pass.
+ */
+function buildRefRemap(
+  registry: ObjectRegistry,
+  reachableKeys: Set<string>,
+): {
+  remap: RefRemap;
+  order: { newRef: PdfRef; obj: PdfObject }[];
+} {
+  const remap: RefRemap = new Map();
+  const order: { newRef: PdfRef; obj: PdfObject }[] = [];
+
+  let nextNum = 1;
+
+  for (const [oldRef, obj] of registry.entries()) {
+    const key = oldRef.key();
+
+    if (!reachableKeys.has(key)) {
+      continue;
+    }
+
+    const newRef = PdfRef.of(nextNum++, 0);
+
+    remap.set(key, newRef);
+    order.push({ newRef, obj });
+  }
+
+  return { remap, order };
+}
+
+/**
+ * Remap PdfRefs within an object tree.
+ *
+ * Returns a new object with each PdfRef replaced by its remapped equivalent.
+ * Refs that aren't in the map (e.g. dangling references to objects that
+ * weren't registered) are replaced with `PdfNull` — per PDF 1.7 spec §7.3.10,
+ * "an indirect reference to an undefined object… shall be treated as a
+ * reference to the null object", so this matches reader behavior while
+ * keeping the on-disk numbering dense.
+ *
+ * The input is not mutated. Primitives (numbers, names, strings, bools, null,
+ * raw bytes) pass through unchanged.
+ */
+function remapRefs(obj: PdfObject, remap: RefRemap): PdfObject {
+  if (obj instanceof PdfRef) {
+    return remap.get(obj.key()) ?? PdfNull.instance;
+  }
+
+  if (obj instanceof PdfStream) {
+    const next = new PdfStream([], obj.data);
+
+    for (const [key, value] of obj) {
+      if (key.value === "Length") {
+        // Length is rewritten by PdfStream.toBytes from the data length
+        continue;
+      }
+
+      next.set(key, remapRefs(value, remap));
+    }
+
+    return next;
+  }
+
+  if (obj instanceof PdfDict) {
+    const next = new PdfDict();
+
+    for (const [key, value] of obj) {
+      next.set(key, remapRefs(value, remap));
+    }
+
+    return next;
+  }
+
+  if (obj instanceof PdfArray) {
+    const next = new PdfArray();
+
+    for (const item of obj) {
+      next.push(remapRefs(item, remap));
+    }
+
+    return next;
+  }
+
+  return obj;
+}
+
+/**
  * Write a complete PDF from scratch.
  *
  * Structure:
@@ -351,79 +458,71 @@ function collectReachableRefs(
  * ```
  */
 export function writeComplete(registry: ObjectRegistry, options: WriteOptions): WriteResult {
-  const writer = new ByteWriter(undefined, {
-    initialSize: options.sizeHint,
-  });
+  const writer = new ByteWriter(undefined, { initialSize: options.sizeHint });
 
   const compress = options.compressStreams ?? true;
   const threshold = options.compressionThreshold ?? DEFAULT_COMPRESSION_THRESHOLD;
 
-  // Version
-  const version = options.version ?? "1.7";
-  writer.writeAscii(`%PDF-${version}\n`);
+  // Header: %PDF-x.y followed by a binary marker line.
+  writer.writeAscii(`%PDF-${options.version ?? "1.7"}\n`);
+  writer.writeBytes(BINARY_MARKER);
 
-  // Binary comment (signals binary file to text tools)
-  // Use high-byte characters as recommended by PDF spec
-  writer.writeBytes(new Uint8Array([0x25, 0xe2, 0xe3, 0xcf, 0xd3, 0x0a])); // %âãÏÓ\n
-
-  // Track offsets for xref
-  const offsets = new Map<number, { offset: number; generation: number }>();
-
-  // Collect only reachable objects (garbage collection)
-  // This ensures orphan objects are not written to the output
+  // Walk the object graph from the trailer entries (Root, Info, Encrypt) to
+  // find every ref the document actually uses. Orphans are dropped.
   const reachableKeys = collectReachableRefs(registry, options.root, options.info, options.encrypt);
 
-  // Write only reachable objects and record offsets
-  for (const [ref, obj] of registry.entries()) {
-    const key = `${ref.objectNumber} ${ref.generation}`;
+  // Assign reachable objects fresh sequential numbers (1..N) in registry
+  // insertion order so /Size matches the number of written objects.
+  const { remap, order } = buildRefRemap(registry, reachableKeys);
 
-    if (!reachableKeys.has(key)) {
-      continue; // Skip orphan objects
-    }
-    // Prepare object (compress streams if needed)
-    let prepared = prepareObjectForWrite(obj, compress, threshold);
+  // Resolve a trailer ref to its remapped form. Falls back to the original
+  // for refs that couldn't be resolved during graph collection (broken inputs).
+  const lookup = (ref: PdfRef | undefined): PdfRef | undefined =>
+    ref && (remap.get(ref.key()) ?? ref);
 
-    // Apply encryption if security handler is provided
-    // Skip encrypting the /Encrypt dictionary itself
-    if (options.securityHandler && options.encrypt && ref !== options.encrypt) {
-      prepared = encryptObject(prepared, {
-        handler: options.securityHandler,
-        objectNumber: ref.objectNumber,
-        generation: ref.generation,
-      });
-    }
+  const trailer = {
+    root: lookup(options.root) ?? options.root,
+    info: lookup(options.info),
+    encrypt: lookup(options.encrypt),
+    id: options.id,
+  };
 
-    offsets.set(ref.objectNumber, {
-      offset: writer.position,
-      generation: ref.generation,
-    });
-
-    writeIndirectObject(writer, ref, prepared);
-  }
-
-  // Record xref offset before writing it
-  const xrefOffset = writer.position;
-
-  // Build xref entries
+  // Write each object: compress → remap refs → encrypt (if needed). Encryption
+  // uses the new object number since that's what the reader derives the
+  // per-object key from. Object 0 is the free-list head, always first.
   const entries: XRefWriteEntry[] = [
-    // Object 0 is always the free list head
     { objectNumber: 0, generation: 65535, type: "free", offset: 0 },
   ];
 
-  for (const [objNum, info] of offsets) {
+  for (const { newRef, obj } of order) {
+    let prepared = prepareObjectForWrite(obj, compress, threshold);
+
+    prepared = remapRefs(prepared, remap);
+
+    if (options.securityHandler && trailer.encrypt && newRef !== trailer.encrypt) {
+      prepared = encryptObject(prepared, {
+        handler: options.securityHandler,
+        objectNumber: newRef.objectNumber,
+        generation: newRef.generation,
+      });
+    }
+
     entries.push({
-      objectNumber: objNum,
-      generation: info.generation,
+      objectNumber: newRef.objectNumber,
+      generation: newRef.generation,
       type: "inuse",
-      offset: info.offset,
+      offset: writer.position,
     });
+
+    writeIndirectObject(writer, newRef, prepared);
   }
 
-  // Write xref section
-  if (options.useXRefStream) {
-    const xrefObjNum = registry.nextObjectNumber;
+  const xrefOffset = writer.position;
 
-    // Add entry for the xref stream itself
+  if (options.useXRefStream) {
+    // The xref stream itself takes the slot just past the last regular object.
+    const xrefObjNum = order.length + 1;
+
     entries.push({
       objectNumber: xrefObjNum,
       generation: 0,
@@ -431,39 +530,19 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       offset: xrefOffset,
     });
 
-    // Size is max object number + 1
-    const size =
-      max(
-        entries.map(e => e.objectNumber),
-        0,
-      ) + 1;
-
     writeXRefStream(writer, {
+      ...trailer,
       entries,
-      size,
+      size: xrefObjNum + 1,
       xrefOffset,
-      root: options.root,
-      info: options.info,
-      encrypt: options.encrypt,
-      id: options.id,
       streamObjectNumber: xrefObjNum,
     });
   } else {
-    // Size is max object number + 1
-    const size =
-      max(
-        entries.map(e => e.objectNumber),
-        0,
-      ) + 1;
-
     writeXRefTable(writer, {
+      ...trailer,
       entries,
-      size,
+      size: order.length + 1,
       xrefOffset,
-      root: options.root,
-      info: options.info,
-      encrypt: options.encrypt,
-      id: options.id,
     });
   }
 

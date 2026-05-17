@@ -34,6 +34,7 @@ export class PdfRef implements PdfPrimitive {
    * Get or create an interned PdfRef for the given object/generation pair.
    */
   static of(objectNumber: number, generation: number = 0): PdfRef {
+    // Build the cache key without allocating a temporary PdfRef.
     const key = `${objectNumber} ${generation}`;
 
     let cached = PdfRef.cache.get(key);
@@ -44,6 +45,17 @@ export class PdfRef implements PdfPrimitive {
     }
 
     return cached;
+  }
+
+  /**
+   * Stable string key for this ref ("objNum gen").
+   *
+   * Useful as a Map/Set key when PdfRef identity isn't reliable — e.g. when
+   * instances may be evicted from the LRU cache, or when two parts of the
+   * code construct equivalent refs independently.
+   */
+  key(): string {
+    return `${this.objectNumber} ${this.generation}`;
   }
 
   /**
