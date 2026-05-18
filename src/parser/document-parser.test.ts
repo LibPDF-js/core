@@ -455,6 +455,31 @@ describe("DocumentParser", () => {
       expect(pages).toBeDefined();
       expect(pages?.getName("Type")?.value).toBe("Pages");
     });
+
+    // Hybrid-reference files (PDF 1.7 §7.5.8.4) keep a legacy /xref table for
+    // pre-PDF 1.5 readers AND a supplementary xref stream (referenced from the
+    // trailer's /XRefStm) that holds entries for compressed objects. Without
+    // following /XRefStm, every compressed object is mis-reported as `free` —
+    // catalogs lose their struct trees, and any save GCs the dropped subgraph.
+    it("hybrid xref: /XRefStm supplements the legacy table with compressed entries", async () => {
+      const bytes = await loadFixture("xref", "sampleForSpec.pdf");
+      const scanner = new Scanner(bytes);
+      const parser = new DocumentParser(scanner);
+
+      const doc = parser.parse();
+
+      // Without /XRefStm support, these would all be `free` and resolve to null.
+      const compressed = [...doc.xref.entries()].filter(([, e]) => e.type === "compressed");
+      expect(compressed.length).toBeGreaterThan(0);
+
+      // Each compressed entry must resolve to a real object via the object
+      // stream it points at — confirming the xref entry actually drives a
+      // successful load rather than just sitting in the table.
+      for (const [objNum] of compressed) {
+        const obj = doc.getObject(PdfRef.of(objNum, 0));
+        expect(obj, `obj ${objNum} should resolve`).not.toBeNull();
+      }
+    });
   });
 
   describe("fixtures: text", () => {

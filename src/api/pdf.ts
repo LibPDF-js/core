@@ -2634,6 +2634,15 @@ export class PDF {
    * ```
    */
   getForm(): PDFForm | null {
+    // If catalog has changed since last load, invalidate form cache
+    if (this._form !== undefined) {
+      const catalog = this.ctx.catalog.getDict();
+
+      if (catalog.dirty || !catalog.has("AcroForm")) {
+        this._form = undefined;
+      }
+    }
+
     if (this._form === undefined) {
       this._form = PDFForm.load(this.ctx);
     }

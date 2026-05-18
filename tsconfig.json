@@ -1,5 +1,5 @@
 {
-  "exclude": ["checkouts", "node_modules", "dist", "apps/docs"],
+  "exclude": ["checkouts", "debug", "node_modules", "dist", "apps/docs"],
   "compilerOptions": {
     // Environment setup & latest features
     "lib": ["ESNext"],

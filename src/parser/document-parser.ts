@@ -317,6 +317,17 @@ export class DocumentParser {
 
   /**
    * Parse the XRef chain, following /Prev links for incremental updates.
+   *
+   * Handles hybrid-reference files (PDF 1.7 §7.5.8.4): when a traditional
+   * xref table's trailer carries a /XRefStm entry, it points to a
+   * supplementary xref stream containing entries for compressed objects
+   * (which the legacy table format cannot express). The stream is
+   * authoritative for the object numbers it covers; the table is kept for
+   * pre-PDF 1.5 readers that don't understand cross-reference streams.
+   *
+   * The chain itself is followed via the table's /Prev — we do NOT follow
+   * the xref stream's own /Prev, since the legacy table chain already
+   * walks every revision.
    */
   private parseXRefChain(
     xrefParser: XRefParser,
@@ -347,7 +358,34 @@ export class DocumentParser {
       try {
         const xrefData = xrefParser.parseAt(offset);
 
-        // Merge entries (first definition wins for each object number)
+        // Hybrid xref: if this revision has a /XRefStm entry, it points to a
+        // supplementary xref stream whose entries override the table for the
+        // object numbers it covers. Apply the stream BEFORE the table so its
+        // entries win the "first-seen" merge below.
+        const xrefStmOffset = xrefData.trailer.getNumber("XRefStm")?.value;
+
+        if (xrefStmOffset !== undefined && !visited.has(xrefStmOffset)) {
+          visited.add(xrefStmOffset);
+
+          try {
+            const stmData = xrefParser.parseAt(xrefStmOffset);
+
+            for (const [objNum, entry] of stmData.entries) {
+              if (!combinedXRef.has(objNum)) {
+                combinedXRef.set(objNum, entry);
+              }
+            }
+          } catch (error) {
+            // Hybrid stream is optional from the legacy table's perspective;
+            // if it's malformed, fall back to the table alone with a warning.
+            const message = error instanceof Error ? error.message : String(error);
+
+            this.warnings.push(`Error parsing /XRefStm at ${xrefStmOffset}: ${message}`);
+          }
+        }
+
+        // Merge table entries (first definition wins — covers anything the
+        // stream above didn't override, and any object not in the stream).
         for (const [objNum, entry] of xrefData.entries) {
           if (!combinedXRef.has(objNum)) {
             combinedXRef.set(objNum, entry);

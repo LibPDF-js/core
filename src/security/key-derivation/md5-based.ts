@@ -164,7 +164,7 @@ export function computeOwnerHash(
 
   if (revision === 2) {
     const cipher = new RC4Cipher(rc4Key);
-    encrypted = cipher.process(encrypted);
+    encrypted = cipher.process(new Uint8Array(encrypted));
   } else {
     // R3+: 20 iterations with XOR'd keys
     for (let i = 0; i < 20; i++) {
@@ -208,7 +208,7 @@ export function computeUserHash(
     hashInput.set(PASSWORD_PADDING);
     hashInput.set(fileId, 32);
 
-    let hash = md5(hashInput);
+    let hash: Uint8Array = md5(hashInput);
 
     // Step b: Encrypt with RC4, 20 iterations with XOR'd keys
     for (let i = 0; i < 20; i++) {

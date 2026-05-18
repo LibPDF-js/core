@@ -272,6 +272,77 @@ function encryptStreamDict(stream: PdfStream, ctx: EncryptionContext): PdfStream
 }
 
 /**
+ * Renumber a single PdfRef using the renumbering map.
+ *
+ * Returns a new PdfRef pointing at the mapped object number, or the original
+ * ref if the object is not in the map (which should not happen for refs to
+ * reachable objects, but is allowed defensively so unreachable trailing refs
+ * don't crash the writer).
+ */
+function renumberRef(ref: PdfRef, renumberMap: Map<number, number>): PdfRef {
+  const newNum = renumberMap.get(ref.objectNumber);
+
+  if (newNum === undefined) {
+    return ref;
+  }
+
+  return PdfRef.of(newNum, ref.generation);
+}
+
+/**
+ * Recursively renumber indirect references inside an object onto the new
+ * numbering. Returns a structural copy of dictionaries, arrays, and streams
+ * with all `PdfRef` children replaced by renumbered references. Primitives
+ * (names, numbers, strings, booleans, null) are returned unchanged because
+ * they carry no embedded refs.
+ *
+ * The original object graph is not mutated — this is important because the
+ * in-memory `PDF` instance may be reused after `save()`, and mutating its
+ * objects would corrupt subsequent operations.
+ */
+function renumberRefs(obj: PdfObject, renumberMap: Map<number, number>): PdfObject {
+  if (obj instanceof PdfRef) {
+    return renumberRef(obj, renumberMap);
+  }
+
+  if (obj instanceof PdfStream) {
+    // PdfStream extends PdfDict but carries binary data. Build a new stream
+    // sharing the same data buffer (data is immutable from the writer's POV)
+    // and copy the renumbered dict entries.
+    const renumbered = new PdfStream([], obj.data);
+
+    for (const [key, value] of obj) {
+      renumbered.set(key.value, renumberRefs(value, renumberMap));
+    }
+
+    return renumbered;
+  }
+
+  if (obj instanceof PdfDict) {
+    const renumbered = new PdfDict();
+
+    for (const [key, value] of obj) {
+      renumbered.set(key.value, renumberRefs(value, renumberMap));
+    }
+
+    return renumbered;
+  }
+
+  if (obj instanceof PdfArray) {
+    const renumbered = new PdfArray();
+
+    for (const item of obj) {
+      renumbered.push(renumberRefs(item, renumberMap));
+    }
+
+    return renumbered;
+  }
+
+  // Primitives carry no embedded refs.
+  return obj;
+}
+
+/**
  * Collect all refs reachable from the document root and trailer entries.
  *
  * Walks the object graph starting from Root, Info, and Encrypt (if present),
@@ -373,6 +444,34 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
   // This ensures orphan objects are not written to the output
   const reachableKeys = collectReachableRefs(registry, options.root, options.info, options.encrypt);
 
+  // Build a renumbering map that assigns sequential object numbers (1, 2, 3, ...)
+  // to all reachable objects. Without this, operations like flattenAll() that
+  // remove objects leave gaps in the xref subsections of the resulting full
+  // save — e.g. xref subsections "0 5", "9 11", "27 7" instead of one
+  // contiguous "0 N". Some strict validators (notably Adobe's LTV gate on
+  // signed PDFs) appear to treat gap-laden baselines as suspect, which can
+  // suppress the LTV-enabled badge even when the signature and DSS are valid.
+  //
+  // Compaction also avoids embedding a record of how many objects the PDF
+  // used to have before garbage collection.
+  const renumberMap = new Map<number, number>();
+  let nextNum = 1;
+
+  for (const [ref] of registry.entries()) {
+    const key = `${ref.objectNumber} ${ref.generation}`;
+
+    if (!reachableKeys.has(key)) {
+      continue;
+    }
+
+    renumberMap.set(ref.objectNumber, nextNum++);
+  }
+
+  // Renumber trailer-level refs (Root / Info / Encrypt) onto the new numbering.
+  const renumberedRoot = renumberRef(options.root, renumberMap);
+  const renumberedInfo = options.info ? renumberRef(options.info, renumberMap) : undefined;
+  const renumberedEncrypt = options.encrypt ? renumberRef(options.encrypt, renumberMap) : undefined;
+
   // Write only reachable objects and record offsets
   for (const [ref, obj] of registry.entries()) {
     const key = `${ref.objectNumber} ${ref.generation}`;
@@ -380,25 +479,36 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
     if (!reachableKeys.has(key)) {
       continue; // Skip orphan objects
     }
+
+    const newObjectNumber = renumberMap.get(ref.objectNumber)!;
+    const newRef = PdfRef.of(newObjectNumber, ref.generation);
+
     // Prepare object (compress streams if needed)
     let prepared = prepareObjectForWrite(obj, compress, threshold);
 
+    // Renumber any indirect references inside this object onto the new
+    // numbering before writing. Without this the body would still reference
+    // old object numbers, producing a broken PDF.
+    prepared = renumberRefs(prepared, renumberMap);
+
     // Apply encryption if security handler is provided
-    // Skip encrypting the /Encrypt dictionary itself
+    // Skip encrypting the /Encrypt dictionary itself.
+    // Encryption keys are derived from the object number, so we use the NEW
+    // number — the saved PDF only knows about the new numbering.
     if (options.securityHandler && options.encrypt && ref !== options.encrypt) {
       prepared = encryptObject(prepared, {
         handler: options.securityHandler,
-        objectNumber: ref.objectNumber,
+        objectNumber: newObjectNumber,
         generation: ref.generation,
       });
     }
 
-    offsets.set(ref.objectNumber, {
+    offsets.set(newObjectNumber, {
       offset: writer.position,
       generation: ref.generation,
     });
 
-    writeIndirectObject(writer, ref, prepared);
+    writeIndirectObject(writer, newRef, prepared);
   }
 
   // Record xref offset before writing it
@@ -421,7 +531,7 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
 
   // Write xref section
   if (options.useXRefStream) {
-    const xrefObjNum = registry.nextObjectNumber;
+    const xrefObjNum = nextNum;
 
     // Add entry for the xref stream itself
     entries.push({
@@ -442,9 +552,9 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       entries,
       size,
       xrefOffset,
-      root: options.root,
-      info: options.info,
-      encrypt: options.encrypt,
+      root: renumberedRoot,
+      info: renumberedInfo,
+      encrypt: renumberedEncrypt,
       id: options.id,
       streamObjectNumber: xrefObjNum,
     });
@@ -460,9 +570,9 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       entries,
       size,
       xrefOffset,
-      root: options.root,
-      info: options.info,
-      encrypt: options.encrypt,
+      root: renumberedRoot,
+      info: renumberedInfo,
+      encrypt: renumberedEncrypt,
       id: options.id,
     });
   }

@@ -11,6 +11,7 @@
     "no-unused-vars": "off",
     "prefer-const": "error",
     "@typescript-eslint/prefer-const": "error",
+    "@typescript-eslint/consistent-return": "off",
     "@typescript-eslint/no-extraneous-class": "off",
     "@typescript-eslint/await-thenable": "error",
     "@typescript-eslint/no-floating-promises": "error",
