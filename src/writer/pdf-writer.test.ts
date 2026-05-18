@@ -398,7 +398,7 @@ describe("writeComplete", () => {
      * a non-existent object number after renumbering.
      */
     function assertNoDanglingRefs(bytes: Uint8Array): void {
-      const text = new TextDecoder("latin1").decode(bytes);
+      const text = Buffer.from(bytes).toString("latin1");
 
       // Collect xref entries — start at the LAST occurrence of `xref` (so
       // we use the most recent xref table for incremental files; for a
@@ -457,7 +457,9 @@ describe("writeComplete", () => {
       while ((match = objHeaderRe.exec(text)) !== null) {
         const endIdx = text.indexOf("endobj", match.index);
 
-        if (endIdx === -1) continue;
+        if (endIdx === -1) {
+          continue;
+        }
 
         const body = text.slice(match.index, endIdx);
         const refRe = /(\d+) \d+ R\b/g;
@@ -466,7 +468,9 @@ describe("writeComplete", () => {
         while ((refMatch = refRe.exec(body)) !== null) {
           const targetNum = Number(refMatch[1]);
 
-          if (targetNum === 0) continue; // Refs to obj 0 are unusual; ignore
+          if (targetNum === 0) {
+            continue;
+          } // Refs to obj 0 are unusual; ignore
 
           if (!liveNums.has(targetNum)) {
             dangling.add(`${targetNum} 0 R (in obj at offset ${match.index})`);
@@ -544,7 +548,7 @@ describe("writeComplete", () => {
       const catalogRef = registry.register(catalog);
 
       const result = writeComplete(registry, { root: catalogRef });
-      const text = new TextDecoder("latin1").decode(result.bytes);
+      const text = Buffer.from(result.bytes).toString("latin1");
 
       // No dangling refs — the leaf and the stream both got renumbered, and
       // every reference to them in the output must point at the new numbers.
@@ -571,10 +575,10 @@ describe("writeComplete", () => {
 
       // Force a dirty mark so save() actually writes (otherwise it returns
       // the original bytes verbatim when nothing changed).
-      pdf.getCatalog().set("LangX", new PdfString("x"));
+      pdf.getCatalog().set("LangX", PdfString.fromString("x"));
 
       const saved = await pdf.save();
-      const savedText = new TextDecoder("latin1").decode(saved);
+      const savedText = Buffer.from(saved).toString("latin1");
 
       // The compressed object stream itself should be gone — we emit plain
       // indirect objects, never objstm.
@@ -599,7 +603,7 @@ describe("writeComplete", () => {
       const fieldsBefore = pdf.getForm()?.getFields().length ?? 0;
       expect(fieldsBefore).toBeGreaterThan(0);
 
-      pdf.getCatalog().set("LangX", new PdfString("x"));
+      pdf.getCatalog().set("LangX", PdfString.fromString("x"));
 
       const saved = await pdf.save();
       assertNoDanglingRefs(saved);
@@ -624,7 +628,7 @@ describe("writeComplete", () => {
       const ref = registry.register(dict);
 
       const result = writeComplete(registry, { root: ref });
-      const text = new TextDecoder("latin1").decode(result.bytes);
+      const text = Buffer.from(result.bytes).toString("latin1");
 
       // The catalog ref in the trailer must use gen 0.
       expect(text).toMatch(/\/Root\s+1\s+0\s+R/);

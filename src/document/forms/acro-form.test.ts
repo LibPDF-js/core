@@ -29,8 +29,7 @@ function countPageWidgets(pdf: PDF): number {
     }
 
     for (const item of annots) {
-      const resolved =
-        item.type === "ref" ? pdf.context.registry.resolve(item) : item;
+      const resolved = item.type === "ref" ? pdf.context.registry.resolve(item) : item;
 
       if (resolved && resolved.type === "dict" && resolved.getName("Subtype")?.value === "Widget") {
         total++;
