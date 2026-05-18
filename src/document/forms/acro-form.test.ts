@@ -13,6 +13,34 @@ import type {
 } from "./fields";
 import { ExistingFont } from "./form-font";
 
+/**
+ * Count widget annotations across all pages' /Annots arrays in a PDF.
+ * Used by flatten regression tests to confirm widgets are fully detached
+ * from the page tree (not just from /Fields).
+ */
+function countPageWidgets(pdf: PDF): number {
+  let total = 0;
+
+  for (const page of pdf.getPages()) {
+    const annots = page.dict.get("Annots", ref => pdf.context.registry.resolve(ref));
+
+    if (!annots || annots.type !== "array") {
+      continue;
+    }
+
+    for (const item of annots) {
+      const resolved =
+        item.type === "ref" ? pdf.context.registry.resolve(item) : item;
+
+      if (resolved && resolved.type === "dict" && resolved.getName("Subtype")?.value === "Widget") {
+        total++;
+      }
+    }
+  }
+
+  return total;
+}
+
 describe("AcroForm", () => {
   describe("loading", () => {
     it("loads AcroForm from PDF with form", async () => {
@@ -813,6 +841,32 @@ describe("Form Writing", () => {
         const fields2 = form2.getFields();
         expect(fields2.length).toBe(0);
       }
+    });
+
+    it("removes ALL widget annotations from page /Annots after flatten", async () => {
+      // Regression test: previously, widgets without a renderable appearance
+      // (no /AP stream, invalid /BBox, hidden) were skipped during flatten
+      // and remained in the page's /Annots array. The parent field would be
+      // gone but the widget annotation lingered as an orphan, which Adobe
+      // Reader still rendered as an interactive form field.
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+      const form = pdf.getForm()?.acroForm();
+
+      // Count widget annotations on each page before flatten
+      const widgetsBefore = countPageWidgets(pdf);
+      expect(widgetsBefore).toBeGreaterThan(0);
+
+      form!.flatten();
+
+      // After flatten, no widgets should remain in any page's /Annots
+      const widgetsAfter = countPageWidgets(pdf);
+      expect(widgetsAfter).toBe(0);
+
+      // And the same should hold after a save+reload roundtrip
+      const saved = await pdf.save();
+      const pdf2 = await PDF.load(saved);
+      expect(countPageWidgets(pdf2)).toBe(0);
     });
 
     it("handles checkbox fields correctly", async () => {

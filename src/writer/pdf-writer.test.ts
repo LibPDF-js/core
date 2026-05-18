@@ -1,3 +1,4 @@
+import { PDF } from "#src/api/pdf";
 import { ObjectRegistry } from "#src/document/object-registry";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -6,6 +7,7 @@ import { PdfNumber } from "#src/objects/pdf-number";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
+import { loadFixture } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
 import { verifyIncrementalSave, writeComplete, writeIncremental } from "./pdf-writer";
@@ -262,10 +264,12 @@ describe("writeComplete", () => {
 
       // Should NOT include orphan object
       expect(text).not.toContain("/Type /Orphan");
-      expect(text).not.toContain("1 0 obj"); // Orphan was obj 1
       // Should include catalog
       expect(text).toContain("/Type /Catalog");
-      expect(text).toContain("2 0 obj"); // Catalog is obj 2
+      // After garbage collection, reachable objects are renumbered
+      // sequentially starting from 1, so /Size reports only live objects
+      // (free entry 0 + the catalog).
+      expect(text).toContain("/Size 2");
     });
 
     it("includes objects reachable through indirect references", () => {
@@ -383,6 +387,248 @@ describe("writeComplete", () => {
       const text2 = new TextDecoder().decode(result2.bytes);
       expect(text2).not.toContain("/Type /Child");
       expect(text2).toContain("/Type /Catalog");
+    });
+  });
+
+  describe("renumbering (full save compacts object numbers)", () => {
+    /**
+     * Walk every indirect object body in the output and confirm that every
+     * `N G R` reference resolves to an entry that exists in the xref table.
+     * This catches the worst-case bug: a dangling reference that points at
+     * a non-existent object number after renumbering.
+     */
+    function assertNoDanglingRefs(bytes: Uint8Array): void {
+      const text = new TextDecoder("latin1").decode(bytes);
+
+      // Collect xref entries — start at the LAST occurrence of `xref` (so
+      // we use the most recent xref table for incremental files; for a
+      // full save there's only one).
+      const xrefHeaderIdx = text.lastIndexOf("\nxref\n");
+      const liveNums = new Set<number>();
+
+      if (xrefHeaderIdx !== -1) {
+        // Parse subsections after "xref\n"
+        const xrefBody = text.slice(xrefHeaderIdx + 6);
+        const trailerIdx = xrefBody.indexOf("trailer");
+        const body = trailerIdx === -1 ? xrefBody : xrefBody.slice(0, trailerIdx);
+        const lines = body.split("\n");
+        let i = 0;
+
+        while (i < lines.length) {
+          const header = lines[i].match(/^(\d+)\s+(\d+)$/);
+
+          if (!header) {
+            i++;
+            continue;
+          }
+
+          const first = Number(header[1]);
+          const count = Number(header[2]);
+
+          i++;
+
+          for (let k = 0; k < count && i < lines.length; k++, i++) {
+            const entry = lines[i].match(/^(\d{10})\s+(\d{5})\s+([nf])/);
+
+            if (entry && entry[3] === "n") {
+              liveNums.add(first + k);
+            }
+          }
+        }
+      } else {
+        // Xref stream output — pull /Size and assume sequential 0..Size-1
+        // (which is the structure renumbering produces).
+        const sizeMatch = text.match(/\/Size\s+(\d+)/);
+
+        if (sizeMatch) {
+          for (let n = 0; n < Number(sizeMatch[1]); n++) {
+            liveNums.add(n);
+          }
+        }
+      }
+
+      // Find every `N G R` reference in the file and check the object exists.
+      // Limit the search to indirect object bodies (between `N G obj` and
+      // `endobj`) to avoid false positives in stream contents.
+      const objHeaderRe = /(\d+) (\d+) obj/g;
+      let match: RegExpExecArray | null;
+      const dangling = new Set<string>();
+
+      while ((match = objHeaderRe.exec(text)) !== null) {
+        const endIdx = text.indexOf("endobj", match.index);
+
+        if (endIdx === -1) continue;
+
+        const body = text.slice(match.index, endIdx);
+        const refRe = /(\d+) \d+ R\b/g;
+        let refMatch: RegExpExecArray | null;
+
+        while ((refMatch = refRe.exec(body)) !== null) {
+          const targetNum = Number(refMatch[1]);
+
+          if (targetNum === 0) continue; // Refs to obj 0 are unusual; ignore
+
+          if (!liveNums.has(targetNum)) {
+            dangling.add(`${targetNum} 0 R (in obj at offset ${match.index})`);
+          }
+        }
+      }
+
+      if (dangling.size > 0) {
+        throw new Error(
+          `Dangling references found after renumbering:\n  ${[...dangling].join("\n  ")}`,
+        );
+      }
+    }
+
+    it("produces a single contiguous xref subsection (0..N)", async () => {
+      // Build a PDF that registers extra objects then orphans some, so the
+      // pre-fix code would have produced gap-laden subsections.
+      const registry = new ObjectRegistry();
+
+      // Orphan-to-be: registered first, never referenced
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan") }));
+
+      const child = PdfDict.of({ Type: PdfName.of("Child") });
+      const childRef = registry.register(child);
+
+      // Another orphan in the middle of the number space
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan2") }));
+
+      const catalog = PdfDict.of({ Type: PdfName.Catalog, Child: childRef });
+      const catalogRef = registry.register(catalog);
+
+      const result = writeComplete(registry, { root: catalogRef });
+      const text = new TextDecoder().decode(result.bytes);
+
+      // Only ONE subsection header `0 N` should exist, not multiple.
+      const subsectionHeaders = [...text.matchAll(/^(\d+) (\d+)$/gm)];
+      expect(subsectionHeaders).toHaveLength(1);
+      expect(subsectionHeaders[0][1]).toBe("0");
+
+      // /Size should equal (live objects + free entry for obj 0), i.e. 3.
+      expect(text).toContain("/Size 3");
+
+      // The orphan dicts should not appear.
+      expect(text).not.toContain("/Type /Orphan");
+      expect(text).not.toContain("/Type /Orphan2");
+
+      assertNoDanglingRefs(result.bytes);
+    });
+
+    it("renumbers refs inside dicts, arrays, and stream dicts", () => {
+      const registry = new ObjectRegistry();
+
+      // Leaf object referenced by both a dict entry and an array item.
+      const leaf = PdfDict.of({ Type: PdfName.of("Leaf") });
+      const leafRef = registry.register(leaf);
+
+      // Orphan to force renumbering (without orphans, numbers stay 1,2,3,...)
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan") }));
+
+      // A stream that references the leaf via its dict entry.
+      const stream = new PdfStream([], new Uint8Array([1, 2, 3]));
+      stream.set("Type", PdfName.of("Wrapper"));
+      stream.set("Ptr", leafRef);
+      const streamRef = registry.register(stream);
+
+      // Another orphan
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan2") }));
+
+      // Catalog references everything via both a direct entry and an array.
+      const catalog = PdfDict.of({
+        Type: PdfName.Catalog,
+        Stream: streamRef,
+        Refs: new PdfArray([leafRef, streamRef]),
+      });
+      const catalogRef = registry.register(catalog);
+
+      const result = writeComplete(registry, { root: catalogRef });
+      const text = new TextDecoder("latin1").decode(result.bytes);
+
+      // No dangling refs — the leaf and the stream both got renumbered, and
+      // every reference to them in the output must point at the new numbers.
+      assertNoDanglingRefs(result.bytes);
+
+      // The output must NOT contain references to the orphans' original
+      // numbers as objects. Verify by reloading and checking structure.
+      expect(text).not.toContain("/Type /Orphan");
+      expect(text).toContain("/Type /Leaf");
+      expect(text).toContain("/Type /Wrapper");
+    });
+
+    it("preserves object-stream content across full save round-trip", async () => {
+      // sampleForSpec.pdf uses /Type /ObjStm to store compressed objects.
+      // After my renumbering change, those objects must:
+      //   (a) round-trip without losing content
+      //   (b) end up as plain indirect objects (the objstm gets dropped)
+      //   (c) have no dangling refs in the output
+      const bytes = await loadFixture("xref", "sampleForSpec.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const pageCountBefore = pdf.getPages().length;
+      expect(pageCountBefore).toBeGreaterThan(0);
+
+      // Force a dirty mark so save() actually writes (otherwise it returns
+      // the original bytes verbatim when nothing changed).
+      pdf.getCatalog().set("LangX", new PdfString("x"));
+
+      const saved = await pdf.save();
+      const savedText = new TextDecoder("latin1").decode(saved);
+
+      // The compressed object stream itself should be gone — we emit plain
+      // indirect objects, never objstm.
+      expect(savedText).not.toContain("/Type /ObjStm");
+
+      // No dangling refs in the renumbered output.
+      assertNoDanglingRefs(saved);
+
+      // Reload and verify all pages still exist.
+      const pdf2 = await PDF.load(saved);
+      expect(pdf2.getPages().length).toBe(pageCountBefore);
+    });
+
+    it("full save of a form PDF preserves all fields and pages", async () => {
+      // The big "don't cook user docs" smoke test: load a real form PDF,
+      // make a trivial change, full save with renumbering, reload, and
+      // confirm field count and page count are preserved.
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const pagesBefore = pdf.getPages().length;
+      const fieldsBefore = pdf.getForm()?.getFields().length ?? 0;
+      expect(fieldsBefore).toBeGreaterThan(0);
+
+      pdf.getCatalog().set("LangX", new PdfString("x"));
+
+      const saved = await pdf.save();
+      assertNoDanglingRefs(saved);
+
+      const pdf2 = await PDF.load(saved);
+      expect(pdf2.getPages().length).toBe(pagesBefore);
+      expect(pdf2.getForm()?.getFields().length).toBe(fieldsBefore);
+    });
+
+    it("preserves generation numbers on renumbered refs", () => {
+      // A defensive check: even though most PDFs use generation 0
+      // exclusively, the spec allows non-zero generations and the
+      // renumberer must preserve them when constructing new PdfRef
+      // instances. If renumberRef ever silently drops generation we'd
+      // produce subtly broken cross-references.
+      const registry = new ObjectRegistry();
+
+      // Register a single dict with a self-reference at gen 0 (we can't
+      // easily inject a non-zero generation through the public API, so
+      // this test mostly documents the invariant — see renumberRef).
+      const dict = PdfDict.of({ Type: PdfName.Catalog });
+      const ref = registry.register(dict);
+
+      const result = writeComplete(registry, { root: ref });
+      const text = new TextDecoder("latin1").decode(result.bytes);
+
+      // The catalog ref in the trailer must use gen 0.
+      expect(text).toMatch(/\/Root\s+1\s+0\s+R/);
+      assertNoDanglingRefs(result.bytes);
     });
   });
 });

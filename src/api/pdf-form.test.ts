@@ -33,6 +33,46 @@ describe("PDFForm", () => {
 
       expect(form1).toBe(form2); // Same instance
     });
+
+    it("invalidates cached form after flatten removes /AcroForm", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const form = pdf.getForm();
+      expect(form).not.toBeNull();
+
+      form!.flatten();
+
+      // After flatten, /AcroForm is gone from the catalog. getForm() must
+      // notice this and stop returning the stale wrapper.
+      expect(pdf.getCatalog().has("AcroForm")).toBe(false);
+      expect(pdf.getForm()).toBeNull();
+    });
+
+    it("getOrCreateForm() after flatten re-adds /AcroForm to the catalog", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+
+      const form = pdf.getForm();
+      form!.flatten();
+      expect(pdf.getCatalog().has("AcroForm")).toBe(false);
+
+      // Calling getOrCreateForm immediately after flatten must create a new
+      // AcroForm and add it back to the catalog. Without cache invalidation
+      // in getForm(), getOrCreateForm early-returns the stale wrapper and
+      // the catalog stays without /AcroForm, which then breaks signing flows
+      // that expect /AcroForm to be present before the signing revision.
+      const recreated = pdf.getOrCreateForm();
+      expect(recreated).not.toBeNull();
+      expect(pdf.getCatalog().has("AcroForm")).toBe(true);
+
+      // Confirm it persists through a full save + reload.
+      const saved = await pdf.save();
+      const pdf2 = await PDF.load(saved);
+
+      expect(pdf2.getCatalog().has("AcroForm")).toBe(true);
+      expect(pdf2.getForm()).not.toBeNull();
+    });
   });
 
   describe("getFields", () => {

@@ -304,7 +304,17 @@ export class FormFlattener {
     let hasVisibleWidgets = false;
 
     for (const widget of widgets) {
-      // Skip hidden widgets
+      // Mark every widget for removal up front. Flattening tears down the
+      // parent field regardless of whether we can render an appearance, so
+      // leaving the widget in the page's /Annots produces an orphaned
+      // annotation (a "ghost" form field that Adobe Reader and similar
+      // viewers still render and treat as interactive even though the
+      // underlying field is gone).
+      if (widget.ref) {
+        widgetRefs.add(`${widget.ref.objectNumber} ${widget.ref.generation}`);
+      }
+
+      // Hidden widgets are removed (above) but not drawn.
       if (this.isWidgetHidden(widget)) {
         continue;
       }
@@ -344,11 +354,6 @@ export class FormFlattener {
       );
 
       hasVisibleWidgets = true;
-
-      // Track widget ref for removal
-      if (widget.ref) {
-        widgetRefs.add(`${widget.ref.objectNumber} ${widget.ref.generation}`);
-      }
     }
 
     // Wrap existing content and append flattened content
