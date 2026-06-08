@@ -70,6 +70,17 @@ export class PdfRef implements PdfPrimitive {
     return `${this.objectNumber} ${this.generation} R`;
   }
 
+  /**
+   * Numeric identity key for use in Set<number> / Map<number, ...>,
+   * avoiding per-ref string allocation. Lossless: PDF caps generation
+   * at 65535.
+   *
+   * Use multiplication, not `<<` — bitshift truncates to int32.
+   */
+  get key(): number {
+    return this.objectNumber * 65536 + this.generation;
+  }
+
   toBytes(writer: ByteWriter): void {
     writer.writeAscii(`${this.objectNumber} ${this.generation} R`);
   }
