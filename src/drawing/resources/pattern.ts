@@ -278,10 +278,12 @@ export class PDFShadingPattern {
   readonly ref: PdfRef;
   readonly patternType = "shading";
   readonly shading: PDFShading;
+  readonly matrix?: PatternMatrix;
 
-  constructor(ref: PdfRef, shading: PDFShading) {
+  constructor(ref: PdfRef, shading: PDFShading, matrix?: PatternMatrix) {
     this.ref = ref;
     this.shading = shading;
+    this.matrix = matrix;
   }
 
   /**

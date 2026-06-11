@@ -49,6 +49,12 @@ type ShadingRegistrar = (shading: PDFShading) => string;
 type PatternRegistrar = (pattern: PDFPattern) => string;
 
 /**
+ * Callback type for handling varying pattern opacity with soft-mask composition.
+ * Return true when the callback handled emission and default paint should be skipped.
+ */
+type PatternOpacityPainter = (pathOps: Operator[], options: PathOptions) => boolean;
+
+/**
  * PathBuilder provides a fluent interface for constructing PDF paths.
  *
  * @example
@@ -87,6 +93,7 @@ export class PathBuilder {
   private readonly registerGraphicsState: GraphicsStateRegistrar;
   private readonly registerShading?: ShadingRegistrar;
   private readonly registerPattern?: PatternRegistrar;
+  private readonly paintWithPatternOpacity?: PatternOpacityPainter;
 
   /** Current point for quadratic-to-cubic conversion */
   private currentX = 0;
@@ -101,11 +108,13 @@ export class PathBuilder {
     registerGraphicsState: GraphicsStateRegistrar,
     registerShading?: ShadingRegistrar,
     registerPattern?: PatternRegistrar,
+    paintWithPatternOpacity?: PatternOpacityPainter,
   ) {
     this.appendContent = appendContent;
     this.registerGraphicsState = registerGraphicsState;
     this.registerShading = registerShading;
     this.registerPattern = registerPattern;
+    this.paintWithPatternOpacity = paintWithPatternOpacity;
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -368,6 +377,10 @@ export class PathBuilder {
    * Paint the path with the given options.
    */
   private paint(options: PathOptions): void {
+    if (this.paintWithPatternOpacity?.(this.pathOps, options)) {
+      return;
+    }
+
     // Register graphics state for opacity if needed
     let gsName: string | null = null;
 
