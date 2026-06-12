@@ -209,6 +209,79 @@ const fullySigned = await pdf2.sign({ signer: signer2 });
 await writeFile("signed.pdf", fullySigned.bytes);
 ```
 
+## Finalizing Multi-Signer Documents
+
+In multi-signer workflows, each recipient signs at B-T level (fast, no
+revocation lookups per signer). Once everyone has signed, finalize the
+document in one pass.
+
+### Add Validation Data (B-T → B-LT)
+
+`addValidationData()` gathers certificates, OCSP responses, and CRLs for
+every signed signature field and writes them as a single DSS incremental
+update:
+
+```ts
+const { bytes, warnings, signatureCount } = await pdf.addValidationData();
+
+console.log(`Embedded LTV for ${signatureCount} signatures`);
+```
+
+Validation data is fetched once per issuer (signers sharing a CA don't
+trigger duplicate lookups) and merged with any existing DSS.
+
+### Add a Document Timestamp
+
+`addTimestamp()` appends a `/DocTimeStamp` signature whose ByteRange covers
+the entire document, sealing all prior signatures with a TSA-attested time:
+
+```ts
+const tsa = new HttpTimestampAuthority("http://timestamp.digicert.com");
+
+const { bytes } = await pdf.addTimestamp({
+  timestampAuthority: tsa,
+  longTermValidation: true, // embed LTV for the timestamp's own chain
+});
+```
+
+Pass `fieldName` to fill a pre-allocated empty signature field — useful when
+the form structure must be locked down before a certification signature:
+
+```ts
+await pdf.addTimestamp({
+  timestampAuthority: tsa,
+  fieldName: "ArchivalTimestamp", // reserved earlier via createSignatureField()
+});
+```
+
+### Full B-LTA Finalization
+
+`addArchivalData()` combines both steps: it gathers validation data for all
+existing signatures, adds an archival document timestamp, and embeds the
+timestamp's own validation data:
+
+```ts
+const tsa = new HttpTimestampAuthority("http://timestamp.digicert.com");
+
+const { bytes, warnings, signatureCount } = await pdf.addArchivalData({
+  timestampAuthority: tsa,
+});
+
+await writeFile("sealed.pdf", bytes);
+```
+
+These methods refuse to run when the document cannot be saved incrementally
+(for example, linearized documents or documents recovered from corruption)
+and throw a `SignatureError` instead — a full rewrite would invalidate every
+existing signature.
+
+<Callout type="warn" title="Error recovery">
+  If `addTimestamp()`, `addValidationData()`, or `addArchivalData()` throws after partial progress
+  (for example, the timestamp authority is unreachable after a DSS update was already written), the
+  in-memory `PDF` instance may be out of sync with its bytes. Don't keep using it: discard the
+  instance and reload from the last known-good bytes with `PDF.load()`.
+</Callout>
+
 ## Check Existing Signatures
 
 ```ts

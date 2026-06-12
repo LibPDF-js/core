@@ -37,6 +37,7 @@ export class AcroForm implements AcroFormLike {
   private readonly dict: PdfDict;
   private readonly registry: ObjectRegistry;
   private readonly pageTree: PDFPageTree | null;
+  private readonly catalog: PdfDict | null;
 
   private fieldsCache: TerminalField[] | null = null;
 
@@ -49,10 +50,16 @@ export class AcroForm implements AcroFormLike {
   /** Cache of existing fonts from /DR */
   private existingFontsCache: Map<string, ExistingFont> | null = null;
 
-  private constructor(dict: PdfDict, registry: ObjectRegistry, pageTree: PDFPageTree | null) {
+  private constructor(
+    dict: PdfDict,
+    registry: ObjectRegistry,
+    pageTree: PDFPageTree | null,
+    catalog: PdfDict | null,
+  ) {
     this.dict = dict;
     this.registry = registry;
     this.pageTree = pageTree;
+    this.catalog = catalog;
   }
 
   /**
@@ -71,7 +78,7 @@ export class AcroForm implements AcroFormLike {
       return null;
     }
 
-    return new AcroForm(dict, registry, pageTree ?? null);
+    return new AcroForm(dict, registry, pageTree ?? null, catalog);
   }
 
   /**
@@ -583,7 +590,6 @@ export class AcroForm implements AcroFormLike {
         : partialName;
 
       // Check if terminal or non-terminal
-
       if (this.isTerminalField(dict)) {
         const field = createFormField(dict, ref, this.registry, this, fullName);
 
@@ -641,7 +647,6 @@ export class AcroForm implements AcroFormLike {
 
     // If first kid has /T, it's a child field → parent is non-terminal
     // If first kid has no /T, it's a widget → parent is terminal
-
     return !firstKidDict.has("T");
   }
 
@@ -793,7 +798,7 @@ export class AcroForm implements AcroFormLike {
    * @param options Flattening options
    */
   flatten(options: FlattenOptions = {}): void {
-    const flattener = new FormFlattener(this, this.registry, this.pageTree);
+    const flattener = new FormFlattener(this, this.registry, this.pageTree, this.catalog);
 
     flattener.flatten(options);
 

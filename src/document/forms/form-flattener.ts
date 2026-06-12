@@ -31,6 +31,7 @@ import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 
 import type { ObjectRegistry } from "../object-registry";
+import { removeAnnotationsFromStructTree } from "../struct-tree";
 import { SignatureField, type TerminalField } from "./fields";
 import type { FormFont } from "./form-font";
 import type { WidgetAnnotation } from "./widget-annotation";
@@ -95,11 +96,18 @@ export class FormFlattener {
   private readonly form: FlattenableForm;
   private readonly registry: ObjectRegistry;
   private readonly pageTree: PageTreeAccess | null;
+  private readonly catalog: PdfDict | null;
 
-  constructor(form: FlattenableForm, registry: ObjectRegistry, pageTree: PageTreeAccess | null) {
+  constructor(
+    form: FlattenableForm,
+    registry: ObjectRegistry,
+    pageTree: PageTreeAccess | null,
+    catalog: PdfDict | null = null,
+  ) {
     this.form = form;
     this.registry = registry;
     this.pageTree = pageTree;
+    this.catalog = catalog;
   }
 
   /**
@@ -149,6 +157,24 @@ export class FormFlattener {
     // Process each page
     for (const { pageRef, widgets } of pageWidgets.values()) {
       this.flattenWidgetsOnPage(pageRef, widgets);
+    }
+
+    // Remove structure tree references (/OBJR kids and /ParentTree entries)
+    // to the flattened widgets. In tagged PDFs the structure tree references
+    // widget annotations, which would otherwise keep the removed fields
+    // reachable and cause full saves to write them back as orphan objects.
+    if (this.catalog) {
+      const removedWidgetRefs = new Set<PdfRef>();
+
+      for (const field of fieldsToFlatten) {
+        for (const widget of field.getWidgets()) {
+          if (widget.ref) {
+            removedWidgetRefs.add(widget.ref);
+          }
+        }
+      }
+
+      removeAnnotationsFromStructTree(this.catalog, this.registry, removedWidgetRefs);
     }
 
     // Update form structure

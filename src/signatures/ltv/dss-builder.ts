@@ -9,7 +9,7 @@
  */
 
 import type { ObjectRegistry } from "#src/document/object-registry.ts";
-import { formatPdfDate } from "#src/helpers/format.ts";
+import { formatPdfDate, parsePdfDate } from "#src/helpers/format.ts";
 import { PdfArray } from "#src/objects/pdf-array.ts";
 import { PdfDict } from "#src/objects/pdf-dict.ts";
 import { PdfName } from "#src/objects/pdf-name.ts";
@@ -131,13 +131,12 @@ export class DSSBuilder {
           const ocspHashes = await builder.extractRefHashes(entry, "OCSP", builder.ocspMap);
           const crlHashes = await builder.extractRefHashes(entry, "CRL", builder.crlMap);
 
-          // Get timestamp if present
+          // Preserve the original VRI creation time if present
           let timestamp: Date | undefined;
           const tuVal = entry.getString("TU", resolve);
 
           if (tuVal) {
-            // Parse PDF date format - simplified
-            timestamp = new Date();
+            timestamp = parsePdfDate(tuVal.asString());
           }
 
           // VRI keys are PdfName, need to get the value string

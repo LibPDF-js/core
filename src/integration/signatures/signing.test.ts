@@ -11,32 +11,9 @@ import { HttpTimestampAuthority } from "#src/signatures/timestamp";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
-/** Test P12 files with different encryption formats */
-const P12_FILES = {
-  /** AES-256-CBC (modern default) */
-  aes256: "test-signer-aes256.p12",
-  /** AES-128-CBC */
-  aes128: "test-signer-aes128.p12",
-  /** Triple DES (legacy but common) */
-  tripleDes: "test-signer-3des.p12",
-  /** RC2-40 (very old legacy format) */
-  legacy: "test-signer-rc2-40.p12",
-  /** ECDSA P-256 */
-  ecdsaP256: "test-signer-ec-p256-aes256.p12",
-  /** ECDSA P-384 */
-  ecdsaP384: "test-signer-ec-p384-aes256.p12",
-};
+import { loadTestSigner, P12_FILES, TEST_TSA_URL } from "./test-helpers";
 
 describe("signing integration", () => {
-  /**
-   * Load the test P12 certificate (default AES-256).
-   */
-  async function loadTestSigner(filename = P12_FILES.aes256) {
-    const p12Bytes = await loadFixture("certificates", filename);
-
-    return P12Signer.create(p12Bytes, "test123");
-  }
-
   describe("B-B signing (basic)", () => {
     it("signs a simple PDF document", async () => {
       const pdfBytes = await loadFixture("basic", "rot0.pdf");
@@ -124,7 +101,7 @@ describe("signing integration", () => {
 
   describe("B-T signing (with timestamp)", () => {
     // FreeTSA is a free public timestamp authority
-    const tsa = new HttpTimestampAuthority("https://freetsa.org/tsr");
+    const tsa = new HttpTimestampAuthority(TEST_TSA_URL);
 
     it("signs with timestamp (B-T level)", async () => {
       const pdfBytes = await loadFixture("basic", "rot0.pdf");
@@ -168,7 +145,7 @@ describe("signing integration", () => {
 
   describe("B-LT signing (long-term validation)", () => {
     // FreeTSA is a free public timestamp authority
-    const tsa = new HttpTimestampAuthority("https://freetsa.org/tsr");
+    const tsa = new HttpTimestampAuthority(TEST_TSA_URL);
 
     it("signs with timestamp and LTV data (B-LT level)", async () => {
       const pdfBytes = await loadFixture("basic", "rot0.pdf");
