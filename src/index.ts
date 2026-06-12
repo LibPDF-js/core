@@ -104,6 +104,8 @@ export { PermissionDeniedError, SecurityError } from "./security/errors";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
+  ArchivalDataOptions,
+  ArchivalDataResult,
   DigestAlgorithm,
   HttpTimestampAuthorityOptions,
   KeyType,
@@ -116,6 +118,10 @@ export type {
   SignWarning,
   SubFilter,
   TimestampAuthority,
+  TimestampOptions,
+  TimestampResult,
+  ValidationDataOptions,
+  ValidationDataResult,
 } from "./signatures";
 export {
   CertificateChainError,

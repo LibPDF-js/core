@@ -260,7 +260,6 @@ export class LtvDataGatherer {
     // ASN.1 DER: first byte is tag, second+ bytes are length
     // If length < 128, it's a single byte
     // If length >= 128, high bit is set and low bits indicate how many length bytes follow
-
     const lengthByte = bytes[1];
 
     if (lengthByte < 128) {

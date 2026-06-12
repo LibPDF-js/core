@@ -583,7 +583,6 @@ export class AcroForm implements AcroFormLike {
         : partialName;
 
       // Check if terminal or non-terminal
-
       if (this.isTerminalField(dict)) {
         const field = createFormField(dict, ref, this.registry, this, fullName);
 
@@ -641,7 +640,6 @@ export class AcroForm implements AcroFormLike {
 
     // If first kid has /T, it's a child field → parent is non-terminal
     // If first kid has no /T, it's a widget → parent is terminal
-
     return !firstKidDict.has("T");
   }
 

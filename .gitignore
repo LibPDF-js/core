@@ -57,3 +57,7 @@ reports/bench-results.json
 
 # Temporary files
 tmp/
+
+# opencode tooling lockfiles (machine-local)
+.opencode/package-lock.json
+.opencode/node_modules/

@@ -373,8 +373,8 @@ export class PDFPage {
 
     if (rotate) {
       const value = rotate.value % 360;
-      // Normalize to 0, 90, 180, 270
 
+      // Normalize to 0, 90, 180, 270
       if (value === 90 || value === -270) {
         return 90;
       }

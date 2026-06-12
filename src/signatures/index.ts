@@ -42,6 +42,8 @@ export { CryptoKeySigner, GoogleKmsSigner, P12Signer, type P12SignerOptions } fr
 export { HttpTimestampAuthority, type HttpTimestampAuthorityOptions } from "./timestamp";
 // Types
 export type {
+  ArchivalDataOptions,
+  ArchivalDataResult,
   DigestAlgorithm,
   KeyType,
   LtvValidationData,
@@ -54,6 +56,10 @@ export type {
   SignWarning,
   SubFilter,
   TimestampAuthority,
+  TimestampOptions,
+  TimestampResult,
+  ValidationDataOptions,
+  ValidationDataResult,
 } from "./types";
 // Errors
 export {

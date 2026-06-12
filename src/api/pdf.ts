@@ -55,7 +55,16 @@ import { generateEncryption, reconstructEncryptDict } from "#src/security/encryp
 import { PermissionDeniedError } from "#src/security/errors";
 import { DEFAULT_PERMISSIONS, type Permissions } from "#src/security/permissions";
 import type { StandardSecurityHandler } from "#src/security/standard-handler.ts";
-import type { SignOptions, SignResult } from "#src/signatures/types";
+import type {
+  ArchivalDataOptions,
+  ArchivalDataResult,
+  SignOptions,
+  SignResult,
+  TimestampOptions,
+  TimestampResult,
+  ValidationDataOptions,
+  ValidationDataResult,
+} from "#src/signatures/types";
 import type { FindTextOptions, PageText, TextMatch } from "#src/text/types";
 import { writeComplete, writeIncremental } from "#src/writer/pdf-writer";
 import { randomBytes } from "@noble/ciphers/utils.js";
@@ -2763,6 +2772,133 @@ export class PDF {
     return signature.sign(options);
   }
 
+  /**
+   * Add an archival document timestamp to the PDF.
+   *
+   * Creates a `/Type /DocTimeStamp` signature whose ByteRange covers the
+   * entire current document, sealing it with a trusted RFC 3161 timestamp.
+   *
+   * This is the timestamping step in a PAdES B-LTA flow: after one or more
+   * signatures have been appended (each as an incremental update), call
+   * `addTimestamp()` to lock the document state with a TSA-attested time.
+   * The timestamp extends the validity of all prior signatures because its
+   * ByteRange covers them.
+   *
+   * Does **not** gather validation data for pre-existing signatures - use
+   * {@link addValidationData} for that, or {@link addArchivalData} to do
+   * both in one call.
+   *
+   * After timestamping, the PDF instance is automatically reloaded with the
+   * updated bytes, so you can call `addTimestamp()` again or `save()` to get
+   * the final bytes. If this method throws after partial progress (e.g. the
+   * TSA request fails), the in-memory instance may be out of sync with its
+   * bytes - discard it and reload from the last known-good bytes.
+   *
+   * @param options Timestamping options including the TSA
+   * @returns The PDF bytes with the timestamp embedded, plus any warnings
+   *
+   * @throws {SignatureError} If `timestampAuthority` is missing, if the
+   *         document cannot be saved incrementally (which would invalidate
+   *         existing signatures), or if the document has no pages
+   * @throws {PlaceholderError} If the reserved size is too small for the token
+   *
+   * @example
+   * ```typescript
+   * import { HttpTimestampAuthority } from "@libpdf/core";
+   *
+   * // Sign first (B-T or B-LT), then seal with an archival timestamp.
+   * const tsa = new HttpTimestampAuthority("https://freetsa.org/tsr");
+   * await pdf.sign({ signer, level: "B-LT", timestampAuthority: tsa });
+   * const { bytes } = await pdf.addTimestamp({
+   *   timestampAuthority: tsa,
+   *   longTermValidation: true,
+   * });
+   * ```
+   */
+  async addTimestamp(options: TimestampOptions): Promise<TimestampResult> {
+    const signature = new PDFSignature(this);
+
+    return signature.addTimestamp(options);
+  }
+
+  /**
+   * Gather LTV (Long-Term Validation) data for every signed signature
+   * field in the document and write it as a single DSS incremental
+   * update.
+   *
+   * Upgrades B-T signatures to B-LT in one shot. Use this after a
+   * multi-signer flow where each recipient signed at B-T level and you
+   * now want full long-term validation data embedded for all of them.
+   *
+   * Reuses one OCSP/CRL cache across signatures so issuers shared
+   * between signers don't get re-fetched. Existing DSS contents are
+   * merged with the new data (certs / OCSP / CRL are deduplicated by
+   * SHA-1).
+   *
+   * Does **not** add a timestamp - use {@link addTimestamp} for that, or
+   * {@link addArchivalData} to do both in one call.
+   *
+   * After this call the PDF instance is reloaded with the updated bytes,
+   * so subsequent operations (e.g. `addTimestamp()`) see the new DSS.
+   *
+   * @param options Optional revocation provider override
+   * @returns Bytes, warnings, and the number of signatures processed
+   *
+   * @throws {SignatureError} If the document cannot be saved incrementally
+   *         (which would invalidate existing signatures)
+   *
+   * @example
+   * ```typescript
+   * const { signatureCount, warnings } = await pdf.addValidationData();
+   * console.log(`Embedded LTV for ${signatureCount} signatures`);
+   * ```
+   */
+  async addValidationData(options: ValidationDataOptions = {}): Promise<ValidationDataResult> {
+    const signature = new PDFSignature(this);
+
+    return signature.addValidationData(options);
+  }
+
+  /**
+   * Finalize the document with full PAdES B-LTA: gather LTV for every
+   * existing signature, embed a DSS, add an archival document timestamp,
+   * and embed a second DSS for the timestamp's own certificate chain.
+   *
+   * This is the convenience wrapper for the typical end-of-flow operation
+   * in a multi-signer advanced electronic signature (AdES) workflow.
+   * Equivalent to calling {@link addValidationData} followed by
+   * {@link addTimestamp} with `longTermValidation: true`. Note that unlike
+   * {@link addValidationData}, this adds a new signature object (the
+   * document timestamp field) to the PDF.
+   *
+   * If this method throws after partial progress (e.g. the TSA request
+   * fails after the DSS update was written), the in-memory instance may be
+   * out of sync with its bytes - discard it and reload from the last
+   * known-good bytes.
+   *
+   * @param options Archival options including the TSA
+   * @returns Bytes, warnings, and the number of pre-existing signatures
+   *          for which LTV data was gathered
+   *
+   * @throws {SignatureError} If `timestampAuthority` is missing or the
+   *         document cannot be saved incrementally (which would invalidate
+   *         existing signatures)
+   *
+   * @example
+   * ```typescript
+   * import { HttpTimestampAuthority } from "@libpdf/core";
+   *
+   * // After every recipient has signed (B-T), seal the document.
+   * const tsa = new HttpTimestampAuthority("https://freetsa.org/tsr");
+   * const { bytes } = await pdf.addArchivalData({ timestampAuthority: tsa });
+   * ```
+   */
+  async addArchivalData(options: ArchivalDataOptions): Promise<ArchivalDataResult> {
+    const signature = new PDFSignature(this);
+
+    return signature.addArchivalData(options);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
   // Layers (Optional Content Groups)
   // ─────────────────────────────────────────────────────────────────────────────
@@ -3135,8 +3271,8 @@ export class PDF {
         securityHandler = handler;
       }
     }
-    // Note: action === "remove" means no encrypt dict (decrypted on load, written without encryption)
 
+    // Note: action === "remove" means no encrypt dict (decrypted on load, written without encryption)
     // Ensure document has an /ID (required for signatures, recommended for all PDFs)
     if (!fileId) {
       const idArray = this.ctx.info.trailer.getArray("ID");

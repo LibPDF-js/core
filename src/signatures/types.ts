@@ -246,6 +246,174 @@ export interface SignOptions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Timestamp Options
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Options for adding an archival document timestamp to a PDF.
+ *
+ * A document timestamp creates a `/Type /DocTimeStamp` signature dictionary
+ * whose ByteRange covers the entire current document, extending the validity
+ * of any existing signatures. This is the timestamping step used at the end
+ * of a PAdES B-LTA flow when signatures have been appended and the caller
+ * wants to seal the document with a trusted time.
+ *
+ * @example
+ * ```typescript
+ * const { bytes, warnings } = await pdf.addTimestamp({
+ *   timestampAuthority: new HttpTimestampAuthority("https://freetsa.org/tsr"),
+ *   longTermValidation: true,
+ * });
+ * ```
+ */
+export interface TimestampOptions {
+  /** RFC 3161 timestamp authority used to obtain the timestamp token. */
+  timestampAuthority: TimestampAuthority;
+
+  /**
+   * Signature field name to use for the document timestamp.
+   *
+   * Behavior:
+   * - If omitted, a unique name with the `Timestamp_` prefix is generated
+   *   and a fresh field is created.
+   * - If provided and the name matches an existing **unsigned** signature
+   *   field, that pre-allocated field is reused (the timestamp's ref is
+   *   written into its `/V`). This is the recommended pattern for
+   *   multi-signer advanced electronic signature (AdES) / DocMDP flows
+   *   where the document author reserves signature fields up front before
+   *   the certification signature is applied.
+   * - If the name matches a signed signature field, or a non-signature
+   *   field, an error is thrown.
+   * - If the name doesn't match any existing field, a new field is created.
+   */
+  fieldName?: string;
+
+  /**
+   * Embed long-term validation data (certificates, OCSP responses, CRLs)
+   * for the timestamp's certificate chain in the DSS.
+   *
+   * Enable this for PAdES B-LTA semantics where the timestamp itself
+   * needs to remain verifiable after its TSA certificate expires.
+   *
+   * @default false
+   */
+  longTermValidation?: boolean;
+
+  /** Provider for OCSP/CRL data when `longTermValidation` is true. */
+  revocationProvider?: RevocationProvider;
+
+  /**
+   * Digest algorithm used to hash the document for the TSA request.
+   *
+   * @default "SHA-256"
+   */
+  digestAlgorithm?: DigestAlgorithm;
+
+  /**
+   * Size to reserve for the timestamp placeholder in bytes.
+   *
+   * Must be large enough to hold the TSA's timestamp token (the CMS
+   * structure plus the full TSA certificate chain).
+   *
+   * @default 12288 (12KB)
+   */
+  estimatedSize?: number;
+}
+
+/**
+ * Result of `addTimestamp()`.
+ */
+export interface TimestampResult {
+  /** The PDF bytes with the document timestamp embedded. */
+  bytes: Uint8Array;
+
+  /** Warnings emitted during the timestamping operation. */
+  warnings: SignWarning[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Validation Data Options (DSS-only update)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Options for `pdf.addValidationData()`.
+ *
+ * Walks every signed signature field (regular signatures and document
+ * timestamps), gathers certificates / OCSP responses / CRLs for each one,
+ * and writes a single DSS incremental update that contains all of it.
+ *
+ * Upgrades B-T signatures in the document to B-LT. Does not add a
+ * timestamp — for that, use `pdf.addTimestamp()` or `pdf.addArchivalData()`.
+ */
+export interface ValidationDataOptions {
+  /**
+   * Provider for OCSP/CRL data.
+   *
+   * @default new DefaultRevocationProvider()
+   */
+  revocationProvider?: RevocationProvider;
+}
+
+/**
+ * Result of `addValidationData()`.
+ */
+export interface ValidationDataResult {
+  /** The PDF bytes with the DSS update embedded. */
+  bytes: Uint8Array;
+
+  /** Warnings emitted during gathering (e.g. CHAIN_INCOMPLETE, REVOCATION_UNAVAILABLE). */
+  warnings: SignWarning[];
+
+  /** Number of signed fields for which LTV data was gathered. */
+  signatureCount: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Archival Data Options (full B-LTA finalization)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Options for `pdf.addArchivalData()`.
+ *
+ * Convenience wrapper that performs full PAdES B-LTA finalization in a
+ * single call:
+ *
+ * 1. Gathers LTV data for every existing signed field (DSS update)
+ * 2. Adds an archival `/DocTimeStamp`
+ * 3. Gathers LTV data for the new timestamp's own certificate chain
+ *
+ * Use this at the end of a multi-signer flow once every recipient has
+ * signed and you want to seal the document with a trusted time + full
+ * long-term validation data.
+ *
+ * The options match {@link TimestampOptions} except that long-term
+ * validation is always enabled for the archival timestamp.
+ *
+ * @example
+ * ```typescript
+ * const tsa = new HttpTimestampAuthority("https://freetsa.org/tsr");
+ * const { bytes, warnings, signatureCount } = await pdf.addArchivalData({
+ *   timestampAuthority: tsa,
+ * });
+ * ```
+ */
+export type ArchivalDataOptions = Omit<TimestampOptions, "longTermValidation">;
+
+/**
+ * Result of `addArchivalData()`.
+ */
+export interface ArchivalDataResult {
+  /** The PDF bytes after the DSS update + archival timestamp. */
+  bytes: Uint8Array;
+
+  /** Warnings emitted during the operation. */
+  warnings: SignWarning[];
+
+  /** Number of pre-existing signed fields for which LTV data was gathered. */
+  signatureCount: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Sign Result
 // ─────────────────────────────────────────────────────────────────────────────
 
