@@ -1,5 +1,10 @@
 import { PDF } from "#src/api/pdf";
-import { loadFixture } from "#src/test-utils";
+import { PdfArray } from "#src/objects/pdf-array";
+import { PdfDict } from "#src/objects/pdf-dict";
+import { PdfName } from "#src/objects/pdf-name";
+import { PdfNumber } from "#src/objects/pdf-number";
+import type { PdfObject } from "#src/objects/pdf-object";
+import { loadFixture, toAsciiString } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
 import { AcroForm } from "./acro-form";
@@ -1009,6 +1014,172 @@ describe("Form Writing", () => {
         const fieldsAfter = form2.getFields();
         expect(fieldsAfter.length).toBe(0);
       }
+    });
+  });
+
+  describe("flatten with tagged PDF (structure tree)", () => {
+    /**
+     * Build a structure tree that references every widget via /OBJR entries,
+     * plus one non-widget (Link) annotation, mirroring how tagged (accessible)
+     * forms reference their fields. Without struct tree cleanup, these /OBJR
+     * references keep the removed widgets reachable, so a full save writes
+     * all the orphaned field objects back into the output.
+     */
+    async function loadTaggedForm(): Promise<{ pdf: PDF; form: AcroForm; linkKey: number }> {
+      const bytes = await loadFixture("forms", "form_to_flatten.pdf");
+      const pdf = await PDF.load(bytes);
+      const registry = pdf.context.registry;
+      const resolve = registry.resolve.bind(registry);
+      const catalogDict = pdf.context.catalog.getDict();
+      const form = pdf.getForm()!.acroForm();
+
+      const docKids = new PdfArray([]);
+      const docElem = PdfDict.of({ S: PdfName.of("Document"), K: docKids });
+      const docElemRef = registry.register(docElem);
+
+      const nums: PdfObject[] = [];
+      let nextKey = 0;
+
+      for (const field of form.getFields()) {
+        for (const widget of field.getWidgets()) {
+          if (!widget.ref) {
+            continue;
+          }
+
+          const objr = PdfDict.of({ Type: PdfName.of("OBJR"), Obj: widget.ref });
+          const elem = PdfDict.of({
+            S: PdfName.of("Form"),
+            P: docElemRef,
+            K: PdfArray.of(registry.register(objr)),
+          });
+          const elemRef = registry.register(elem);
+
+          docKids.push(elemRef);
+          widget.dict.set("StructParent", new PdfNumber(nextKey));
+          nums.push(new PdfNumber(nextKey), elemRef);
+          nextKey++;
+        }
+      }
+
+      expect(nextKey).toBeGreaterThan(0);
+
+      // Add a non-widget (Link) annotation referenced from the struct tree.
+      // It must survive flattening untouched.
+      const pageRef = pdf.context.pages.getPage(0)!;
+      const pageDict = resolve(pageRef) as PdfDict;
+      const linkKey = nextKey;
+      const link = PdfDict.of({
+        Type: PdfName.of("Annot"),
+        Subtype: PdfName.of("Link"),
+        Rect: PdfArray.of(new PdfNumber(0), new PdfNumber(0), new PdfNumber(10), new PdfNumber(10)),
+        StructParent: new PdfNumber(linkKey),
+      });
+      const linkRef = registry.register(link);
+      const annots = pageDict.getArray("Annots", resolve);
+
+      if (annots) {
+        annots.push(linkRef);
+      } else {
+        pageDict.set("Annots", PdfArray.of(linkRef));
+      }
+
+      const linkObjr = PdfDict.of({ Type: PdfName.of("OBJR"), Obj: linkRef });
+      const linkElem = PdfDict.of({
+        S: PdfName.of("Link"),
+        P: docElemRef,
+        K: PdfArray.of(registry.register(linkObjr)),
+      });
+      const linkElemRef = registry.register(linkElem);
+
+      docKids.push(linkElemRef);
+      nums.push(new PdfNumber(linkKey), linkElemRef);
+      nextKey++;
+
+      const parentTree = PdfDict.of({ Nums: new PdfArray(nums) });
+      const structTreeRoot = PdfDict.of({
+        Type: PdfName.of("StructTreeRoot"),
+        K: docElemRef,
+        ParentTree: registry.register(parentTree),
+        ParentTreeNextKey: new PdfNumber(nextKey),
+      });
+
+      catalogDict.set("StructTreeRoot", registry.register(structTreeRoot));
+
+      return { pdf, form, linkKey };
+    }
+
+    it("does not leave orphaned field objects in the saved output", async () => {
+      const { pdf, form } = await loadTaggedForm();
+
+      form.flatten();
+
+      const saved = await pdf.save();
+      const text = toAsciiString(saved, saved.length);
+
+      // No field dicts should survive the full-save garbage collection
+      expect(text).not.toContain("/FT");
+      expect(text).not.toContain("/Widget");
+
+      // Only the Link annotation's OBJR should remain
+      expect(text.match(/\/OBJR/g) ?? []).toHaveLength(1);
+    });
+
+    it("removes stale ParentTree entries for flattened widgets", async () => {
+      const { pdf, form, linkKey } = await loadTaggedForm();
+
+      form.flatten();
+
+      const saved = await pdf.save();
+      const pdf2 = await PDF.load(saved);
+      const resolve2 = pdf2.context.registry.resolve.bind(pdf2.context.registry);
+      const catalog2 = pdf2.context.catalog.getDict();
+
+      const structTreeRoot = catalog2.getDict("StructTreeRoot", resolve2);
+      expect(structTreeRoot).toBeDefined();
+
+      const parentTree = structTreeRoot!.getDict("ParentTree", resolve2);
+      const numsAfter = parentTree!.getArray("Nums", resolve2)!;
+
+      // Only the Link annotation's entry should remain
+      const keys: number[] = [];
+
+      for (let i = 0; i + 1 < numsAfter.length; i += 2) {
+        const key = numsAfter.at(i, resolve2);
+
+        if (key instanceof PdfNumber) {
+          keys.push(key.value);
+        }
+      }
+
+      expect(keys).toEqual([linkKey]);
+    });
+
+    it("preserves struct tree references to non-widget annotations", async () => {
+      const { pdf, form } = await loadTaggedForm();
+
+      form.flatten();
+
+      const saved = await pdf.save();
+      const pdf2 = await PDF.load(saved);
+      const resolve2 = pdf2.context.registry.resolve.bind(pdf2.context.registry);
+
+      // The Link annotation should still be on the page
+      const pageRef = pdf2.context.pages.getPage(0)!;
+      const pageDict = resolve2(pageRef) as PdfDict;
+      const annots = pageDict.getArray("Annots", resolve2);
+      expect(annots).toBeDefined();
+
+      let linkFound = false;
+
+      for (let i = 0; i < annots!.length; i++) {
+        const annot = annots!.at(i, resolve2);
+
+        if (annot instanceof PdfDict && annot.getName("Subtype")?.value === "Link") {
+          linkFound = true;
+        }
+      }
+
+      expect(linkFound).toBe(true);
     });
   });
 
