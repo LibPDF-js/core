@@ -215,6 +215,7 @@ export type {
   BBox,
   BlendMode,
   ColorStop,
+  ExtGStateSoftMask,
   ExtGStateOptions,
   FormXObjectOptions,
   ImagePatternOptions,
@@ -229,7 +230,10 @@ export type {
   RadialCoords,
   RadialShadingOptions,
   ShadingPatternOptions,
+  SoftMaskOptions,
   TilingPatternOptions,
+  TransparencyGroupColorSpace,
+  TransparencyGroupOptions,
 } from "./drawing/resources/index";
 
 // ─────────────────────────────────────────────────────────────────────────────
