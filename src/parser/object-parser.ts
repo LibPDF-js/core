@@ -157,6 +157,12 @@ export class ObjectParser {
         return { object: PdfBool.FALSE, hasStream: false };
 
       default:
+        if (this.recoveryMode) {
+          this.warn(`Unexpected keyword: ${value}, treating as null`);
+
+          return { object: PdfNull.instance, hasStream: false };
+        }
+
         throw new ObjectParseError(`Unexpected keyword: ${value}`);
     }
   }

@@ -429,8 +429,17 @@ export class DocumentParser {
     trailer: PdfDict,
     recoveredViaBruteForce: boolean,
   ): ParsedDocument {
-    // Object cache: "objNum genNum" -> PdfObject
-    const cache = new Map<string, PdfObject>();
+    // Object cache: "objNum genNum" -> PdfObject (null = known-unparseable)
+    const cache = new Map<string, PdfObject | null>();
+
+    const lenient = this.options.lenient ?? true;
+
+    const recoveryOptions = {
+      recoveryMode: lenient,
+      onWarning: (message: string, position: number) => {
+        this.warnings.push(`Object parse warning at offset ${position}: ${message}`);
+      },
+    };
 
     // Object stream cache: streamObjNum -> ObjectStreamParser
     const objectStreamCache = new Map<number, ObjectStreamParser>();
@@ -644,8 +653,7 @@ export class DocumentParser {
 
       // Check cache
       if (cache.has(key)) {
-        // biome-ignore lint/style/noNonNullAssertion: checked with .has(...)
-        return cache.get(key)!;
+        return cache.get(key) ?? null;
       }
 
       // Look up in xref
@@ -657,59 +665,77 @@ export class DocumentParser {
 
       let obj: PdfObject | null = null;
 
-      switch (entry.type) {
-        case "free":
-          return null;
+      try {
+        switch (entry.type) {
+          case "free":
+            return null;
 
-        case "uncompressed": {
-          const parser = new IndirectObjectParser(this.scanner, lengthResolver);
+          case "uncompressed": {
+            const parser = new IndirectObjectParser(this.scanner, lengthResolver, recoveryOptions);
 
-          const result = parser.parseObjectAt(entry.offset);
+            const result = parser.parseObjectAt(entry.offset);
 
-          // Verify generation matches
-          if (result.genNum !== ref.generation) {
-            this.warnings.push(
-              `Generation mismatch for object ${ref.objectNumber}: expected ${ref.generation}, got ${result.genNum}`,
-            );
-          }
-
-          obj = result.value;
-
-          // Decrypt the object
-          if (securityHandler?.isAuthenticated) {
-            obj = decryptObject(obj, ref.objectNumber, ref.generation);
-          }
-
-          break;
-        }
-
-        case "compressed": {
-          // Get or create object stream parser
-          let streamParser = objectStreamCache.get(entry.streamObjNum);
-
-          if (!streamParser) {
-            // Load the object stream
-            const streamRef = PdfRef.of(entry.streamObjNum, 0);
-            const streamObj = getObject(streamRef);
-
-            if (!streamObj || !(streamObj instanceof PdfStream)) {
-              this.warnings.push(`Object stream ${entry.streamObjNum} not found or invalid`);
-
-              return null;
+            // Verify generation matches
+            if (result.genNum !== ref.generation) {
+              this.warnings.push(
+                `Generation mismatch for object ${ref.objectNumber}: expected ${ref.generation}, got ${result.genNum}`,
+              );
             }
 
-            streamParser = new ObjectStreamParser(streamObj);
+            obj = result.value;
 
-            objectStreamCache.set(entry.streamObjNum, streamParser);
+            // Decrypt the object
+            if (securityHandler?.isAuthenticated) {
+              obj = decryptObject(obj, ref.objectNumber, ref.generation);
+            }
+
+            break;
           }
 
-          obj = streamParser.getObject(entry.indexInStream);
+          case "compressed": {
+            // Get or create object stream parser
+            let streamParser = objectStreamCache.get(entry.streamObjNum);
 
-          // Objects in object streams don't need individual decryption
-          // because the stream itself was decrypted
+            if (!streamParser) {
+              // Load the object stream
+              const streamRef = PdfRef.of(entry.streamObjNum, 0);
+              const streamObj = getObject(streamRef);
 
-          break;
+              if (!streamObj || !(streamObj instanceof PdfStream)) {
+                this.warnings.push(`Object stream ${entry.streamObjNum} not found or invalid`);
+
+                return null;
+              }
+
+              streamParser = new ObjectStreamParser(streamObj, recoveryOptions);
+
+              objectStreamCache.set(entry.streamObjNum, streamParser);
+            }
+
+            obj = streamParser.getObject(entry.indexInStream);
+
+            // Objects in object streams don't need individual decryption
+            // because the stream itself was decrypted
+
+            break;
+          }
         }
+      } catch (error) {
+        // Error boundary: a single malformed object must not crash reads
+        // or saves. In lenient mode, record a warning and treat the object
+        // as missing (like pdf.js and PDFBox).
+        if (!lenient) {
+          throw error;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+
+        this.warnings.push(`Failed to parse object ${key}: ${message}`);
+
+        // Cache the failure so repeated lookups don't re-parse and re-warn
+        cache.set(key, null);
+
+        return null;
       }
 
       // Cache the result

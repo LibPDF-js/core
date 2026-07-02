@@ -8,7 +8,7 @@ import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
 import { describe, expect, it } from "vitest";
 
-import { IndirectObjectParser } from "./indirect-object-parser";
+import { IndirectObjectParser, type IndirectObjectParserOptions } from "./indirect-object-parser";
 
 /**
  * Helper to create an IndirectObjectParser from a string.
@@ -16,11 +16,12 @@ import { IndirectObjectParser } from "./indirect-object-parser";
 function parser(
   input: string,
   lengthResolver?: (ref: PdfRef) => number | null,
+  options?: IndirectObjectParserOptions,
 ): IndirectObjectParser {
   const bytes = new TextEncoder().encode(input);
   const scanner = new Scanner(bytes);
 
-  return new IndirectObjectParser(scanner, lengthResolver);
+  return new IndirectObjectParser(scanner, lengthResolver, options);
 }
 
 describe("IndirectObjectParser", () => {
@@ -315,6 +316,99 @@ endobj`);
 endobj`);
 
       expect(() => p.parseObject()).toThrow(/obj/i);
+    });
+
+    it("recovers stream with /Length too small via endstream scan", () => {
+      const warnings: string[] = [];
+      const p = parser(
+        `1 0 obj
+<< /Length 3 >>
+stream
+Hello World
+endstream
+endobj`,
+        undefined,
+        { onWarning: msg => warnings.push(msg) },
+      );
+      const result = p.parseObject();
+
+      const stream = result.value as PdfStream;
+      expect(new TextDecoder().decode(stream.data)).toBe("Hello World");
+      expect(warnings.length).toBe(1);
+      expect(warnings[0]).toContain("/Length 3");
+    });
+
+    it("recovers stream with /Length too large via endstream scan", () => {
+      const warnings: string[] = [];
+      const p = parser(
+        `1 0 obj
+<< /Length 9999 >>
+stream
+Hello
+endstream
+endobj`,
+        undefined,
+        { onWarning: msg => warnings.push(msg) },
+      );
+      const result = p.parseObject();
+
+      const stream = result.value as PdfStream;
+      expect(new TextDecoder().decode(stream.data)).toBe("Hello");
+      expect(warnings.length).toBe(1);
+    });
+
+    it("accepts correct /Length without warnings", () => {
+      const warnings: string[] = [];
+      const p = parser(
+        `1 0 obj
+<< /Length 5 >>
+stream
+Hello
+endstream
+endobj`,
+        undefined,
+        { onWarning: msg => warnings.push(msg) },
+      );
+      const result = p.parseObject();
+
+      const stream = result.value as PdfStream;
+      expect(new TextDecoder().decode(stream.data)).toBe("Hello");
+      expect(warnings.length).toBe(0);
+    });
+
+    it("throws when stream has no endstream at all", () => {
+      const p = parser(`1 0 obj
+<< /Length 9999 >>
+stream
+Hello and then the file just ends`);
+
+      expect(() => p.parseObject()).toThrow(/no endstream found/);
+    });
+
+    it("recovers dict with missing value in recovery mode", () => {
+      const warnings: string[] = [];
+      const p = parser(
+        `1 0 obj
+<< /S /GoTo /D >>
+endobj`,
+        undefined,
+        { recoveryMode: true, onWarning: msg => warnings.push(msg) },
+      );
+      const result = p.parseObject();
+
+      const dict = result.value as PdfDict;
+      expect(dict.getName("S")?.value).toBe("GoTo");
+      expect(dict.has("D")).toBe(false);
+      expect(warnings.length).toBe(1);
+      expect(warnings[0]).toContain("Missing value for key D");
+    });
+
+    it("throws on dict with missing value without recovery mode", () => {
+      const p = parser(`1 0 obj
+<< /S /GoTo /D >>
+endobj`);
+
+      expect(() => p.parseObject()).toThrow("Missing value for key D");
     });
 
     it("recovers stream with missing /Length via endstream scan", () => {
