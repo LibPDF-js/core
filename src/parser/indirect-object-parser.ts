@@ -1,4 +1,4 @@
-import { CR, LF, SPACE, TAB } from "#src/helpers/chars";
+import { CR, isWhitespace, LF } from "#src/helpers/chars";
 import type { Scanner } from "#src/io/scanner";
 import type { PdfDict } from "#src/objects/pdf-dict";
 import type { PdfObject } from "#src/objects/pdf-object";
@@ -6,7 +6,7 @@ import type { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 
 import { ObjectParseError } from "./errors";
-import { ObjectParser } from "./object-parser";
+import { ObjectParser, type WarningCallback } from "./object-parser";
 import { TokenReader } from "./token-reader";
 
 /**
@@ -25,6 +25,20 @@ export interface IndirectObject {
 export type LengthResolver = (ref: PdfRef) => number | null;
 
 /**
+ * Options for IndirectObjectParser.
+ */
+export interface IndirectObjectParserOptions {
+  /**
+   * Enable recovery mode for lenient parsing of object contents.
+   * Malformed dicts/arrays produce partial results instead of throwing.
+   */
+  recoveryMode?: boolean;
+
+  /** Callback for warnings emitted during lenient parsing. */
+  onWarning?: WarningCallback;
+}
+
+/**
  * Parser for indirect object definitions.
  *
  * Handles the `N M obj ... endobj` syntax and stream binary data.
@@ -34,7 +48,12 @@ export class IndirectObjectParser {
   constructor(
     private scanner: Scanner,
     private lengthResolver?: LengthResolver,
+    private options: IndirectObjectParserOptions = {},
   ) {}
+
+  private warn(message: string, position: number): void {
+    this.options.onWarning?.(message, position);
+  }
 
   /**
    * Parse indirect object at current scanner position.
@@ -69,6 +88,10 @@ export class IndirectObjectParser {
 
     // Parse the object value
     const objectParser = new ObjectParser(reader);
+
+    objectParser.recoveryMode = this.options.recoveryMode ?? false;
+    objectParser.onWarning = this.options.onWarning ?? null;
+
     const result = objectParser.parseObject();
 
     if (result === null) {
@@ -134,16 +157,30 @@ export class IndirectObjectParser {
     // Try to resolve /Length from the dict. If that fails (e.g. indirect
     // ref during brute-force recovery with no resolver), fall back to
     // scanning for the "endstream" keyword to determine the length.
-    let length: number;
+    let length = -1;
 
     try {
       length = this.resolveLength(dict);
     } catch {
-      length = this.findEndStream(startPos);
+      length = -1;
+    }
 
-      if (length < 0) {
-        throw new ObjectParseError("Stream missing /Length and no endstream found");
-      }
+    // Validate /Length: the "endstream" keyword must follow the data.
+    // Malformed PDFs often carry a wrong /Length — recover by scanning
+    // for endstream instead of trusting the declared value.
+    if (length >= 0 && !this.isEndstreamAt(startPos + length)) {
+      this.warn(
+        `Stream /Length ${length} does not point at endstream, scanning for actual end`,
+        startPos,
+      );
+
+      length = -1;
+    }
+
+    length = length < 0 ? this.findEndStream(startPos) : length;
+
+    if (length < 0) {
+      throw new ObjectParseError("Stream has no valid /Length and no endstream found");
     }
 
     // Read exactly `length` bytes.
@@ -160,6 +197,38 @@ export class IndirectObjectParser {
     this.expectKeyword("endstream");
 
     return new PdfStream(dict, data);
+  }
+
+  /**
+   * Check whether the "endstream" keyword appears at the given position,
+   * allowing optional whitespace before it.
+   */
+  private isEndstreamAt(pos: number): boolean {
+    const bytes = this.scanner.bytes;
+
+    if (pos > bytes.length) {
+      return false;
+    }
+
+    let i = pos;
+
+    while (i < bytes.length && isWhitespace(bytes[i])) {
+      i++;
+    }
+
+    const keyword = "endstream";
+
+    if (i + keyword.length > bytes.length) {
+      return false;
+    }
+
+    for (let j = 0; j < keyword.length; j++) {
+      if (bytes[i + j] !== keyword.charCodeAt(j)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -190,7 +259,7 @@ export class IndirectObjectParser {
       if (byte === -1) {
         break;
       }
-      if (byte === SPACE || byte === TAB || byte === LF || byte === CR) {
+      if (isWhitespace(byte)) {
         this.scanner.advance();
       } else {
         break;

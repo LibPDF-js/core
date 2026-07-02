@@ -3,7 +3,7 @@ import type { PdfObject } from "#src/objects/pdf-object";
 import type { PdfStream } from "#src/objects/pdf-stream";
 
 import { ObjectParseError } from "./errors";
-import { ObjectParser } from "./object-parser";
+import { ObjectParser, type WarningCallback } from "./object-parser";
 import { TokenReader } from "./token-reader";
 
 /**
@@ -14,6 +14,20 @@ interface ObjectStreamEntry {
   objNum: number;
   /** Byte offset relative to /First */
   offset: number;
+}
+
+/**
+ * Options for ObjectStreamParser.
+ */
+export interface ObjectStreamParserOptions {
+  /**
+   * Enable recovery mode for lenient parsing of contained objects.
+   * Malformed objects produce partial results instead of throwing.
+   */
+  recoveryMode?: boolean;
+
+  /** Callback for warnings emitted during lenient parsing. */
+  onWarning?: WarningCallback;
 }
 
 /**
@@ -43,7 +57,10 @@ export class ObjectStreamParser {
   private readonly first: number;
   private readonly n: number;
 
-  constructor(private stream: PdfStream) {
+  constructor(
+    private stream: PdfStream,
+    private options: ObjectStreamParserOptions = {},
+  ) {
     // Validate stream type
     const type = stream.getName("Type");
 
@@ -155,6 +172,9 @@ export class ObjectStreamParser {
 
     const reader = new TokenReader(scanner);
     const parser = new ObjectParser(reader);
+
+    parser.recoveryMode = this.options.recoveryMode ?? false;
+    parser.onWarning = this.options.onWarning ?? null;
 
     const result = parser.parseObject();
 

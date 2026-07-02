@@ -363,6 +363,66 @@ describe("ObjectParser", () => {
       expect(dict.get("Type")).toBe(PdfName.of("Page"));
       expect(warnings.length).toBeGreaterThan(0);
     });
+
+    it("throws on missing value for key in normal mode", () => {
+      const p = parser("<< /S /GoTo /D >>");
+
+      expect(() => p.parseObject()).toThrow("Missing value for key D");
+    });
+
+    it("drops key with missing value in recovery mode", () => {
+      const p = parser("<< /S /GoTo /D >>");
+      const warnings: string[] = [];
+
+      p.recoveryMode = true;
+      p.onWarning = msg => warnings.push(msg);
+
+      const result = p.parseObject();
+      const dict = result!.object as PdfDict;
+
+      expect(dict.get("S")).toBe(PdfName.of("GoTo"));
+      expect(dict.has("D")).toBe(false);
+      expect(warnings.length).toBe(1);
+      expect(warnings[0]).toContain("Missing value for key D");
+    });
+  });
+
+  describe("unknown keywords", () => {
+    it("throws on unknown keyword in normal mode", () => {
+      const p = parser("garbage");
+
+      expect(() => p.parseObject()).toThrow("Unexpected keyword: garbage");
+    });
+
+    it("treats unknown keyword as null in recovery mode", () => {
+      const p = parser("garbage");
+      const warnings: string[] = [];
+
+      p.recoveryMode = true;
+      p.onWarning = msg => warnings.push(msg);
+
+      const result = p.parseObject();
+
+      expect(result!.object).toBe(PdfNull.instance);
+      expect(warnings.length).toBe(1);
+      expect(warnings[0]).toContain("garbage");
+    });
+
+    it("recovers dict with unknown keyword value", () => {
+      const p = parser("<< /Type /Page /Foo bogus /Count 2 >>");
+      const warnings: string[] = [];
+
+      p.recoveryMode = true;
+      p.onWarning = msg => warnings.push(msg);
+
+      const result = p.parseObject();
+      const dict = result!.object as PdfDict;
+
+      expect(dict.get("Type")).toBe(PdfName.of("Page"));
+      expect(dict.get("Foo")).toBe(PdfNull.instance);
+      expect(dict.getNumber("Count")?.value).toBe(2);
+      expect(warnings.length).toBe(1);
+    });
   });
 
   describe("stream detection", () => {

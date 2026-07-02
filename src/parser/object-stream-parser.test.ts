@@ -272,6 +272,37 @@ describe("ObjectStreamParser", () => {
     });
   });
 
+  describe("recovery mode", () => {
+    it("throws on malformed object without recovery mode", () => {
+      const stream = createObjectStream([{ objNum: 1, text: "<< /S /GoTo /D >>" }]);
+
+      const parser = new ObjectStreamParser(stream);
+
+      expect(() => parser.getObject(0)).toThrow("Missing value for key D");
+    });
+
+    it("recovers malformed object with recovery mode", () => {
+      const warnings: string[] = [];
+      const stream = createObjectStream([
+        { objNum: 1, text: "<< /S /GoTo /D >>" },
+        { objNum: 2, text: "<< /Type /Page >>" },
+      ]);
+
+      const parser = new ObjectStreamParser(stream, {
+        recoveryMode: true,
+        onWarning: msg => warnings.push(msg),
+      });
+
+      const first = parser.getObject(0) as PdfDict;
+      expect(first.getName("S")?.value).toBe("GoTo");
+      expect(first.has("D")).toBe(false);
+      expect(warnings.length).toBe(1);
+
+      const second = parser.getObject(1) as PdfDict;
+      expect(second.getName("Type")?.value).toBe("Page");
+    });
+  });
+
   describe("edge cases", () => {
     it("handles empty stream (n=0)", async () => {
       const stream = new PdfStream(

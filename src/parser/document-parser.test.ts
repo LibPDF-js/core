@@ -16,6 +16,7 @@ function createMinimalPdf(options: {
   garbageBeforeHeader?: string;
   objects?: Array<{ objNum: number; content: string }>;
   xrefEntries?: Array<{ objNum: number; offset: number; gen?: number; free?: boolean }>;
+  extraXrefEntries?: Array<{ objNum: number; offset: number; gen?: number; free?: boolean }>;
   trailer?: Record<string, string>;
 }): Uint8Array {
   const parts: string[] = [];
@@ -30,9 +31,12 @@ function createMinimalPdf(options: {
   parts.push(`%PDF-${version}\n`);
   parts.push("%\x80\x81\x82\x83\n"); // Binary marker
 
-  // Track offsets for xref
+  // Track offsets for xref (byte lengths, not string lengths — the binary
+  // marker encodes to multiple UTF-8 bytes per char)
+  const byteLength = (s: string): number => new TextEncoder().encode(s).length;
+
   const offsets: Array<{ objNum: number; offset: number; gen: number; free: boolean }> = [];
-  let currentOffset = parts.join("").length;
+  let currentOffset = byteLength(parts.join(""));
 
   // Objects
   const objects = options.objects ?? [
@@ -44,7 +48,7 @@ function createMinimalPdf(options: {
     offsets.push({ objNum: obj.objNum, offset: currentOffset, gen: 0, free: false });
     const objStr = `${obj.objNum} 0 obj\n${obj.content}\nendobj\n`;
     parts.push(objStr);
-    currentOffset += objStr.length;
+    currentOffset += byteLength(objStr);
   }
 
   // Use provided xref entries or build from objects
@@ -52,6 +56,10 @@ function createMinimalPdf(options: {
     { objNum: 0, offset: 0, gen: 65535, free: true },
     ...offsets,
   ];
+
+  if (options.extraXrefEntries) {
+    xrefEntries.push(...options.extraXrefEntries);
+  }
 
   // XRef table
   const xrefOffset = currentOffset;
@@ -776,6 +784,102 @@ describe("DocumentParser", () => {
       // Should recover and find objects via brute-force
       expect(doc.warnings.length).toBeGreaterThan(0);
       expect(doc.xref.size).toBeGreaterThan(0);
+    });
+  });
+
+  describe("malformed object recovery", () => {
+    it("recovers dict with missing value (lenient default)", () => {
+      const bytes = createMinimalPdf({
+        objects: [
+          { objNum: 1, content: "<< /Type /Catalog /Pages 2 0 R >>" },
+          { objNum: 2, content: "<< /Type /Pages /Kids [] /Count 0 >>" },
+          { objNum: 3, content: "<< /S /GoTo /D >>" },
+        ],
+      });
+      const scanner = new Scanner(bytes);
+      const doc = new DocumentParser(scanner).parse();
+
+      const obj = doc.getObject(PdfRef.of(3, 0));
+
+      expect(obj).toBeInstanceOf(PdfDict);
+      expect((obj as PdfDict).getName("S")?.value).toBe("GoTo");
+      expect((obj as PdfDict).has("D")).toBe(false);
+      expect(doc.warnings.some(w => w.includes("Missing value for key D"))).toBe(true);
+    });
+
+    it("throws on dict with missing value in strict mode", () => {
+      const bytes = createMinimalPdf({
+        objects: [
+          { objNum: 1, content: "<< /Type /Catalog /Pages 2 0 R >>" },
+          { objNum: 2, content: "<< /Type /Pages /Kids [] /Count 0 >>" },
+          { objNum: 3, content: "<< /S /GoTo /D >>" },
+        ],
+      });
+      const scanner = new Scanner(bytes);
+      const doc = new DocumentParser(scanner, { lenient: false }).parse();
+
+      expect(() => doc.getObject(PdfRef.of(3, 0))).toThrow("Missing value for key D");
+    });
+
+    it("recovers stream with wrong /Length via endstream scan", () => {
+      const bytes = createMinimalPdf({
+        objects: [
+          { objNum: 1, content: "<< /Type /Catalog /Pages 2 0 R >>" },
+          { objNum: 2, content: "<< /Type /Pages /Kids [] /Count 0 >>" },
+          { objNum: 3, content: "<< /Length 999 >>\nstream\nHello\nendstream" },
+        ],
+      });
+      const scanner = new Scanner(bytes);
+      const doc = new DocumentParser(scanner).parse();
+
+      const obj = doc.getObject(PdfRef.of(3, 0));
+
+      expect(obj).toBeInstanceOf(PdfStream);
+      expect(new TextDecoder().decode((obj as PdfStream).data)).toBe("Hello");
+      expect(doc.warnings.some(w => w.includes("/Length 999"))).toBe(true);
+    });
+
+    it("returns null for unparseable object instead of throwing (lenient)", () => {
+      const bytes = createMinimalPdf({
+        // Object 3 points at garbage (way past EOF)
+        extraXrefEntries: [{ objNum: 3, offset: 999999 }],
+      });
+      const scanner = new Scanner(bytes);
+      const doc = new DocumentParser(scanner).parse();
+
+      const obj = doc.getObject(PdfRef.of(3, 0));
+
+      expect(obj).toBeNull();
+      expect(doc.warnings.some(w => w.includes("Failed to parse object 3 0"))).toBe(true);
+
+      // Rest of the document still works
+      expect(doc.getCatalog()).not.toBeNull();
+      expect(doc.getPageCount()).toBe(0);
+    });
+
+    it("caches parse failures and does not re-warn on repeated lookups", () => {
+      const bytes = createMinimalPdf({
+        extraXrefEntries: [{ objNum: 3, offset: 999999 }],
+      });
+      const scanner = new Scanner(bytes);
+      const doc = new DocumentParser(scanner).parse();
+
+      expect(doc.getObject(PdfRef.of(3, 0))).toBeNull();
+
+      const warningCount = doc.warnings.length;
+
+      expect(doc.getObject(PdfRef.of(3, 0))).toBeNull();
+      expect(doc.warnings.length).toBe(warningCount);
+    });
+
+    it("throws for unparseable object in strict mode", () => {
+      const bytes = createMinimalPdf({
+        extraXrefEntries: [{ objNum: 3, offset: 999999 }],
+      });
+      const scanner = new Scanner(bytes);
+      const doc = new DocumentParser(scanner, { lenient: false }).parse();
+
+      expect(() => doc.getObject(PdfRef.of(3, 0))).toThrow();
     });
   });
 
