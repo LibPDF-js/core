@@ -440,6 +440,18 @@ export class PDFForm {
   }
 
   /**
+   * Get all signature fields that carry a real signature or document timestamp.
+   *
+   * Filters {@link getSignatureFields} via {@link SignatureField.isSigned},
+   * skipping empty placeholders and malformed signature dicts.
+   */
+  getSignedFields(): SignatureField[] {
+    return this.allFields.filter(
+      (f): f is SignatureField => f instanceof SignatureField && f.isSigned(),
+    );
+  }
+
+  /**
    * Get all buttons.
    */
   getButtons(): ButtonField[] {
