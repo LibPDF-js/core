@@ -117,6 +117,7 @@ import {
   showText,
 } from "#src/helpers/operators";
 import * as operatorHelpers from "#src/helpers/operators";
+import type { RefResolver } from "#src/helpers/types";
 import type { PDFImage } from "#src/images/pdf-image";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
@@ -134,7 +135,12 @@ import type { PDFContext } from "./pdf-context";
 import type { PDFEmbeddedPage } from "./pdf-embedded-page";
 
 /**
- * A rectangle defined by [x1, y1, x2, y2] coordinates.
+ * A rectangle given as an origin plus a size.
+ *
+ * Note this is *not* the shape a PDF box array has. A box array is
+ * `[llx lly urx ury]` — two opposite corners — so a rectangle is derived from one
+ * by taking the lower-left corner as the origin and the corner difference as the
+ * size. See `readBox()`.
  */
 export interface Rectangle {
   /** Left x coordinate */
@@ -220,6 +226,111 @@ export interface DrawFieldOptions {
 }
 
 /**
+ * Size a page falls back to when no MediaBox exists anywhere on its branch of the
+ * page tree. US Letter, which is also what PDFium substitutes.
+ */
+const DEFAULT_MEDIA_BOX: Rectangle = { x: 0, y: 0, width: 612, height: 792 };
+
+/**
+ * How far up the `/Parent` chain an inheritable attribute is looked for.
+ *
+ * A well-formed page tree is orders of magnitude shallower than this. The cap is
+ * here because `/Parent` comes from the file and a malformed document can point it
+ * back at a descendant, which would otherwise loop forever.
+ */
+const MAX_PAGE_TREE_DEPTH = 64;
+
+/**
+ * The box entries a page may inherit from an ancestor node.
+ *
+ * Only MediaBox and CropBox are inheritable page attributes (ISO 32000-2, Table
+ * 29). BleedBox, TrimBox and ArtBox are not — they are looked up on the page
+ * itself and otherwise fall back to CropBox.
+ */
+const INHERITABLE_BOXES = new Set(["MediaBox", "CropBox"]);
+
+/**
+ * Read a box entry off one page-tree node as an origin-plus-size rectangle.
+ *
+ * A PDF box is `[llx lly urx ury]`: two opposite corners, and the spec does not
+ * guarantee which is which, so the corners are ordered rather than trusted. A box
+ * written `[512 692 20 30]` describes the same region as `[20 30 512 692]`, and
+ * viewers treat the two identically.
+ */
+function readBox(node: PdfDict, name: string, resolver: RefResolver): Rectangle | undefined {
+  const box = node.get(name, resolver);
+
+  if (!(box instanceof PdfArray) || box.length < 4) {
+    return undefined;
+  }
+
+  const corners: number[] = [];
+
+  for (let index = 0; index < 4; index++) {
+    const entry = box.at(index, resolver);
+
+    if (!(entry instanceof PdfNumber) || !Number.isFinite(entry.value)) {
+      return undefined;
+    }
+
+    corners.push(entry.value);
+  }
+
+  const [ax, ay, bx, by] = corners as [number, number, number, number];
+
+  return {
+    x: Math.min(ax, bx),
+    y: Math.min(ay, by),
+    width: Math.abs(bx - ax),
+    height: Math.abs(by - ay),
+  };
+}
+
+/**
+ * Intersect two rectangles, or `null` when they do not overlap.
+ */
+function intersectRectangles(a: Rectangle, b: Rectangle): Rectangle | null {
+  const x = Math.max(a.x, b.x);
+  const y = Math.max(a.y, b.y);
+  const right = Math.min(a.x + a.width, b.x + b.width);
+  const top = Math.min(a.y + a.height, b.y + b.height);
+
+  if (right <= x || top <= y) {
+    return null;
+  }
+
+  return { x, y, width: right - x, height: top - y };
+}
+
+/**
+ * Coerce a raw `/Rotate` value to one of the four quarter turns.
+ *
+ * Values that are not a multiple of 90 are not meaningful (the spec requires one)
+ * and are read as unrotated rather than guessed at.
+ */
+function normalizeRotation(value: number | undefined): 0 | 90 | 180 | 270 {
+  if (value === undefined || !Number.isFinite(value)) {
+    return 0;
+  }
+
+  const turn = value % 360;
+
+  if (turn === 90 || turn === -270) {
+    return 90;
+  }
+
+  if (turn === 180 || turn === -180) {
+    return 180;
+  }
+
+  if (turn === 270 || turn === -90) {
+    return 270;
+  }
+
+  return 0;
+}
+
+/**
  * PDFPage wraps a page dictionary with convenient accessors.
  */
 export class PDFPage {
@@ -252,17 +363,24 @@ export class PDFPage {
   /**
    * Get the MediaBox (page boundary).
    *
-   * Returns the effective MediaBox, accounting for inheritance from parent pages.
-   * If no MediaBox is found, returns a default US Letter size.
+   * Returns the effective MediaBox, accounting for inheritance from ancestor page
+   * tree nodes. If no MediaBox is found on the page or any ancestor, returns a
+   * default US Letter size.
    */
   getMediaBox(): Rectangle {
-    return this.getBox("MediaBox") ?? { x: 0, y: 0, width: 612, height: 792 };
+    return this.getBox("MediaBox") ?? { ...DEFAULT_MEDIA_BOX };
   }
 
   /**
    * Get the CropBox (visible region).
    *
-   * Falls back to MediaBox if CropBox is not defined.
+   * Returns the effective CropBox, accounting for inheritance from ancestor page
+   * tree nodes. Falls back to MediaBox if no CropBox is defined.
+   *
+   * The box is returned as authored (with its corners ordered), *not* intersected
+   * with the MediaBox. A CropBox that overhangs the MediaBox does not enlarge the
+   * page, but that intersection belongs to the page's effective size — see
+   * {@link width} and {@link height} — rather than to this accessor.
    */
   getCropBox(): Rectangle {
     return this.getBox("CropBox") ?? this.getMediaBox();
@@ -296,10 +414,11 @@ export class PDFPage {
   }
 
   /**
-   * Page width in points (based on MediaBox).
+   * Page width in points.
    *
-   * Accounts for page rotation - if rotated 90 or 270 degrees,
-   * returns the height of the MediaBox instead.
+   * Measured on the page's visible region — its CropBox intersected with its
+   * MediaBox. Accounts for page rotation: if rotated 90 or 270 degrees, returns
+   * the height of that region instead.
    */
   get width(): number {
     const box = this.getEffectiveBox();
@@ -313,10 +432,11 @@ export class PDFPage {
   }
 
   /**
-   * Page height in points (based on MediaBox).
+   * Page height in points.
    *
-   * Accounts for page rotation - if rotated 90 or 270 degrees,
-   * returns the width of the MediaBox instead.
+   * Measured on the page's visible region — its CropBox intersected with its
+   * MediaBox. Accounts for page rotation: if rotated 90 or 270 degrees, returns
+   * the width of that region instead.
    */
   get height(): number {
     const box = this.getEffectiveBox();
@@ -332,17 +452,18 @@ export class PDFPage {
   /**
    * Get the effective box for dimension calculations.
    *
-   * Returns CropBox if it's smaller than MediaBox, otherwise MediaBox.
+   * The visible region of a page is its CropBox intersected with its MediaBox: a
+   * CropBox may crop the page down but never extend it (ISO 32000-2, 14.11.2).
+   *
+   * A CropBox that shares no area with the MediaBox is degenerate. There is no
+   * correct size for such a page, so the MediaBox is used — a zero-sized page
+   * would propagate a `0` into every dimension a caller derives from it.
    */
   private getEffectiveBox(): Rectangle {
     const mediaBox = this.getMediaBox();
     const cropBox = this.getCropBox();
 
-    if (cropBox.width < mediaBox.width || cropBox.height < mediaBox.height) {
-      return cropBox;
-    }
-
-    return mediaBox;
+    return intersectRectangles(cropBox, mediaBox) ?? mediaBox;
   }
 
   /**
@@ -367,28 +488,16 @@ export class PDFPage {
 
   /**
    * Page rotation in degrees (0, 90, 180, or 270).
+   *
+   * `/Rotate` is an inheritable page attribute, so a page with no `/Rotate` of its
+   * own takes the value of its nearest ancestor that has one.
    */
   get rotation(): 0 | 90 | 180 | 270 {
-    const rotate = this.dict.getNumber("Rotate", this.ctx.resolve.bind(this.ctx));
+    const resolver = this.ctx.resolve.bind(this.ctx);
 
-    if (rotate) {
-      const value = rotate.value % 360;
-
-      // Normalize to 0, 90, 180, 270
-      if (value === 90 || value === -270) {
-        return 90;
-      }
-
-      if (value === 180 || value === -180) {
-        return 180;
-      }
-
-      if (value === 270 || value === -90) {
-        return 270;
-      }
-    }
-
-    return 0;
+    return normalizeRotation(
+      this.inherited(node => node.getNumber("Rotate", resolver)?.value, resolver),
+    );
   }
 
   /**
@@ -2610,35 +2719,49 @@ export class PDFPage {
   }
 
   /**
-   * Get a box (MediaBox, CropBox, etc.) from the page dictionary.
+   * Get a box (MediaBox, CropBox, etc.) from the page.
+   *
+   * MediaBox and CropBox are inheritable, so they are looked up on the page and
+   * then on each ancestor in turn. The other boxes are read from the page only.
    */
   private getBox(name: string): Rectangle | null {
-    const box = this.dict.get(name, this.ctx.resolve.bind(this.ctx));
+    const resolver = this.ctx.resolve.bind(this.ctx);
 
-    if (!(box instanceof PdfArray) || box.length < 4) {
-      return null;
+    if (!INHERITABLE_BOXES.has(name)) {
+      return readBox(this.dict, name, resolver) ?? null;
     }
 
-    const x1 = box.at(0);
-    const y1 = box.at(1);
-    const x2 = box.at(2);
-    const y2 = box.at(3);
+    return this.inherited(node => readBox(node, name, resolver), resolver) ?? null;
+  }
 
-    if (
-      !(x1 instanceof PdfNumber) ||
-      !(y1 instanceof PdfNumber) ||
-      !(x2 instanceof PdfNumber) ||
-      !(y2 instanceof PdfNumber)
-    ) {
-      return null;
+  /**
+   * Read an inheritable attribute: the page's own dictionary first, then each
+   * `/Parent` in turn, with the nearest ancestor winning (ISO 32000-2, 7.7.3.4).
+   *
+   * The stopping condition is that a node *has* the attribute, not that its value
+   * is truthy — an explicit `/Rotate 0` on a page under a rotated `/Pages` node
+   * makes that page unrotated, and must not be mistaken for an absent entry.
+   *
+   * The walk is depth-capped because `/Parent` is file-supplied and a malformed
+   * document can make the chain circular.
+   */
+  private inherited<T>(
+    read: (node: PdfDict) => T | undefined,
+    resolver: RefResolver,
+  ): T | undefined {
+    let node: PdfDict | undefined = this.dict;
+
+    for (let depth = 0; node !== undefined && depth < MAX_PAGE_TREE_DEPTH; depth++) {
+      const value = read(node);
+
+      if (value !== undefined) {
+        return value;
+      }
+
+      node = node.getDict("Parent", resolver);
     }
 
-    return {
-      x: x1.value,
-      y: y1.value,
-      width: x2.value,
-      height: y2.value,
-    };
+    return undefined;
   }
 
   /**
