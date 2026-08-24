@@ -9,14 +9,14 @@
         "@noble/hashes": "^2.2.0",
         "@scure/base": "^2.2.0",
         "asn1js": "^3.0.10",
-        "lru-cache": "^11.4.0",
+        "lru-cache": "^11.5.1",
         "pako": "^2.1.0",
         "pkijs": "^3.4.0",
       },
       "devDependencies": {
-        "@cantoo/pdf-lib": "^2.6.5",
-        "@google-cloud/kms": "^5.5.0",
-        "@google-cloud/secret-manager": "^6.1.2",
+        "@cantoo/pdf-lib": "^2.9.1",
+        "@google-cloud/kms": "^5.5.1",
+        "@google-cloud/secret-manager": "^6.1.3",
         "@types/bun": "^1.3.14",
         "@types/pako": "^2.0.4",
         "@vitest/coverage-v8": "4.0.16",
@@ -24,11 +24,11 @@
         "lint-staged": "^16.4.0",
         "oxfmt": "^0.50.0",
         "oxlint": "~1.39.0",
-        "oxlint-tsgolint": "^0.11.1",
+        "oxlint-tsgolint": "^0.11.5",
         "pdf-lib": "^1.17.1",
-        "tsdown": "^0.22.0",
+        "tsdown": "^0.22.2",
         "typescript": "^5.9.3",
-        "vitest": "^4.1.6",
+        "vitest": "^4.1.8",
       },
       "peerDependencies": {
         "@google-cloud/kms": "^5.0.0",
@@ -53,7 +53,7 @@
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@1.0.2", "", {}, "sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA=="],
 
-    "@cantoo/pdf-lib": ["@cantoo/pdf-lib@2.7.1", "", { "dependencies": { "@pdf-lib/standard-fonts": "^1.0.0", "@pdf-lib/upng": "^1.0.1", "color": "^4.2.3", "crypto-js": "^4.2.0", "node-html-better-parser": ">=1.4.0", "pako": "^1.0.11", "tslib": ">=2" } }, "sha512-oHVfp0JrHYodyF18dG1r85LStjJJs42LLoiu+elB9qZu9YfYoE66omF5hJ3gEKEXk6PPUUEDpBngeZiHMSnueQ=="],
+    "@cantoo/pdf-lib": ["@cantoo/pdf-lib@2.9.1", "", { "dependencies": { "@pdf-lib/standard-fonts": "^1.0.0", "@pdf-lib/upng": "^1.0.1", "color": "^4.2.3", "html-entities": "^2.3.2", "node-html-better-parser": ">=1.5.9", "pako": "^2.2.0", "tslib": ">=2" } }, "sha512-wAKXXDjp5lO0wS6d+k0FRpmWsULb95WhHKYx2fonTbv4zIfuIdCBz2nyTVVDGJpNDLl6o4w9aSTxQisBvvd60A=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-l9Oo58x0HOP5znGzVhYW9U3e5wVuA4LAZU2AGezTmkhO1CgQRFDhDg4nneHsu/t3WniXg9QrG2nIXL/ZS8ln8Q=="],
 
@@ -409,8 +409,6 @@
 
     "cross-spawn": ["cross-spawn@7.0.6", "", { "dependencies": { "path-key": "^3.1.0", "shebang-command": "^2.0.0", "which": "^2.0.1" } }, "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA=="],
 
-    "crypto-js": ["crypto-js@4.2.0", "", {}, "sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q=="],
-
     "data-uri-to-buffer": ["data-uri-to-buffer@4.0.1", "", {}, "sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A=="],
 
     "debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
@@ -553,7 +551,7 @@
 
     "node-fetch": ["node-fetch@3.3.2", "", { "dependencies": { "data-uri-to-buffer": "^4.0.0", "fetch-blob": "^3.1.4", "formdata-polyfill": "^4.0.10" } }, "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA=="],
 
-    "node-html-better-parser": ["node-html-better-parser@1.5.8", "", { "dependencies": { "html-entities": "^2.3.2" } }, "sha512-t/wAKvaTSKco43X+yf9+76RiMt18MtMmzd4wc7rKj+fWav6DV4ajDEKdWlLzSE8USDF5zr/06uGj0Wr/dGAFtw=="],
+    "node-html-better-parser": ["node-html-better-parser@1.5.9", "", { "dependencies": { "html-entities": "^2.3.2" } }, "sha512-z1I5UINMezJXYL9cH3h0a9KBth2G978gSLlfkpQ+CQzzVHVQy9gpARgm9eDsz1O4gn1HtgUqjdAIYxKFZm6uHQ=="],
 
     "object-hash": ["object-hash@3.0.0", "", {}, "sha512-RSn9F68PjH9HqtltsSnqYC1XXoWe9Bju5+213R98cNGttag9q9yAOTzdbsqvIa7aNm5WffBZFpWYr2aWrklWAw=="],
 
@@ -717,7 +715,7 @@
 
     "@babel/types/@babel/helper-validator-identifier": ["@babel/helper-validator-identifier@7.28.5", "", {}, "sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q=="],
 
-    "@cantoo/pdf-lib/pako": ["pako@1.0.11", "", {}, "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="],
+    "@cantoo/pdf-lib/pako": ["pako@2.2.0", "", {}, "sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w=="],
 
     "@isaacs/cliui/string-width": ["string-width@5.1.2", "", { "dependencies": { "eastasianwidth": "^0.2.0", "emoji-regex": "^9.2.2", "strip-ansi": "^7.0.1" } }, "sha512-HnLOCR3vjcY8beoNLtcjZ5/nxn2afmME6lhrDrebokqMap+XbeW8n9TXpPDOqdGK5qcI3oT0GKTW6wC7EMiVqA=="],
 

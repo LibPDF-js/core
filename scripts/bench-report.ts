@@ -14,6 +14,8 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { cpus, platform, totalmem } from "node:os";
 
+import { getLibraryVersions } from "./bench-versions";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types for vitest bench JSON output
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,6 +124,8 @@ function generateMarkdown(data: BenchmarkOutput): string {
   lines.push(`> Generated on ${dateStr} at ${timeStr} UTC`);
   lines.push(`>`);
   lines.push(`> System: ${getSystemInfo()}`);
+  lines.push(`>`);
+  lines.push(`> Libraries: ${getLibraryVersions()}`);
   lines.push("");
   lines.push("---");
   lines.push("");

@@ -9,6 +9,8 @@
 
 import { readFileSync } from "node:fs";
 
+import { getLibraryVersions } from "./bench-versions";
+
 interface Bench {
   name: string;
   mean: number;
@@ -116,7 +118,8 @@ const runner = process.env.BENCH_RUNNER ?? "local";
 lines.push(
   `<details><summary>Environment</summary>\n\n` +
     `- Runner: \`${runner}\`\n` +
-    `- Runtime: Bun ${process.versions.bun}\n\n` +
+    `- Runtime: Bun ${process.versions.bun}\n` +
+    `- Libraries: ${getLibraryVersions()}\n\n` +
     `*Results are machine-dependent.*\n` +
     `</details>`,
 );
