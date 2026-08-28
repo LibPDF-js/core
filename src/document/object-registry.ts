@@ -168,6 +168,14 @@ export class ObjectRegistry {
    * @returns The object, or null if not found
    */
   resolve(ref: PdfRef): PdfObject | null {
+    // Malformed files can reference object numbers at or above
+    // the allocation cursor (dangling refs beyond the xref's /Size). Bump
+    // the cursor so newly allocated numbers never collide with numbers the
+    // existing content already references.
+    if (ref.objectNumber >= this._nextObjNum) {
+      this._nextObjNum = ref.objectNumber + 1;
+    }
+
     // Check registry first
     const existing = this.getObject(ref);
 

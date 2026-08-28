@@ -4,6 +4,7 @@ import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
 import type { PdfObject } from "#src/objects/pdf-object";
+import { PdfRef } from "#src/objects/pdf-ref";
 import { loadFixture, toAsciiString } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
@@ -871,6 +872,35 @@ describe("Form Writing", () => {
       const saved = await pdf.save();
       const pdf2 = await PDF.load(saved);
       expect(countPageWidgets(pdf2)).toBe(0);
+    });
+
+    it("drops dangling /Annots refs when removing flattened widgets", async () => {
+      // Regression: removeAnnotations rebuilt /Annots keeping every ref not
+      // in the removal set — refs whose targets don't exist were never in
+      // that set, so they survived flatten and later broke signature
+      // validation after full-save renumbering + incremental signing.
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+      const form = pdf.getForm()?.acroForm();
+
+      const page = pdf.getPages()[0];
+      const annots = page.dict.get("Annots", ref => pdf.context.registry.resolve(ref));
+      expect(annots?.type).toBe("array");
+
+      // Inject a ref whose target is never defined anywhere in the file.
+      (annots as PdfArray).push(PdfRef.of(9999, 0));
+
+      form!.flatten();
+
+      const after = page.dict.get("Annots", ref => pdf.context.registry.resolve(ref));
+
+      if (after && after.type === "array") {
+        for (const item of after) {
+          if (item instanceof PdfRef) {
+            expect(item.objectNumber).not.toBe(9999);
+          }
+        }
+      }
     });
 
     it("handles checkbox fields correctly", async () => {

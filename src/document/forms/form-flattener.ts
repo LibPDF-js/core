@@ -617,9 +617,17 @@ export class FormFlattener {
       if (item instanceof PdfRef) {
         const key = `${item.objectNumber} ${item.generation}`;
 
-        if (!toRemove.has(key)) {
-          remaining.push(item);
+        if (toRemove.has(key)) {
+          continue;
         }
+
+        // Drop dangling refs (targets that don't exist). Per PDF 1.7
+        // §7.3.10 they are null anyway.
+        if (this.registry.resolve(item) === null) {
+          continue;
+        }
+
+        remaining.push(item);
       }
     }
 

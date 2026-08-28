@@ -485,6 +485,39 @@ describe("writeComplete", () => {
       }
     }
 
+    /**
+     * Build a minimal raw PDF whose page /Annots references object numbers
+     * (295, 299) that are not defined anywhere in the file — dangling refs
+     * above the file's own /Size, as seen in malformed uploads and files
+     * pre-processed by broken third-party flatteners.
+     */
+    function buildPdfWithDanglingAnnots(): Uint8Array {
+      const objects = [
+        "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Annots [295 0 R 299 0 R] >>\nendobj\n",
+      ];
+
+      let body = "%PDF-1.7\n%\xe2\xe3\xcf\xd3\n";
+      const offsets: number[] = [];
+
+      for (const obj of objects) {
+        offsets.push(body.length);
+        body += obj;
+      }
+
+      const xrefOffset = body.length;
+      let xref = "xref\n0 4\n0000000000 65535 f \n";
+
+      for (const off of offsets) {
+        xref += `${String(off).padStart(10, "0")} 00000 n \n`;
+      }
+
+      const trailer = `trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+
+      return Uint8Array.from(Buffer.from(body + xref + trailer, "latin1"));
+    }
+
     it("produces a single contiguous xref subsection (0..N)", async () => {
       // Build a PDF that registers extra objects then orphans some, so the
       // pre-fix code would have produced gap-laden subsections.
@@ -611,6 +644,74 @@ describe("writeComplete", () => {
       const pdf2 = await PDF.load(saved);
       expect(pdf2.getPages().length).toBe(pagesBefore);
       expect(pdf2.getForm()?.getFields().length).toBe(fieldsBefore);
+    });
+
+    it("replaces dangling refs (targets never registered) with null", () => {
+      // Regression: refs whose targets are not in the registry used to pass
+      // through renumbering with their ORIGINAL object numbers. After dense
+      // compaction those numbers land above the new /Size, and a later
+      // incremental update (signing, DSS) re-allocates them — redefining
+      // objects that signed content still references. Adobe then reports
+      // "Document has been altered or corrupted since it was signed".
+      // Per PDF 1.7 §7.3.10 a ref to a nonexistent object is null.
+      const registry = new ObjectRegistry();
+
+      // Orphan forces renumbering to actually move numbers around.
+      registry.register(PdfDict.of({ Type: PdfName.of("Orphan") }));
+
+      const page = PdfDict.of({
+        Type: PdfName.of("Page"),
+        // 295 and 299 are never registered — dangling refs.
+        Annots: new PdfArray([PdfRef.of(295, 0), PdfRef.of(299, 0)]),
+      });
+      const pageRef = registry.register(page);
+
+      const catalog = PdfDict.of({ Type: PdfName.Catalog, Page: pageRef });
+      const catalogRef = registry.register(catalog);
+
+      const result = writeComplete(registry, { root: catalogRef });
+      const text = Buffer.from(result.bytes).toString("latin1");
+
+      // The dangling refs must not survive with their original numbers.
+      expect(text).not.toContain("295 0 R");
+      expect(text).not.toContain("299 0 R");
+
+      // They must be written as null.
+      expect(text).toMatch(/\/Annots\s*\[\s*null\s+null\s*\]/);
+
+      assertNoDanglingRefs(result.bytes);
+    });
+
+    it("full save of a loaded PDF with dangling /Annots refs emits no refs at or above /Size", async () => {
+      // End-to-end variant through the real parse path: a file whose page
+      // /Annots references object numbers that are not defined anywhere
+      // (above its own /Size), as produced by broken third-party tools.
+      const raw = buildPdfWithDanglingAnnots();
+      const pdf = await PDF.load(raw);
+
+      // Force a dirty mark so save() actually rewrites.
+      pdf.getCatalog().set("LangX", PdfString.fromString("x"));
+
+      const saved = await pdf.save();
+      const text = Buffer.from(saved).toString("latin1");
+
+      // Original dangling numbers must not appear as refs in the output.
+      expect(text).not.toContain("295 0 R");
+      expect(text).not.toContain("299 0 R");
+      assertNoDanglingRefs(saved);
+
+      // No reference anywhere in the output may be >= /Size.
+      const sizeMatch = text.match(/\/Size\s+(\d+)/);
+      expect(sizeMatch).not.toBeNull();
+      const size = Number(sizeMatch![1]);
+
+      for (const [, numStr] of text.matchAll(/(\d+) \d+ R\b/g)) {
+        expect(Number(numStr)).toBeLessThan(size);
+      }
+
+      // The file must still reload cleanly.
+      const pdf2 = await PDF.load(saved);
+      expect(pdf2.getPages().length).toBe(1);
     });
 
     it("preserves generation numbers on renumbered refs", () => {

@@ -16,6 +16,7 @@ import { ByteWriter } from "#src/io/byte-writer";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
+import { PdfNull } from "#src/objects/pdf-null";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
@@ -302,7 +303,13 @@ function renumberRef(ref: PdfRef, renumberMap: Map<number, number>): PdfRef {
  */
 function renumberRefs(obj: PdfObject, renumberMap: Map<number, number>): PdfObject {
   if (obj instanceof PdfRef) {
-    return renumberRef(obj, renumberMap);
+    const newNum = renumberMap.get(obj.objectNumber);
+
+    if (newNum === undefined) {
+      return PdfNull.instance;
+    }
+
+    return PdfRef.of(newNum, obj.generation);
   }
 
   if (obj instanceof PdfStream) {

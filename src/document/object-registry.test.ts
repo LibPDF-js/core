@@ -159,6 +159,43 @@ describe("ObjectRegistry", () => {
     });
   });
 
+  describe("dangling reference defense", () => {
+    it("bumps nextObjectNumber when resolving a ref beyond the xref range", () => {
+      // Regression: malformed files can reference object numbers above their
+      // own /Size (dangling refs). If the allocation cursor only considers
+      // DEFINED objects, a later incremental update (e.g. signing) allocates
+      // numbers that signed content already references — redefining them and
+      // breaking signature validation in Adobe.
+      const xref = new Map<number, XRefEntry>([
+        [1, { type: "uncompressed", offset: 100, generation: 0 }],
+        [5, { type: "uncompressed", offset: 200, generation: 0 }],
+      ]);
+
+      const registry = new ObjectRegistry(xref);
+      expect(registry.nextObjectNumber).toBe(6);
+
+      // Resolving a dangling ref (no resolver → null) must still bump the cursor.
+      expect(registry.resolve(PdfRef.of(295, 0))).toBeNull();
+      expect(registry.nextObjectNumber).toBe(296);
+
+      const ref = registry.register(new PdfDict());
+      expect(ref.objectNumber).toBe(296);
+    });
+
+    it("does not bump nextObjectNumber for in-range refs", () => {
+      const xref = new Map<number, XRefEntry>([
+        [1, { type: "uncompressed", offset: 100, generation: 0 }],
+        [5, { type: "uncompressed", offset: 200, generation: 0 }],
+      ]);
+
+      const registry = new ObjectRegistry(xref);
+
+      registry.resolve(PdfRef.of(3, 0));
+
+      expect(registry.nextObjectNumber).toBe(6);
+    });
+  });
+
   describe("commitNewObjects", () => {
     it("moves new objects to loaded", () => {
       const registry = new ObjectRegistry();

@@ -8,6 +8,7 @@ import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { PdfRef } from "#src/objects/pdf-ref";
 import { describe, expect, it } from "vitest";
 
 import type { PDFLinkAnnotation } from "./link";
@@ -627,6 +628,54 @@ describe("PDFAnnotations", () => {
 
       expect(count).toBe(3);
       expect(page.getAnnotations()).toHaveLength(0);
+    });
+
+    it("drops dangling /Annots refs during flatten", async () => {
+      // Regression: /Annots entries whose target object doesn't exist were
+      // skipped (`continue`) instead of removed. The dangling ref survived
+      // into the full save, where renumbering left it pointing above /Size —
+      // and a later incremental update (signing) reused that number,
+      // invalidating signatures in Adobe.
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.addHighlightAnnotation({
+        rect: { x: 100, y: 700, width: 200, height: 14 },
+        color: rgb(1, 1, 0),
+      });
+
+      // Inject a ref whose target is never defined.
+      const annots = page.dict.get("Annots", ref => pdf.context.registry.resolve(ref));
+      expect(annots).toBeInstanceOf(PdfArray);
+      (annots as PdfArray).push(PdfRef.of(999, 0));
+
+      const count = page.flattenAnnotations();
+      expect(count).toBe(1);
+
+      // The dangling ref must not survive in /Annots.
+      const after = page.dict.get("Annots", ref => pdf.context.registry.resolve(ref));
+
+      if (after instanceof PdfArray) {
+        for (const item of after) {
+          expect(item).not.toBe(PdfRef.of(999, 0));
+        }
+      }
+    });
+
+    it("drops dangling /Annots refs even when nothing is flattenable", async () => {
+      const pdf = PDF.create();
+      const page = pdf.addPage();
+
+      page.dict.set("Annots", new PdfArray([PdfRef.of(999, 0)]));
+
+      const count = page.flattenAnnotations();
+      expect(count).toBe(0);
+
+      const after = page.dict.get("Annots", ref => pdf.context.registry.resolve(ref));
+
+      if (after instanceof PdfArray) {
+        expect(after.length).toBe(0);
+      }
     });
 
     it("preserves link annotations during flatten", async () => {

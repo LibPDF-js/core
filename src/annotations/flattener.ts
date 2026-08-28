@@ -129,6 +129,13 @@ export class AnnotationFlattener {
       }
 
       if (!annotDict) {
+        // Dangling ref (target doesn't exist) or resolves to a non-dict.
+        // Per PDF 1.7 §7.3.10 such refs are null, remove them from /Annots
+        // rather than skipping.
+        if (annotRef) {
+          refsToRemove.add(`${annotRef.objectNumber} ${annotRef.generation}`);
+        }
+
         continue;
       }
 
