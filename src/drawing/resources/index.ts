@@ -27,9 +27,13 @@ export type { ImagePatternOptions, ShadingPatternOptions, TilingPatternOptions }
 export { PDFShadingPattern, PDFTilingPattern, type PDFPattern } from "./pattern";
 
 // ExtGState
-export type { ExtGStateOptions } from "./extgstate";
+export type { ExtGStateOptions, ExtGStateSoftMask, SoftMaskOptions } from "./extgstate";
 export { PDFExtGState } from "./extgstate";
 
 // Form XObject
-export type { FormXObjectOptions } from "./form-xobject";
+export type {
+  FormXObjectOptions,
+  TransparencyGroupColorSpace,
+  TransparencyGroupOptions,
+} from "./form-xobject";
 export { PDFFormXObject } from "./form-xobject";
