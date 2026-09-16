@@ -1,4 +1,10 @@
 import type { TerminalField } from "#src/document/forms/fields";
+import { SignatureField } from "#src/document/forms/fields";
+import { PdfArray } from "#src/objects/pdf-array";
+import { PdfDict } from "#src/objects/pdf-dict";
+import { PdfName } from "#src/objects/pdf-name";
+import { PdfNumber } from "#src/objects/pdf-number";
+import { PdfString } from "#src/objects/pdf-string";
 import { loadFixture } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
@@ -206,6 +212,73 @@ describe("PDFForm", () => {
       const fields = form!.getCheckboxes();
 
       expect(fields.every(f => f.type === "checkbox")).toBe(true);
+    });
+  });
+
+  describe("getSignedFields", () => {
+    it("returns empty when sig fields are empty placeholders", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+      const form = pdf.getForm();
+
+      expect(form!.getSignatureFields().length).toBeGreaterThan(0);
+      expect(form!.getSignedFields()).toHaveLength(0);
+    });
+
+    it("includes fields with a well-formed signature dict", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+      const form = pdf.getForm();
+
+      const sigField = form!.getSignatureFields()[0];
+      expect(sigField).toBeDefined();
+
+      const sigDict = PdfDict.of({
+        Type: PdfName.of("Sig"),
+        Filter: PdfName.of("Adobe.PPKLite"),
+        SubFilter: PdfName.of("ETSI.CAdES.detached"),
+        Contents: PdfString.fromHex("30820100"),
+        ByteRange: new PdfArray([
+          PdfNumber.of(0),
+          PdfNumber.of(100),
+          PdfNumber.of(200),
+          PdfNumber.of(50),
+        ]),
+      });
+      const sigRef = pdf.context.registry.register(sigDict);
+      sigField.getDict().set("V", sigRef);
+
+      const signed = form!.getSignedFields();
+      expect(signed).toContain(sigField);
+      expect(signed.every(f => f instanceof SignatureField && f.isSigned())).toBe(true);
+    });
+
+    it("includes document timestamp fields", async () => {
+      const bytes = await loadFixture("forms", "sample_form.pdf");
+      const pdf = await PDF.load(bytes);
+      const form = pdf.getForm();
+
+      const sigField = form!.getSignatureFields()[0];
+      expect(sigField).toBeDefined();
+
+      const tsDict = PdfDict.of({
+        Type: PdfName.of("DocTimeStamp"),
+        Filter: PdfName.of("Adobe.PPKLite"),
+        SubFilter: PdfName.of("ETSI.RFC3161"),
+        Contents: PdfString.fromHex("30820100"),
+        ByteRange: new PdfArray([
+          PdfNumber.of(0),
+          PdfNumber.of(100),
+          PdfNumber.of(200),
+          PdfNumber.of(50),
+        ]),
+      });
+      const tsRef = pdf.context.registry.register(tsDict);
+      sigField.getDict().set("V", tsRef);
+
+      const signed = form!.getSignedFields();
+      expect(signed).toContain(sigField);
+      expect(sigField.isDocumentTimestamp()).toBe(true);
     });
   });
 
