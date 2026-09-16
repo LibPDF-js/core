@@ -20,6 +20,8 @@ import { PKCS12KDF } from "./pkcs12-kdf";
 import { RC2 } from "./rc2";
 import { TripleDES } from "./triple-des";
 
+type AlgorithmIdentifier = string | { name: string };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // OID Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,12 +129,14 @@ export class CryptoEngine extends pkijs.CryptoEngine {
   /**
    * Override digest to normalize algorithm names.
    * Web Crypto expects "SHA-256" but some code passes "SHA256".
+   * `algorithm` might be passed either as string or { name: string } by pkijs
    */
   override async digest(
-    algorithm: { name: string },
+    algorithm: AlgorithmIdentifier,
     data: ArrayBuffer | ArrayBufferView,
   ): Promise<ArrayBuffer> {
-    const normalizedAlgorithm = { ...algorithm };
+    const normalizedAlgorithm =
+      typeof algorithm === "string" ? { name: algorithm } : { ...algorithm };
 
     // Normalize hash algorithm names (SHA256 -> SHA-256)
     if (normalizedAlgorithm.name && !normalizedAlgorithm.name.includes("-")) {
