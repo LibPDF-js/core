@@ -2695,10 +2695,14 @@ export class PDF {
       BaseFont: PdfName.of("ZapfDingbats"),
     });
 
+    // Register fonts and get references
+    const helveticaRef = this.ctx.registry.register(helveticaDict);
+    const zapfDingbatsRef = this.ctx.registry.register(zapfDingbatsDict);
+
     // Create Font dictionary with standard fonts
     const fontsDict = PdfDict.of({
-      Helv: helveticaDict,
-      ZaDb: zapfDingbatsDict,
+      Helv: helveticaRef,
+      ZaDb: zapfDingbatsRef,
     });
 
     // Create Default Resources dictionary
