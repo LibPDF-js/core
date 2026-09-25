@@ -1,0 +1,54 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R
+   /Resources << /Font << /F1 5 0 R >> /ExtGState << /GS0 6 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 411 >>
+stream
+BT
+/F1 12 Tf 72 700 Td (Sign below) Tj
+ET
+BT
+/F1 10 Tf /GS0 gs
+217 330.75 Td (field1date) Tj
+264.75 0.75 Td (field2date) Tj
+-427.5 -3 Td (field1sign) Tj
+270.75 0 Td (field2sign) Tj
+ET
+BT
+/F1 10 Tf 1 0 0 rg
+231.365 333.405 Td ({{date,r1}}) Tj
+268.5 -2.25 Td ({{date,r2}}) Tj
+1.95486 0 0 3.65714 0 0 Tm 28.4501 90.7155 Td ({{signature,r1}}) Tj
+1.90687 0 0 3.79167 0 0 Tm 170.84 87.405 Td ({{signature,r2}}) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /ExtGState /ca 0 >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000278 00000 n 
+0000000739 00000 n 
+0000000836 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+880
+%%EOF

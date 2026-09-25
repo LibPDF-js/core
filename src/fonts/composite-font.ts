@@ -28,7 +28,7 @@ import { PdfStream } from "#src/objects/pdf-stream.ts";
 import { CIDFont, parseCIDFont } from "./cid-font";
 import { CMap, parseCMap } from "./cmap";
 import type { FontDescriptor } from "./font-descriptor";
-import { PdfFont } from "./pdf-font";
+import { type CharCode, PdfFont } from "./pdf-font";
 import type { ToUnicodeMap } from "./to-unicode";
 
 /**
@@ -99,6 +99,19 @@ export class CompositeFont extends PdfFont {
    */
   encodeText(text: string): number[] {
     return this.cmap.encode(text);
+  }
+
+  /** Codes are one to four bytes, per the CMap's codespace ranges. */
+  decode(bytes: Uint8Array): CharCode[] {
+    const codes: CharCode[] = [];
+
+    for (let offset = 0; offset < bytes.length; ) {
+      const next = this.cmap.readCharCode(bytes, offset);
+      codes.push(next);
+      offset += next.length;
+    }
+
+    return codes;
   }
 
   /**

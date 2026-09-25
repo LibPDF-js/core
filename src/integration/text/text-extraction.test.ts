@@ -222,6 +222,46 @@ describe("Text Extraction Integration", () => {
     });
   });
 
+  describe("template tags drawn over invisible labels", () => {
+    // Field labels drawn with /ca 0 and the tag printed on top, same baseline
+    it("finds every tag intact", async () => {
+      const bytes = await loadFixture("text", "overlapping-invisible-labels.pdf");
+      const pdf = await PDF.load(bytes);
+      const page = pdf.getPage(0);
+
+      const matches = page!.findText(/\{\{[^}]*\}\}/g).map(m => m.text);
+
+      expect(matches).toEqual([
+        "{{date,r1}}",
+        "{{signature,r1}}",
+        "{{signature,r2}}",
+        "{{date,r2}}",
+      ]);
+    });
+
+    it("keeps the overlapped label on its own line", async () => {
+      const bytes = await loadFixture("text", "overlapping-invisible-labels.pdf");
+      const pdf = await PDF.load(bytes);
+      const page = pdf.getPage(0);
+
+      const lines = page!.extractText().lines.map(l => l.text);
+
+      expect(lines).toContain("{{date,r2}}");
+      expect(lines.some(l => l.includes("field2date"))).toBe(true);
+      expect(lines.some(l => l.includes("field2date") && l.includes("{{date,r2}}"))).toBe(false);
+    });
+  });
+
+  describe("malformed documents", () => {
+    it("terminates on a page tree with a Parent cycle", async () => {
+      const bytes = await loadFixture("malformed", "PDFBOX-6040-nodeloop.pdf");
+      const pdf = await PDF.load(bytes);
+      const page = pdf.getPage(0);
+
+      expect(() => page!.extractText()).not.toThrow();
+    });
+  });
+
   describe("bounding boxes", () => {
     it("provides valid bounding boxes", async () => {
       const bytes = await loadFixture("text", "rot0.pdf");

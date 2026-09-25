@@ -151,6 +151,37 @@ describe("CompositeFont", () => {
     });
   });
 
+  describe("decode", () => {
+    const cidFont = new CIDFont({ subtype: "CIDFontType2", baseFontName: "TestFont" });
+
+    it("reads two bytes per code for Identity-H", () => {
+      const font = new CompositeFont({ baseFontName: "TestFont", cmap: CMap.identityH(), cidFont });
+
+      expect(font.decode(new Uint8Array([0x00, 0x41, 0x4e, 0x2d]))).toEqual([
+        { code: 0x41, length: 2 },
+        { code: 0x4e2d, length: 2 },
+      ]);
+    });
+
+    it("follows the CMap codespace ranges for mixed-width codes", () => {
+      // Shift-JIS style: single-byte ASCII, double-byte kanji
+      const cmap = new CMap({
+        name: "Custom",
+        codespaceRanges: [
+          { low: 0x20, high: 0x7e, numBytes: 1 },
+          { low: 0x8140, high: 0x9ffc, numBytes: 2 },
+        ],
+      });
+      const font = new CompositeFont({ baseFontName: "TestFont", cmap, cidFont });
+
+      expect(font.decode(new Uint8Array([0x41, 0x81, 0x40, 0x20]))).toEqual([
+        { code: 0x41, length: 1 },
+        { code: 0x8140, length: 2 },
+        { code: 0x20, length: 1 },
+      ]);
+    });
+  });
+
   describe("canEncode", () => {
     it("should return true for Identity-H", () => {
       const cmap = CMap.identityH();

@@ -14,7 +14,7 @@ import type { PdfRef } from "#src/objects/pdf-ref.ts";
 import { parseFontProgram } from "./embedded-parser.ts";
 import { FontDescriptor } from "./font-descriptor.ts";
 import { type FontProgram, TrueTypeFontProgram } from "./font-program/index.ts";
-import { PdfFont } from "./pdf-font.ts";
+import { type CharCode, PdfFont } from "./pdf-font.ts";
 
 /**
  * Options for embedding a font.
@@ -237,6 +237,17 @@ export class EmbeddedFont extends PdfFont {
    */
   encodeText(text: string): number[] {
     return this.trackAndEncode(text).map(e => e.codePoint);
+  }
+
+  /** Identity-H: two bytes per code. */
+  decode(bytes: Uint8Array): CharCode[] {
+    const codes: CharCode[] = [];
+
+    for (let offset = 0; offset + 1 < bytes.length; offset += 2) {
+      codes.push({ code: (bytes[offset] << 8) | bytes[offset + 1], length: 2 });
+    }
+
+    return codes;
   }
 
   /**

@@ -56,8 +56,10 @@ This document captures the high-level goals for @libpdf/core. Use this to steer 
 
 - [x] **Extract text** — Get text content from pages (extractText API)
 - [x] **Search text** — Find text patterns with bounding box results (findText API)
-- [x] **Preserve reading order** — Line grouping based on baseline/font
+- [x] **Preserve reading order** — Run-based line grouping (strings stay intact, overlaps split)
+- [x] **Extract from form XObjects** — Headers, footers, embedded pages, flattened fields
 - [ ] **Extract from annotations** — Include comment text, form values
+- [ ] **Respect clipping** — Drop text outside the current clip path
 
 ### 9. Creation
 
