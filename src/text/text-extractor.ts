@@ -191,6 +191,8 @@ export class TextExtractor {
 
     try {
       this.run(form.content, form.resources);
+    } catch {
+      // A broken form must not take the page's own text with it
     } finally {
       this.state.restoreGraphicsStateTo(depth);
       this.activeForms.delete(form.stream);

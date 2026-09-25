@@ -76,11 +76,20 @@ export class TextResources {
       return null;
     }
 
+    let content: Uint8Array;
+
+    try {
+      content = stream.getDecodedData();
+    } catch {
+      // Undecodable form: treat as absent rather than losing the page
+      return null;
+    }
+
     const ownResources = stream.getDict("Resources", this.resolve);
 
     return {
       stream,
-      content: stream.getDecodedData(),
+      content,
       matrix: readMatrix(stream.getArray("Matrix", this.resolve), this.resolve),
       resources: ownResources
         ? new TextResources(ownResources, this.resolve, this.fontCache)

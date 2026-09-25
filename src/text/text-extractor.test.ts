@@ -249,6 +249,24 @@ describe("TextExtractor", () => {
       expect(chars.map(c => c.char).join("")).toBe("x");
     });
 
+    it("keeps the page's text when a form cannot be decoded", () => {
+      const broken = new PdfStream(
+        PdfDict.of({
+          Type: PdfName.of("XObject"),
+          Subtype: PdfName.of("Form"),
+          BBox: PdfArray.of(PdfNumber.of(0), PdfNumber.of(0), PdfNumber.of(1), PdfNumber.of(1)),
+          Filter: PdfName.of("LZWDecode"),
+        }),
+        new Uint8Array([0xff, 0xff, 0xff, 0xff]),
+      );
+      const res = resources(resourcesDict({ F1: helvetica() }, { Fm1: broken }));
+
+      const chars = extract("BT /F1 10 Tf 0 0 Td (a) Tj ET /Fm1 Do BT 20 0 Td (b) Tj ET", res);
+
+      expect(chars.map(c => c.char).join("")).toBe("ab");
+      expect(chars[1].bbox.x).toBeCloseTo(20);
+    });
+
     it("ignores image XObjects and unknown names", () => {
       const image = new PdfStream(
         PdfDict.of({ Type: PdfName.of("XObject"), Subtype: PdfName.of("Image") }),

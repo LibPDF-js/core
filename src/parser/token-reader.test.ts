@@ -818,6 +818,17 @@ describe("TokenReader", () => {
   });
 
   describe("delimiter parsing", () => {
+    it.each([")", "{", "}"])("always advances past a stray %s", stray => {
+      const r = reader(`a ${stray} b`);
+      const values: unknown[] = [];
+
+      for (let t = r.nextToken(); t.type !== "eof"; t = r.nextToken()) {
+        values.push(t.type === "keyword" ? t.value : t.type);
+      }
+
+      expect(values).toEqual(["a", stray, "b"]);
+    });
+
     it("parses array start [", () => {
       const r = reader("[");
       const token = r.nextToken();

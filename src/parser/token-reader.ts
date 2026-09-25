@@ -600,6 +600,12 @@ export class TokenReader {
       this.scanner.advance();
     }
 
+    // A stray delimiter such as ")" or "}" is not a regular char; consume it
+    // as a one-byte keyword so the reader always makes progress
+    if (this.scanner.position === start) {
+      this.scanner.advance();
+    }
+
     const value = this.extractText(start, this.scanner.position);
 
     return { type: "keyword", value, position };
