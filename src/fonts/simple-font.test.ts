@@ -40,6 +40,18 @@ describe("SimpleFont", () => {
     });
   });
 
+  describe("decode", () => {
+    it("reads one byte per code", () => {
+      const font = new SimpleFont({ subtype: "TrueType", baseFontName: "Helvetica" });
+
+      expect(font.decode(new Uint8Array([0x48, 0x20, 0xe9]))).toEqual([
+        { code: 0x48, length: 1 },
+        { code: 0x20, length: 1 },
+        { code: 0xe9, length: 1 },
+      ]);
+    });
+  });
+
   describe("getWidth", () => {
     it("should return width from widths array", () => {
       const font = new SimpleFont({

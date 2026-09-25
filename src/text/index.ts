@@ -6,7 +6,8 @@
  */
 
 export { getPlainText, groupCharsIntoLines, type LineGrouperOptions } from "./line-grouper";
-export { TextExtractor, type TextExtractorOptions } from "./text-extractor";
+export { TextExtractor } from "./text-extractor";
+export { type FormXObject, TextResources } from "./text-resources";
 export { searchPage, searchPages } from "./text-search";
 export { TextState } from "./text-state";
 export * from "./types";

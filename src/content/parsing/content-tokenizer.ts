@@ -25,6 +25,9 @@ export class ContentTokenizer {
 
   private peeked: ContentOrOperatorToken | null = null;
 
+  /** An operator found inside an unterminated array or dict, emitted next */
+  private pushedBack: OperatorToken | null = null;
+
   constructor(bytes: Uint8Array) {
     this.scanner = new Scanner(bytes);
     this.reader = new TokenReader(this.scanner);
@@ -90,6 +93,13 @@ export class ContentTokenizer {
   }
 
   private readNext(): ContentOrOperatorToken | null {
+    if (this.pushedBack !== null) {
+      const token = this.pushedBack;
+      this.pushedBack = null;
+
+      return token;
+    }
+
     while (true) {
       const token = this.reader.nextToken();
 
@@ -188,8 +198,9 @@ export class ContentTokenizer {
       }
 
       if (item.type === "operator") {
-        // Operators shouldn't appear inside arrays - treat as error
-        throw new Error(`Unexpected operator in array: ${item.name}`);
+        // The closing ] was lost; end the array and let the operator run
+        this.pushedBack = item;
+        break;
       }
 
       items.push(item);
@@ -220,8 +231,14 @@ export class ContentTokenizer {
         break;
       }
 
+      if (key.type === "operator") {
+        // The closing >> was lost; end the dict and let the operator run
+        this.pushedBack = key;
+        break;
+      }
+
       if (key.type !== "name") {
-        throw new Error(`Expected name as dict key, got ${key.type}`);
+        continue;
       }
 
       // Read value
@@ -232,7 +249,8 @@ export class ContentTokenizer {
       }
 
       if (value.type === "operator") {
-        throw new Error(`Unexpected operator as dict value: ${value.name}`);
+        this.pushedBack = value;
+        break;
       }
 
       entries.set(key.value, value);

@@ -248,20 +248,45 @@ Embedded file specification handling.
 
 Text extraction from PDF content streams with position tracking.
 
-| Component       | Purpose                                          |
-| --------------- | ------------------------------------------------ |
-| `TextExtractor` | Parses content streams, tracks text state        |
-| `TextState`     | Manages text matrix, font, and positioning       |
-| `LineGrouper`   | Groups characters into lines based on baseline   |
-| `text-search`   | String and regex search with bounding boxes      |
-| `types.ts`      | TextChar, TextLine, TextSpan, SearchResult types |
+| Component       | Purpose                                                               |
+| --------------- | --------------------------------------------------------------------- |
+| `TextExtractor` | Interprets content streams and form XObjects, emits positioned glyphs |
+| `TextResources` | Fonts and form XObjects reachable from a `/Resources` dict, cached    |
+| `TextState`     | Graphics/text state; glyph geometry through Tm × CTM                  |
+| `LineGrouper`   | Groups glyphs into runs, runs into lines, lines into spans            |
+| `text-search`   | String and regex search with bounding boxes                           |
+| `types.ts`      | ExtractedChar, TextLine, TextSpan, TextMatch types                    |
 
 ### Supported Text Operators
 
 - Positioning: `Td`, `TD`, `Tm`, `T*`
-- Showing: `Tj`, `TJ`, `'`, `"`
+- Showing: `Tj`, `TJ`, `'`, `"` (codes split via the font's CMap; `Tw` on single-byte code 32)
 - State: `Tf`, `Tc`, `Tw`, `Tz`, `TL`, `Ts`, `Tr`
-- Graphics: `cm`, `q`, `Q` (matrix transformations)
+- Graphics: `cm`, `q`, `Q` (font and text state are part of the saved state)
+- XObjects: `Do` for `/Subtype /Form` (own or inherited resources, `/Matrix`, cycle and depth guard)
+
+### Line Grouping Model
+
+Glyphs arrive in stream order. Consecutive glyphs that advance along one baseline form a
+**run** (the string a producer drew as a unit). Runs are placed on lines: a run joins a
+line if it shares the baseline and none of its space-occupying glyphs collide with glyphs
+already there; otherwise it opens a new line on the same baseline. This keeps strings drawn
+over each other (tags over invisible labels, layered text) intact instead of interleaving
+them glyph by glyph. Within a line, runs are k-way merged by glyph x while intra-run order
+is preserved.
+
+Rules layered on that model, each with a fixture or unit test:
+
+- Whitespace and overlay glyphs (combining marks, accents) do not occupy space.
+- A glyph repeating one already on the line at the same position is dropped (fake bold,
+  redrawn chunk boundaries).
+- Whitespace-only runs stay with the run drawn before them.
+- Lines whose glyphs predominantly move left in stream order keep stream order (design-tool
+  exports, RTL).
+
+Known limitations: rotated/vertical text, multi-column pages sharing a baseline, an
+invisible text layer that duplicates visible text at _different_ positions (yields a
+duplicate line), text clipped away by `W n`, and `Tr 3` text is extracted like any other.
 
 ## Annotations Layer (`src/annotations/`)
 

@@ -42,6 +42,12 @@ end
   return new TextEncoder().encode(cmap);
 }
 
+const TWO_BYTE_CODESPACE = `
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+`;
+
 describe("CMap", () => {
   describe("Identity-H", () => {
     it("should be identity mapping", () => {
@@ -132,19 +138,20 @@ describe("CMap", () => {
 
   describe("lookup", () => {
     it("should return 0 for unmapped codes", () => {
-      const cmap = new CMap({ name: "Test" });
+      const cmap = parseCMap(makeCMapStream(TWO_BYTE_CODESPACE));
 
       expect(cmap.lookup(0x100)).toBe(0);
     });
 
     it("should find direct char mappings", () => {
-      const cmap = new CMap({
-        name: "Test",
-        charMappings: new Map([
-          [0x0001, 100],
-          [0x0002, 200],
-        ]),
-      });
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
+2 begincidchar
+<0001> 100
+<0002> 200
+endcidchar
+`),
+      );
 
       expect(cmap.lookup(0x0001)).toBe(100);
       expect(cmap.lookup(0x0002)).toBe(200);
@@ -152,10 +159,13 @@ describe("CMap", () => {
     });
 
     it("should find range mappings", () => {
-      const cmap = new CMap({
-        name: "Test",
-        rangeMappings: [{ start: 0x0100, end: 0x01ff, baseCID: 1000 }],
-      });
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
+1 begincidrange
+<0100> <01FF> 1000
+endcidrange
+`),
+      );
 
       expect(cmap.lookup(0x0100)).toBe(1000);
       expect(cmap.lookup(0x0101)).toBe(1001);
@@ -164,38 +174,63 @@ describe("CMap", () => {
     });
 
     it("should prefer direct mappings over ranges", () => {
-      const cmap = new CMap({
-        name: "Test",
-        charMappings: new Map([[0x0105, 999]]),
-        rangeMappings: [{ start: 0x0100, end: 0x01ff, baseCID: 1000 }],
-      });
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
+1 begincidchar
+<0105> 999
+endcidchar
+1 begincidrange
+<0100> <01FF> 1000
+endcidrange
+`),
+      );
 
       expect(cmap.lookup(0x0105)).toBe(999);
       expect(cmap.lookup(0x0106)).toBe(1006);
+    });
+
+    it("should distinguish codes by byte length when given", () => {
+      const cmap = parseCMap(
+        makeCMapStream(`
+2 begincodespacerange
+<00> <7F>
+<8000> <FFFF>
+endcodespacerange
+2 begincidchar
+<41> 1
+<0041> 2
+endcidchar
+`),
+      );
+
+      expect(cmap.lookup(0x41, 1)).toBe(1);
+      expect(cmap.lookup(0x41, 2)).toBe(2);
     });
   });
 
   describe("canEncode (non-identity)", () => {
     it("should return true for codes with direct mappings", () => {
-      const cmap = new CMap({
-        name: "Test",
-        codespaceRanges: [{ low: 0x0000, high: 0xffff, numBytes: 2 }],
-        charMappings: new Map([
-          [0x0041, 100], // 'A'
-          [0x0042, 101], // 'B'
-        ]),
-      });
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
+2 begincidchar
+<0041> 100
+<0042> 101
+endcidchar
+`),
+      );
 
       expect(cmap.canEncode("A")).toBe(true);
       expect(cmap.canEncode("AB")).toBe(true);
     });
 
     it("should return true for codes within range mappings", () => {
-      const cmap = new CMap({
-        name: "Test",
-        codespaceRanges: [{ low: 0x0000, high: 0xffff, numBytes: 2 }],
-        rangeMappings: [{ start: 0x0041, end: 0x005a, baseCID: 100 }], // A-Z
-      });
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
+1 begincidrange
+<0041> <005A> 100
+endcidrange
+`),
+      );
 
       expect(cmap.canEncode("A")).toBe(true);
       expect(cmap.canEncode("Z")).toBe(true);
@@ -203,25 +238,65 @@ describe("CMap", () => {
     });
 
     it("should return false for unmapped codes", () => {
-      const cmap = new CMap({
-        name: "Test",
-        codespaceRanges: [{ low: 0x0000, high: 0xffff, numBytes: 2 }],
-        charMappings: new Map([[0x0041, 100]]), // Only 'A'
-      });
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
+1 begincidchar
+<0041> 100
+endcidchar
+`),
+      );
 
       expect(cmap.canEncode("B")).toBe(false);
       expect(cmap.canEncode("AB")).toBe(false);
     });
+  });
 
-    it("should return false for codes outside codespace", () => {
-      const cmap = new CMap({
-        name: "Test",
-        codespaceRanges: [{ low: 0x0000, high: 0x00ff, numBytes: 1 }],
-        charMappings: new Map([[0x0041, 100]]),
+  describe("readCharCode (non-identity)", () => {
+    const shiftJis = parseCMap(
+      makeCMapStream(`
+2 begincodespacerange
+<20> <7E>
+<8140> <9FFC>
+endcodespacerange
+`),
+    );
+
+    it("reads mixed-width codes by codespace range", () => {
+      const bytes = new Uint8Array([0x41, 0x81, 0x40, 0x20]);
+
+      expect(shiftJis.readCharCode(bytes, 0)).toEqual({ code: 0x41, length: 1 });
+      expect(shiftJis.readCharCode(bytes, 1)).toEqual({ code: 0x8140, length: 2 });
+      expect(shiftJis.readCharCode(bytes, 3)).toEqual({ code: 0x20, length: 1 });
+    });
+
+    it("matches codespace ranges byte-wise, not by integer value", () => {
+      const cmap = parseCMap(
+        makeCMapStream(`
+2 begincodespacerange
+<8140> <9FFC>
+<810000> <9FFFFF>
+endcodespacerange
+`),
+      );
+
+      // 0x8200 is inside 0x8140..0x9ffc numerically but 0x00 < 0x40
+      expect(cmap.readCharCode(new Uint8Array([0x82, 0x00, 0x00]), 0)).toEqual({
+        code: 0x820000,
+        length: 3,
       });
+      expect(cmap.readCharCode(new Uint8Array([0x81, 0x5f, 0x00]), 0)).toEqual({
+        code: 0x815f,
+        length: 2,
+      });
+    });
 
-      // Code point 0x4E00 (Chinese character) is outside 0x00-0xFF codespace
-      expect(cmap.canEncode("\u4E00")).toBe(false);
+    it("consumes the shortest code length on invalid codes", () => {
+      // 0x81 0x20: no 1-byte match, 0x20 < 0x40 so no 2-byte match
+      const bytes = new Uint8Array([0x81, 0x20, 0x41]);
+
+      expect(shiftJis.readCharCode(bytes, 0)).toEqual({ code: 0x81, length: 1 });
+      expect(shiftJis.readCharCode(bytes, 1)).toEqual({ code: 0x20, length: 1 });
+      expect(shiftJis.readCharCode(bytes, 2)).toEqual({ code: 0x41, length: 1 });
     });
   });
 });
@@ -229,52 +304,43 @@ describe("CMap", () => {
 describe("parseCMap", () => {
   describe("codespace ranges", () => {
     it("should parse single codespace range", () => {
-      const data = makeCMapStream(`
-1 begincodespacerange
-<0000> <FFFF>
-endcodespacerange
-`);
+      const cmap = parseCMap(makeCMapStream(TWO_BYTE_CODESPACE));
 
-      const cmap = parseCMap(data);
-      const ranges = cmap.getCodespaceRanges();
-
-      expect(ranges.length).toBe(1);
-      expect(ranges[0].low).toBe(0x0000);
-      expect(ranges[0].high).toBe(0xffff);
-      expect(ranges[0].numBytes).toBe(2);
+      expect(cmap.readCharCode(new Uint8Array([0x12, 0x34]), 0)).toEqual({
+        code: 0x1234,
+        length: 2,
+      });
     });
 
     it("should parse multiple codespace ranges", () => {
-      const data = makeCMapStream(`
+      const cmap = parseCMap(
+        makeCMapStream(`
 2 begincodespacerange
 <00> <7F>
 <8000> <FFFF>
 endcodespacerange
-`);
+`),
+      );
 
-      const cmap = parseCMap(data);
-      const ranges = cmap.getCodespaceRanges();
-
-      expect(ranges.length).toBe(2);
-      expect(ranges[0].numBytes).toBe(1);
-      expect(ranges[1].numBytes).toBe(2);
+      expect(cmap.readCharCode(new Uint8Array([0x41]), 0)).toEqual({ code: 0x41, length: 1 });
+      expect(cmap.readCharCode(new Uint8Array([0x80, 0x01]), 0)).toEqual({
+        code: 0x8001,
+        length: 2,
+      });
     });
   });
 
   describe("cidchar mappings", () => {
     it("should parse cidchar entries", () => {
-      const data = makeCMapStream(`
-1 begincodespacerange
-<0000> <FFFF>
-endcodespacerange
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
 3 begincidchar
 <0001> 100
 <0002> 200
 <0003> 300
 endcidchar
-`);
-
-      const cmap = parseCMap(data);
+`),
+      );
 
       expect(cmap.lookup(0x0001)).toBe(100);
       expect(cmap.lookup(0x0002)).toBe(200);
@@ -284,16 +350,13 @@ endcidchar
 
   describe("cidrange mappings", () => {
     it("should parse cidrange entries", () => {
-      const data = makeCMapStream(`
-1 begincodespacerange
-<0000> <FFFF>
-endcodespacerange
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
 1 begincidrange
 <0100> <01FF> 1000
 endcidrange
-`);
-
-      const cmap = parseCMap(data);
+`),
+      );
 
       expect(cmap.lookup(0x0100)).toBe(1000);
       expect(cmap.lookup(0x0101)).toBe(1001);
@@ -301,17 +364,14 @@ endcidrange
     });
 
     it("should parse multiple cidrange entries", () => {
-      const data = makeCMapStream(`
-1 begincodespacerange
-<0000> <FFFF>
-endcodespacerange
+      const cmap = parseCMap(
+        makeCMapStream(`${TWO_BYTE_CODESPACE}
 2 begincidrange
 <0100> <01FF> 1000
 <0200> <02FF> 2000
 endcidrange
-`);
-
-      const cmap = parseCMap(data);
+`),
+      );
 
       expect(cmap.lookup(0x0100)).toBe(1000);
       expect(cmap.lookup(0x0200)).toBe(2000);
@@ -320,24 +380,29 @@ endcidrange
 
   describe("CMap metadata", () => {
     it("should parse CMap name", () => {
-      const data = makeCMapStream("");
-      const cmap = parseCMap(data);
+      const cmap = parseCMap(makeCMapStream(""));
 
       expect(cmap.name).toBe("TestCMap");
     });
 
     it("should use provided name as fallback", () => {
-      const data = new TextEncoder().encode("begincmap endcmap");
-      const cmap = parseCMap(data, "FallbackName");
+      const cmap = parseCMap(new TextEncoder().encode("begincmap endcmap"), "FallbackName");
 
       expect(cmap.name).toBe("FallbackName");
     });
 
     it("should parse WMode for vertical", () => {
-      const data = makeCMapStream("/WMode 1 def");
-      const cmap = parseCMap(data);
+      const cmap = parseCMap(makeCMapStream("/WMode 1 def"));
 
       expect(cmap.vertical).toBe(true);
+    });
+
+    it("should recognize an embedded Identity-H by name", () => {
+      const cmap = parseCMap(
+        new TextEncoder().encode(`/CMapName /Identity-H def ${TWO_BYTE_CODESPACE}`),
+      );
+
+      expect(cmap.isIdentity).toBe(true);
     });
   });
 });

@@ -1,31 +1,71 @@
 /**
  * LineGrouper - Groups extracted characters into lines and spans.
  *
- * Characters are grouped into lines based on their baseline Y coordinate,
- * and within lines into spans based on font/size changes.
- * Spaces are detected from gaps between characters.
+ * Characters arrive in content-stream order and pass through three steps:
+ *
+ * 1. **Runs.** Consecutive characters advancing along one baseline form a
+ *    run: the string a producer drew as a unit (as in pdf.js text items).
+ * 2. **Lines.** A run joins a line if it shares the baseline and none of its
+ *    glyphs collide with glyphs already there; otherwise it opens a new line
+ *    on the same baseline. Strings drawn over each other (a tag printed on an
+ *    invisible label) stay intact instead of interleaving glyph by glyph. A
+ *    glyph repeating one already on the line at the same position is dropped.
+ * 3. **Spans.** Runs are merged left to right by glyph position (stream order
+ *    for RTL-placed text) and split into spans on font changes, with spaces
+ *    synthesised from gaps.
+ *
+ * Whitespace and overlay glyphs (combining marks, accents) occupy no space and
+ * take no part in collision or repeat checks. Only horizontal text is handled.
  */
 
 import type { ExtractedChar, TextLine, TextSpan } from "./types";
 import { mergeBboxes } from "./types";
 
 /**
- * Minimum fraction of consecutive char pairs with decreasing x-positions
- * (in stream order) to classify a line as "RTL-placed".
- *
- * Figma/Canva exports produce ~100% decreasing pairs within words.
- * 80% tolerates small forward jumps at word boundaries.
+ * Run continuity, as fractions of the font size. A glyph may start up to
+ * RUN_BACKWARD before the previous glyph's right edge (CJK punctuation
+ * compression is exactly 0.5em, so the limit sits above it) and up to
+ * RUN_FORWARD after it, keeping runs at word granularity.
  */
+const RUN_BACKWARD_FACTOR = 0.6;
+const RUN_FORWARD_FACTOR = 0.6;
+
+/**
+ * A glyph collides with another run once that run covers more than a quarter
+ * em of it, or 30% of its own width for narrow glyphs. Less is kerning or
+ * italic overhang.
+ */
+const GLYPH_COVER_EM_FACTOR = 0.25;
+const GLYPH_COVER_WIDTH_FACTOR = 0.3;
+
+/** Same character within this fraction of an em is the same glyph drawn twice. */
+const REPEAT_POSITION_FACTOR = 0.1;
+
+/** Combining marks and modifier symbols (spacing accents) sit over other glyphs. */
+const OVERLAY_CHARS = /^[\p{Mn}\p{Mc}\p{Me}\p{Sk}]+$/u;
+
+/** Fraction of stream-order pairs moving left for a line to count as RTL-placed. */
 const RTL_PLACED_THRESHOLD = 0.8;
 
 /**
- * Result of ordering characters within a line.
+ * A maximal sequence of characters drawn continuously along one baseline.
  */
-interface OrderedLine {
-  /** Characters in reading order */
+interface TextRun {
   chars: ExtractedChar[];
-  /** Whether the line was detected as RTL-placed (design-tool pattern) */
-  rtlPlaced: boolean;
+  /** Baseline of the first space-occupying glyph; spaces are often placed oddly */
+  baseline: number;
+  /** Extent of space-occupying glyphs; empty (left > right) if there are none */
+  inkLeft: number;
+  inkRight: number;
+}
+
+/**
+ * A line under construction. Baseline is that of the first run, not an
+ * average, so placement does not drift.
+ */
+interface LineBuilder {
+  baseline: number;
+  runs: TextRun[];
 }
 
 /**
@@ -50,9 +90,9 @@ export interface LineGrouperOptions {
 /**
  * Group extracted characters into lines and spans.
  *
- * @param chars - Array of extracted characters
+ * @param chars - Extracted characters in content-stream order
  * @param options - Grouping options
- * @returns Array of text lines
+ * @returns Array of text lines, top to bottom
  */
 export function groupCharsIntoLines(
   chars: ExtractedChar[],
@@ -65,159 +105,301 @@ export function groupCharsIntoLines(
   const baselineTolerance = options.baselineTolerance ?? 2;
   const spaceThreshold = options.spaceThreshold ?? 0.3;
 
-  // Group characters by baseline
-  const lineGroups = groupByBaseline(chars, baselineTolerance);
+  const runs = splitIntoRuns(chars, baselineTolerance);
+  const builders = placeRunsOnLines(runs, baselineTolerance);
 
-  // Convert each group to a TextLine
   const lines: TextLine[] = [];
 
-  for (const group of lineGroups) {
-    // Order characters within the line.
-    // Normally we sort left-to-right by x-position, but some design tools
-    // (Figma, Canva) place characters right-to-left via TJ adjustments while
-    // the text is actually LTR. In that case, content stream order is correct
-    // and position-based sorting would reverse the text.
-    const { chars: sorted, rtlPlaced } = orderLineChars(group);
-
-    // Group into spans and detect spaces
-    const spans = groupIntoSpans(sorted, spaceThreshold, rtlPlaced);
+  for (const builder of builders) {
+    const { chars: ordered, rtlPlaced } = orderRuns(builder.runs);
+    const spans = groupIntoSpans(ordered, spaceThreshold, rtlPlaced);
 
     if (spans.length === 0) {
       continue;
     }
 
-    // Build the line
-    const lineText = spans.map(s => s.text).join("");
-    const lineBbox = mergeBboxes(spans.map(s => s.bbox));
-    const baseline = calculateAverageBaseline(sorted);
-
     lines.push({
-      text: lineText,
-      bbox: lineBbox,
+      text: spans.map(s => s.text).join(""),
+      bbox: mergeBboxes(spans.map(s => s.bbox)),
       spans,
-      baseline,
+      baseline: averageBaseline(ordered),
     });
   }
 
-  // Sort lines top-to-bottom (higher Y = higher on page in PDF coordinates)
+  // Top to bottom; stable, so lines sharing a baseline keep stream order
   lines.sort((a, b) => b.baseline - a.baseline);
 
   return lines;
 }
 
+function splitIntoRuns(chars: ExtractedChar[], baselineTolerance: number): TextRun[] {
+  const groups: ExtractedChar[][] = [];
+  let current: ExtractedChar[] = [];
+
+  for (const char of chars) {
+    const prev = current[current.length - 1];
+
+    if (prev && !continuesRun(prev, char, baselineTolerance)) {
+      groups.push(current);
+      current = [];
+    }
+
+    current.push(char);
+  }
+
+  if (current.length > 0) {
+    groups.push(current);
+  }
+
+  return groups.map(createRun);
+}
+
+function createRun(chars: ExtractedChar[]): TextRun {
+  const run: TextRun = {
+    chars,
+    baseline: chars[0].baseline,
+    inkLeft: Infinity,
+    inkRight: -Infinity,
+  };
+
+  for (const char of chars) {
+    if (occupiesSpace(char)) {
+      if (!hasInk(run)) {
+        run.baseline = char.baseline;
+      }
+
+      run.inkLeft = Math.min(run.inkLeft, char.bbox.x);
+      run.inkRight = Math.max(run.inkRight, char.bbox.x + char.bbox.width);
+    }
+  }
+
+  return run;
+}
+
+function hasInk(run: TextRun): boolean {
+  return run.inkLeft <= run.inkRight;
+}
+
+function isWhitespace(char: ExtractedChar): boolean {
+  return char.char.trim() === "";
+}
+
+function occupiesSpace(char: ExtractedChar): boolean {
+  return !isWhitespace(char) && !OVERLAY_CHARS.test(char.char);
+}
+
 /**
- * Determine the correct character order for a line.
- *
- * Design tools like Figma and Canva export PDFs where LTR characters are placed
- * right-to-left via TJ positioning adjustments (positive values move the pen left).
- * The font has near-zero glyph widths, so all positioning comes from TJ. Characters
- * appear in correct reading order in the content stream, but their x-positions
- * decrease monotonically.
- *
- * When this pattern is detected, we preserve content stream order instead of sorting
- * by x-position, which would reverse the text.
- *
- * **Limitation**: Detection requires `sequenceIndex` on every character. If any
- * character in the group lacks a `sequenceIndex`, we fall back to x-position sorting
- * because stream order cannot be reliably reconstructed.
+ * Same baseline, and the pen advanced past the previous origin without a
+ * large jump either way. A glyph drawn on top of the previous one is a
+ * redraw, not a continuation.
  */
-function orderLineChars(group: ExtractedChar[]): OrderedLine {
-  if (group.length <= 1) {
-    return { chars: [...group], rtlPlaced: false };
+function continuesRun(
+  prev: ExtractedChar,
+  char: ExtractedChar,
+  baselineTolerance: number,
+): boolean {
+  if (Math.abs(char.baseline - prev.baseline) > baselineTolerance) {
+    return false;
   }
 
-  // If any character lacks sequenceIndex, fall back to x-sort
-  const hasStreamOrder = group.every(c => c.sequenceIndex != null);
+  const fontSize = (prev.fontSize + char.fontSize) / 2;
+  const advanced = char.bbox.x - prev.bbox.x > fontSize * REPEAT_POSITION_FACTOR;
+  const gap = char.bbox.x - (prev.bbox.x + prev.bbox.width);
 
-  if (!hasStreamOrder) {
-    return {
-      chars: [...group].sort((a, b) => a.bbox.x - b.bbox.x),
-      rtlPlaced: false,
-    };
+  return advanced && gap >= -fontSize * RUN_BACKWARD_FACTOR && gap <= fontSize * RUN_FORWARD_FACTOR;
+}
+
+/**
+ * Each run joins the first line that shares its baseline and has room for
+ * it, or opens a new line. Repeated glyphs (fake bold, redrawn chunk
+ * boundaries) are dropped first. Whitespace-only runs cannot collide and
+ * stay with the run drawn before them.
+ */
+function placeRunsOnLines(runs: TextRun[], baselineTolerance: number): LineBuilder[] {
+  const lines: LineBuilder[] = [];
+  let previous: LineBuilder | null = null;
+
+  for (const run of runs) {
+    previous = hasInk(run)
+      ? placeInkRun(run, lines, baselineTolerance)
+      : placeInklessRun(run, lines, previous, baselineTolerance);
   }
 
-  // Sort by sequenceIndex to get content stream order.
-  // Safe to use `!` — hasStreamOrder guarantees every char has sequenceIndex.
-  const streamOrder = [...group].sort((a, b) => a.sequenceIndex! - b.sequenceIndex!);
+  return lines;
+}
+
+function placeInkRun(run: TextRun, lines: LineBuilder[], baselineTolerance: number): LineBuilder {
+  for (const line of lines) {
+    if (Math.abs(run.baseline - line.baseline) > baselineTolerance) {
+      continue;
+    }
+
+    const fresh = withoutRepeatedGlyphs(run, line);
+
+    if (!fresh || !hasInk(fresh)) {
+      return line;
+    }
+
+    if (!line.runs.some(other => runsConflict(fresh, other))) {
+      line.runs.push(fresh);
+
+      return line;
+    }
+  }
+
+  const line = { baseline: run.baseline, runs: [run] };
+  lines.push(line);
+
+  return line;
+}
+
+function placeInklessRun(
+  run: TextRun,
+  lines: LineBuilder[],
+  previous: LineBuilder | null,
+  baselineTolerance: number,
+): LineBuilder {
+  const sameBaseline = (line: LineBuilder) =>
+    Math.abs(run.baseline - line.baseline) <= baselineTolerance;
+
+  let line = previous && sameBaseline(previous) ? previous : lines.find(sameBaseline);
+
+  if (!line) {
+    line = { baseline: run.baseline, runs: [] };
+    lines.push(line);
+  }
+
+  line.runs.push(run);
+
+  return line;
+}
+
+function withoutRepeatedGlyphs(run: TextRun, line: LineBuilder): TextRun | null {
+  const existing = line.runs.flatMap(r => r.chars);
+  const kept = run.chars.filter(glyph => !existing.some(other => isRepeatedGlyph(glyph, other)));
+
+  if (kept.length === run.chars.length) {
+    return run;
+  }
+
+  return kept.length > 0 ? createRun(kept) : null;
+}
+
+function isRepeatedGlyph(glyph: ExtractedChar, other: ExtractedChar): boolean {
+  return (
+    glyph.char === other.char &&
+    Math.abs(glyph.bbox.x - other.bbox.x) <= glyph.fontSize * REPEAT_POSITION_FACTOR
+  );
+}
+
+/**
+ * Checked per glyph so a run may fill gaps in another (some producers draw
+ * narrow glyphs in a second pass); coverage is summed so a glyph straddling
+ * two others is still caught.
+ */
+function runsConflict(a: TextRun, b: TextRun): boolean {
+  if (overlapOf(a.inkLeft, a.inkRight, b.inkLeft, b.inkRight) <= 0) {
+    return false;
+  }
+
+  return hasCoveredGlyph(a, b) || hasCoveredGlyph(b, a);
+}
+
+function hasCoveredGlyph(run: TextRun, other: TextRun): boolean {
+  for (const glyph of run.chars) {
+    if (!occupiesSpace(glyph)) {
+      continue;
+    }
+
+    const left = glyph.bbox.x;
+    const right = left + glyph.bbox.width;
+    const tolerance = Math.min(
+      glyph.fontSize * GLYPH_COVER_EM_FACTOR,
+      glyph.bbox.width * GLYPH_COVER_WIDTH_FACTOR,
+    );
+    let covered = 0;
+
+    for (const ink of other.chars) {
+      if (!occupiesSpace(ink)) {
+        continue;
+      }
+
+      covered += Math.max(0, overlapOf(left, right, ink.bbox.x, ink.bbox.x + ink.bbox.width));
+
+      if (covered > tolerance) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function overlapOf(aLeft: number, aRight: number, bLeft: number, bRight: number): number {
+  return Math.min(aRight, bRight) - Math.max(aLeft, bLeft);
+}
+
+/**
+ * Flatten a line's runs into reading order: merged by glyph x with intra-run
+ * order preserved, or plain stream order when the line is RTL-placed.
+ */
+function orderRuns(runs: TextRun[]): { chars: ExtractedChar[]; rtlPlaced: boolean } {
+  const streamOrder = runs.flatMap(run => run.chars);
 
   if (isRtlPlaced(streamOrder)) {
     return { chars: streamOrder, rtlPlaced: true };
   }
 
-  // Normal case: sort left-to-right by x-position
-  return {
-    chars: [...group].sort((a, b) => a.bbox.x - b.bbox.x),
-    rtlPlaced: false,
-  };
+  return { chars: mergeRunsByPosition(runs), rtlPlaced: false };
+}
+
+function mergeRunsByPosition(runs: TextRun[]): ExtractedChar[] {
+  const cursors = runs.map(run => ({ chars: run.chars, index: 0 }));
+  const merged: ExtractedChar[] = [];
+
+  for (;;) {
+    let next: (typeof cursors)[number] | null = null;
+
+    for (const cursor of cursors) {
+      if (cursor.index >= cursor.chars.length) {
+        continue;
+      }
+
+      if (!next || cursor.chars[cursor.index].bbox.x < next.chars[next.index].bbox.x) {
+        next = cursor;
+      }
+    }
+
+    if (!next) {
+      return merged;
+    }
+
+    merged.push(next.chars[next.index]);
+    next.index++;
+  }
 }
 
 /**
- * Detect whether characters are placed right-to-left in user space while
- * content stream order represents the correct reading order.
- *
- * Returns true when x-positions in stream order are predominantly decreasing
- * (≥ 80% of consecutive pairs). In that case, position-based sorting would
- * reverse the reading order, so we preserve stream order instead.
- *
- * This covers two real-world scenarios:
- * - **Design-tool PDFs** (Figma, Canva): LTR text placed right-to-left via
- *   TJ positioning adjustments. Stream order = correct reading order.
- * - **Genuine RTL text** (Arabic, Hebrew): characters naturally placed
- *   right-to-left. PDF producers typically emit them in reading order, so
- *   stream order is again correct.
- *
- * In both cases, when x-positions decrease in stream order, preserving stream
- * order produces the correct reading order.
- *
- * **Known limitation**: mixed bidi text (e.g., Arabic with embedded English)
- * requires a full Unicode bidi algorithm, which is out of scope for this
- * heuristic. For mixed lines, neither stream order nor x-sort is fully
- * correct; a future bidi implementation should replace this heuristic.
+ * Design tools (Figma, Canva) place LTR glyphs right-to-left via TJ
+ * adjustments, and genuine RTL text is emitted in logical order; in both
+ * cases stream order is reading order. Measured per character, not per run,
+ * so two runs drawn right-then-left (page number, then title) don't trigger
+ * it. Mixed bidi text needs a real bidi algorithm and is not handled.
  */
 function isRtlPlaced(streamOrder: ExtractedChar[]): boolean {
   if (streamOrder.length < 2) {
     return false;
   }
 
-  // Count how many consecutive character pairs have decreasing x
   let decreasingCount = 0;
+
   for (let i = 1; i < streamOrder.length; i++) {
     if (streamOrder[i].bbox.x < streamOrder[i - 1].bbox.x) {
       decreasingCount++;
     }
   }
 
-  const totalPairs = streamOrder.length - 1;
-
-  return decreasingCount / totalPairs >= RTL_PLACED_THRESHOLD;
-}
-
-/**
- * Group characters by baseline Y coordinate.
- */
-function groupByBaseline(chars: ExtractedChar[], tolerance: number): ExtractedChar[][] {
-  const groups: ExtractedChar[][] = [];
-
-  for (const char of chars) {
-    // Find an existing group with a similar baseline
-    let foundGroup = false;
-
-    for (const group of groups) {
-      const avgBaseline = calculateAverageBaseline(group);
-
-      if (Math.abs(char.baseline - avgBaseline) <= tolerance) {
-        group.push(char);
-        foundGroup = true;
-        break;
-      }
-    }
-
-    if (!foundGroup) {
-      groups.push([char]);
-    }
-  }
-
-  return groups;
+  return decreasingCount / (streamOrder.length - 1) >= RTL_PLACED_THRESHOLD;
 }
 
 /**
@@ -241,38 +423,33 @@ function groupIntoSpans(
     const prevChar = chars[i - 1];
     const char = chars[i];
 
-    // Check for font/size change
     const fontChanged =
       char.fontName !== currentFontName || Math.abs(char.fontSize - currentFontSize) > 0.5;
 
-    // Check for space gap — in RTL-placed lines, the "next" character in
-    // reading order sits to the left of the previous one, so the gap is
-    // measured from the left edge of prevChar to the right edge of char.
+    // In RTL-placed lines the next character sits to the left of the previous.
+    // A gap beside a real space glyph is the same logical space, not a second one.
     const gap = rtlPlaced
       ? prevChar.bbox.x - (char.bbox.x + char.bbox.width)
       : char.bbox.x - (prevChar.bbox.x + prevChar.bbox.width);
     const avgFontSize = (prevChar.fontSize + char.fontSize) / 2;
-    const needsSpace = gap > avgFontSize * spaceThreshold;
+    const needsSpace =
+      gap > avgFontSize * spaceThreshold && !isWhitespace(prevChar) && !isWhitespace(char);
+
+    if (needsSpace) {
+      currentSpan.push(createSpaceChar(prevChar, char, rtlPlaced));
+    }
 
     if (fontChanged) {
-      // Complete current span
       spans.push(buildSpan(currentSpan));
 
-      // Start new span
       currentSpan = [char];
       currentFontName = char.fontName;
       currentFontSize = char.fontSize;
-    } else if (needsSpace) {
-      // Add space to current span and continue
-      // We insert a synthetic space character
-      currentSpan.push(createSpaceChar(prevChar, char, rtlPlaced));
-      currentSpan.push(char);
     } else {
       currentSpan.push(char);
     }
   }
 
-  // Complete final span
   if (currentSpan.length > 0) {
     spans.push(buildSpan(currentSpan));
   }
@@ -328,7 +505,7 @@ function createSpaceChar(
 /**
  * Calculate the average baseline of a group of characters.
  */
-function calculateAverageBaseline(chars: ExtractedChar[]): number {
+function averageBaseline(chars: ExtractedChar[]): number {
   if (chars.length === 0) {
     return 0;
   }

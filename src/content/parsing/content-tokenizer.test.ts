@@ -232,6 +232,58 @@ describe("ContentTokenizer", () => {
       expect(tokenizer.nextToken()).toEqual({ type: "number", value: 42 });
       expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "m" });
     });
+
+    it("ends an array at an operator and re-emits the operator", () => {
+      const tokenizer = new ContentTokenizer(encode("[(a) 5 TJ (b) Tj"));
+
+      expect(tokenizer.nextToken()).toEqual({
+        type: "array",
+        items: [
+          { type: "string", value: encode("a"), hex: false },
+          { type: "number", value: 5 },
+        ],
+      });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "TJ" });
+      expect(tokenizer.nextToken()).toMatchObject({ type: "string" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "Tj" });
+    });
+
+    it("keeps the re-emitted operator in order when peeked", () => {
+      const tokenizer = new ContentTokenizer(encode("[(a) TJ q"));
+
+      expect(tokenizer.peek()).toMatchObject({ type: "array" });
+      expect(tokenizer.nextToken()).toMatchObject({ type: "array" });
+      expect(tokenizer.peek()).toEqual({ type: "operator", name: "TJ" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "TJ" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "q" });
+    });
+
+    it("skips a dict entry whose key is not a name", () => {
+      const tokenizer = new ContentTokenizer(encode("<< 1 2 /K 3 >> BDC"));
+
+      expect(tokenizer.nextToken()).toEqual({
+        type: "dict",
+        entries: new Map([["K", { type: "number", value: 3 }]]),
+      });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "BDC" });
+    });
+
+    it("ends a dict at an operator and re-emits the operator", () => {
+      const tokenizer = new ContentTokenizer(encode("<< /K 1 /V BDC q"));
+
+      expect(tokenizer.nextToken()).toMatchObject({ type: "dict" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "BDC" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "q" });
+    });
+
+    it("stray ) or } does not stall the tokenizer", () => {
+      const tokenizer = new ContentTokenizer(encode("q ) } Q"));
+
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "q" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: ")" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "}" });
+      expect(tokenizer.nextToken()).toEqual({ type: "operator", name: "Q" });
+    });
   });
 
   describe("peek and eof", () => {

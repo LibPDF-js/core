@@ -80,9 +80,6 @@ export class CIDFont {
   /** ToUnicode map from the parent Type0 font, if available */
   private readonly toUnicodeMap: ToUnicodeMap | null;
 
-  /** Reverse ToUnicode map: Unicode code point -> character code */
-  private unicodeToCharCodeMap: Map<number, number> | null = null;
-
   constructor(options: {
     subtype: CIDFontSubtype;
     baseFontName: string;
@@ -239,32 +236,7 @@ export class CIDFont {
       }
     }
 
-    if (!this.toUnicodeMap) {
-      return null;
-    }
-
-    if (!this.unicodeToCharCodeMap) {
-      this.unicodeToCharCodeMap = new Map();
-      const unicodeToCharCodeMap = this.unicodeToCharCodeMap;
-
-      this.toUnicodeMap.forEach((unicodeValue, charCode) => {
-        const chars = Array.from(unicodeValue);
-
-        if (chars.length !== 1) {
-          return;
-        }
-
-        const codePoint = chars[0].codePointAt(0);
-
-        if (codePoint === undefined || unicodeToCharCodeMap.has(codePoint)) {
-          return;
-        }
-
-        unicodeToCharCodeMap.set(codePoint, charCode);
-      });
-    }
-
-    return this.unicodeToCharCodeMap.get(unicode) ?? null;
+    return this.toUnicodeMap?.getCodeForUnicode(String.fromCodePoint(unicode)) ?? null;
   }
 
   private getCharCodeForGid(gid: number): number | null {

@@ -13,6 +13,12 @@
 
 import type { FontDescriptor } from "./font-descriptor";
 
+/** A character code and the number of bytes it occupied in the string. */
+export interface CharCode {
+  code: number;
+  length: number;
+}
+
 /**
  * Abstract base class for PDF fonts.
  */
@@ -57,6 +63,14 @@ export abstract class PdfFont {
    * @returns Unicode string (may be empty if no mapping)
    */
   abstract toUnicode(code: number): string;
+
+  /**
+   * Split string operand bytes into character codes. One byte per code
+   * unless overridden.
+   */
+  decode(bytes: Uint8Array): CharCode[] {
+    return Array.from(bytes, code => ({ code, length: 1 }));
+  }
 
   /**
    * Check if this font can encode the given text.

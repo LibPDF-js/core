@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CIDFont, CIDWidthMap } from "./cid-font";
-import { CMap } from "./cmap";
+import { CMap, parseCMap } from "./cmap";
 import { CompositeFont } from "./composite-font";
 import { ToUnicodeMap } from "./to-unicode";
 
@@ -148,6 +148,38 @@ describe("CompositeFont", () => {
       // For Identity-H, code is Unicode
       expect(font.toUnicode(0x41)).toBe("A");
       expect(font.toUnicode(0x4e2d)).toBe("中");
+    });
+  });
+
+  describe("decode", () => {
+    const cidFont = new CIDFont({ subtype: "CIDFontType2", baseFontName: "TestFont" });
+
+    it("reads two bytes per code for Identity-H", () => {
+      const font = new CompositeFont({ baseFontName: "TestFont", cmap: CMap.identityH(), cidFont });
+
+      expect(font.decode(new Uint8Array([0x00, 0x41, 0x4e, 0x2d]))).toEqual([
+        { code: 0x41, length: 2 },
+        { code: 0x4e2d, length: 2 },
+      ]);
+    });
+
+    it("follows the CMap codespace ranges for mixed-width codes", () => {
+      // Shift-JIS style: single-byte ASCII, double-byte kanji
+      const cmap = parseCMap(
+        new TextEncoder().encode(`
+          2 begincodespacerange
+          <20> <7e>
+          <8140> <9ffc>
+          endcodespacerange
+        `),
+      );
+      const font = new CompositeFont({ baseFontName: "TestFont", cmap, cidFont });
+
+      expect(font.decode(new Uint8Array([0x41, 0x81, 0x40, 0x20]))).toEqual([
+        { code: 0x41, length: 1 },
+        { code: 0x8140, length: 2 },
+        { code: 0x20, length: 1 },
+      ]);
     });
   });
 

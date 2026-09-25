@@ -20,9 +20,13 @@ export interface GraphicsState {
 }
 
 /**
- * Text-specific state parameters.
+ * Text state parameters (9.3); all are part of the graphics state saved by q/Q.
  */
 export interface TextStateParams {
+  /** Font (Tf) */
+  font: PdfFont | null;
+  /** Font size (Tf) */
+  fontSize: number;
   /** Character spacing (Tc) - extra space after each character */
   charSpacing: number;
   /** Word spacing (Tw) - extra space after space characters */
@@ -77,33 +81,14 @@ export class TextState {
   /** Graphics state stack for q/Q operators */
   private graphicsStateStack: GraphicsState[] = [];
 
-  /**
-   * Get the current position in user space.
-   * This applies the CTM to the text matrix position.
-   */
-  get position(): { x: number; y: number } {
-    // Text position is at the origin of the text matrix
-    // transformed by the CTM
-    return this.ctm.transformPoint(this.tm.e, this.tm.f + this.rise);
+  /** Tm × CTM: maps scaled text space (after Tfs, Tz, Ts) to user space. */
+  get textRenderingMatrix(): Matrix {
+    return this.tm.multiply(this.ctm);
   }
 
-  /**
-   * Get the effective font size accounting for text matrix and CTM scaling.
-   */
+  /** Font size in user space. */
   get effectiveFontSize(): number {
-    // The effective font size considers the text matrix scaling
-    // and the CTM scaling
-    const tmScale = this.tm.getScaleY();
-    const ctmScale = this.ctm.getScaleY();
-
-    return Math.abs(this.fontSize * tmScale * ctmScale);
-  }
-
-  /**
-   * Get the horizontal scale factor in user space.
-   */
-  get effectiveHorizontalScale(): number {
-    return (this.horizontalScale / 100) * this.tm.getScaleX() * this.ctm.getScaleX();
+    return Math.abs(this.fontSize * this.textRenderingMatrix.getScaleY());
   }
 
   /**
@@ -200,6 +185,8 @@ export class TextState {
     this.graphicsStateStack.push({
       ctm: this.ctm.clone(),
       textState: {
+        font: this.font,
+        fontSize: this.fontSize,
         charSpacing: this.charSpacing,
         wordSpacing: this.wordSpacing,
         horizontalScale: this.horizontalScale,
@@ -218,12 +205,28 @@ export class TextState {
 
     if (saved) {
       this.ctm = saved.ctm;
+      this.font = saved.textState.font;
+      this.fontSize = saved.textState.fontSize;
       this.charSpacing = saved.textState.charSpacing;
       this.wordSpacing = saved.textState.wordSpacing;
       this.horizontalScale = saved.textState.horizontalScale;
       this.leading = saved.textState.leading;
       this.rise = saved.textState.rise;
       this.renderMode = saved.textState.renderMode;
+    }
+  }
+
+  /**
+   * Number of saved graphics states.
+   */
+  get stackDepth(): number {
+    return this.graphicsStateStack.length;
+  }
+
+  /** Pop saved states until the stack is back at `depth`. */
+  restoreGraphicsStateTo(depth: number): void {
+    while (this.graphicsStateStack.length > depth) {
+      this.restoreGraphicsState();
     }
   }
 
@@ -237,10 +240,11 @@ export class TextState {
   }
 
   /**
-   * Calculate the bounding box for a character at the current position.
+   * Bounding box for a glyph at the current position: laid out in scaled
+   * text space, rise included, and mapped through Tm × CTM.
    *
-   * @param width - Character width in glyph units (1000 = 1 em)
-   * @returns Bounding box in user space
+   * @param width - Glyph width in glyph units (1000 = 1 em)
+   * @returns Axis-aligned bounding box and baseline in user space
    */
   getCharBbox(width: number): {
     x: number;
@@ -249,106 +253,45 @@ export class TextState {
     height: number;
     baseline: number;
   } {
-    // Get font metrics - fall back to FontBBox if ascent/descent are 0 or missing
-    let ascender = this.font?.descriptor?.ascent;
-    let descender = this.font?.descriptor?.descent;
+    const { ascent, descent } = this.fontMetrics();
+    const trm = this.textRenderingMatrix;
 
-    // If ascent/descent are 0 or missing, try to derive from FontBBox
-    // This is common for Type3 fonts and some poorly-formed PDFs
-    if (!ascender && !descender && this.font?.descriptor?.fontBBox) {
-      const bbox = this.font.descriptor.fontBBox;
-      // FontBBox is [llx, lly, urx, ury] - ascent is ury, descent is lly
-      ascender = bbox[3]; // ury
-      descender = bbox[1]; // lly (typically negative or 0)
-    }
+    const glyphWidth = (width / 1000) * this.fontSize * (this.horizontalScale / 100);
+    const bottom = (descent / 1000) * this.fontSize + this.rise;
+    const top = (ascent / 1000) * this.fontSize + this.rise;
 
-    // Final fallback to reasonable defaults
-    if (!ascender) {
-      ascender = 800;
-    }
-    if (descender === undefined || descender === null) {
-      descender = -200;
-    }
-
-    // Calculate glyph dimensions in scaled text space (after fontSize)
-    // These are in "text rendering space" before Tm rotation/scaling
-    const glyphWidthScaled = (width / 1000) * this.fontSize * (this.horizontalScale / 100);
-    const glyphHeightScaled = ((ascender - descender) / 1000) * this.fontSize;
-    const descenderScaled = (descender / 1000) * this.fontSize;
-
-    // Current text position from Tm (translation component)
-    const textX = this.tm.e;
-    const textY = this.tm.f + this.rise;
-
-    // Build the combined transformation matrix: CTM * Tm
-    // This transforms from text rendering space to user space
-    const _combined = this.ctm.multiply(this.tm);
-
-    // Transform baseline point to user space
-    const baselinePoint = this.ctm.transformPoint(textX, textY);
-
-    // Define glyph corners in text rendering space (relative to origin)
-    // We'll compute positions relative to (0,0) then add the translation
-    // Bottom-left of glyph is at (0, descender), top-right is at (width, ascender)
     const corners = [
-      { x: 0, y: descenderScaled }, // bottom-left
-      { x: glyphWidthScaled, y: descenderScaled }, // bottom-right
-      { x: glyphWidthScaled, y: descenderScaled + glyphHeightScaled }, // top-right
-      { x: 0, y: descenderScaled + glyphHeightScaled }, // top-left
+      trm.transformPoint(0, bottom),
+      trm.transformPoint(glyphWidth, bottom),
+      trm.transformPoint(glyphWidth, top),
+      trm.transformPoint(0, top),
     ];
 
-    // Transform each corner through combined matrix (without translation, then add it)
-    // The Tm translation (e, f) positions the glyph, but we already have the baseline point
-    // We need to transform the glyph shape through the rotation/scale part of the matrix
-    const transformedCorners = corners.map(corner => {
-      // Transform the corner offset through Tm (rotation/scale only, no translation)
-      // Then through CTM
-      const tmRotated = {
-        x: this.tm.a * corner.x + this.tm.c * corner.y,
-        y: this.tm.b * corner.x + this.tm.d * corner.y,
-      };
-      // Now transform through CTM (rotation/scale only)
-      return {
-        x: baselinePoint.x + (this.ctm.a * tmRotated.x + this.ctm.c * tmRotated.y),
-        y: baselinePoint.y + (this.ctm.b * tmRotated.x + this.ctm.d * tmRotated.y),
-      };
-    });
-
-    // Compute axis-aligned bounding box from transformed corners
-    const xs = transformedCorners.map(c => c.x);
-    const ys = transformedCorners.map(c => c.y);
-
+    const xs = corners.map(c => c.x);
+    const ys = corners.map(c => c.y);
     const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
 
     return {
       x: minX,
       y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-      baseline: baselinePoint.y,
+      width: Math.max(...xs) - minX,
+      height: Math.max(...ys) - minY,
+      baseline: trm.transformPoint(0, this.rise).y,
     };
   }
 
-  /**
-   * Clone the current text state.
-   */
-  clone(): TextState {
-    const copy = new TextState();
-    copy.ctm = this.ctm.clone();
-    copy.tm = this.tm.clone();
-    copy.tlm = this.tlm.clone();
-    copy.font = this.font;
-    copy.fontSize = this.fontSize;
-    copy.charSpacing = this.charSpacing;
-    copy.wordSpacing = this.wordSpacing;
-    copy.horizontalScale = this.horizontalScale;
-    copy.leading = this.leading;
-    copy.rise = this.rise;
-    copy.renderMode = this.renderMode;
+  /** Ascent/descent in glyph units, falling back to FontBBox (Type3) then defaults. */
+  private fontMetrics(): { ascent: number; descent: number } {
+    const descriptor = this.font?.descriptor;
+    let ascent = descriptor?.ascent;
+    let descent = descriptor?.descent;
 
-    return copy;
+    if (!ascent && !descent && descriptor?.fontBBox) {
+      ascent = descriptor.fontBBox[3];
+      descent = descriptor.fontBBox[1];
+    }
+
+    return { ascent: ascent || 800, descent: descent ?? -200 };
   }
 }

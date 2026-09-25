@@ -91,15 +91,12 @@ import type {
 } from "#src/drawing/types";
 import { resolveRotationOrigin } from "#src/drawing/types";
 import { EmbeddedFont } from "#src/fonts/embedded-font";
-import { parseFont } from "#src/fonts/font-factory";
-import type { PdfFont } from "#src/fonts/pdf-font";
 import {
   getEncodingForStandard14,
   getStandard14BasicMetrics,
   isStandard14Font,
   isWinAnsiStandard14,
 } from "#src/fonts/standard-14";
-import { parseToUnicode } from "#src/fonts/to-unicode";
 // Annotation utilities - imported here to avoid dynamic require issues
 import { concatBytes } from "#src/helpers/buffer";
 import { black } from "#src/helpers/colors";
@@ -127,6 +124,7 @@ import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
 import { getPlainText, groupCharsIntoLines } from "#src/text/line-grouper";
 import { TextExtractor } from "#src/text/text-extractor";
+import { TextResources } from "#src/text/text-resources";
 import { searchPage } from "#src/text/text-search";
 import type { ExtractTextOptions, FindTextOptions, PageText, TextMatch } from "#src/text/types";
 
@@ -2817,12 +2815,12 @@ export class PDFPage {
     // Get content stream bytes
     const contentBytes = this.getContentBytes();
 
-    // Create font resolver
-    const resolveFont = this.createFontResolver();
-
     // Extract characters
-    const extractor = new TextExtractor({ resolveFont });
-    const chars = extractor.extract(contentBytes);
+    const resources = new TextResources(
+      this.resolveInheritedResources(),
+      this.ctx.resolve.bind(this.ctx),
+    );
+    const chars = new TextExtractor(resources).extract(contentBytes);
 
     // Group into lines and spans
     const lines = groupCharsIntoLines(chars);
@@ -2936,8 +2934,11 @@ export class PDFPage {
   private resolveInheritedResources(): PdfDict | null {
     // Start with the page dict
     let currentDict: PdfDict | null = this.dict;
+    const visited = new Set<PdfDict>();
 
-    while (currentDict) {
+    while (currentDict && !visited.has(currentDict)) {
+      visited.add(currentDict);
+
       // Check for Resources on the current node
       const resources = currentDict.get("Resources", this.ctx.resolve.bind(this.ctx));
 
@@ -2956,63 +2957,5 @@ export class PDFPage {
     }
 
     return null;
-  }
-
-  /**
-   * Create a font resolver function for text extraction.
-   */
-  private createFontResolver(): (name: string) => PdfFont | null {
-    // Get the page's Font resources (may be a ref or inherited from parent)
-    const resourcesDict = this.resolveInheritedResources();
-
-    if (!resourcesDict) {
-      return () => null;
-    }
-
-    const font = resourcesDict.getDict("Font", this.ctx.resolve.bind(this.ctx));
-
-    if (!font) {
-      return () => null;
-    }
-
-    // Preload all font dictionaries and build the cache
-    const fontCache = new Map<string, PdfFont>();
-
-    for (const [key, entry] of font) {
-      const name = key.value;
-      const resolved = entry instanceof PdfRef ? this.ctx.resolve(entry) : entry;
-
-      let entryDict = resolved instanceof PdfDict ? resolved : null;
-
-      if (!entryDict) {
-        continue;
-      }
-
-      // Parse ToUnicode CMap if present
-      let toUnicodeMap = null;
-
-      const toUnicode = entryDict.get("ToUnicode", this.ctx.resolve.bind(this.ctx));
-      const toUnicodeStream = toUnicode instanceof PdfStream ? toUnicode : null;
-
-      if (toUnicodeStream) {
-        try {
-          toUnicodeMap = parseToUnicode(toUnicodeStream.getDecodedData());
-        } catch {
-          // ToUnicode parsing failed - continue without it
-        }
-      }
-
-      // Parse the font
-      const pdfFont = parseFont(entryDict, {
-        resolver: this.ctx.resolve.bind(this.ctx),
-        toUnicodeMap,
-      });
-
-      fontCache.set(name, pdfFont);
-    }
-
-    return (name: string): PdfFont | null => {
-      return fontCache.get(name) ?? null;
-    };
   }
 }
