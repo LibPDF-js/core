@@ -95,6 +95,7 @@ export type {
   PermissionOptions,
   Permissions,
   ProtectionOptions,
+  RemoveProtectionOptions,
   SecurityInfo,
 } from "./api/pdf-security";
 export { PermissionDeniedError, SecurityError } from "./security/errors";

@@ -63,6 +63,20 @@ export interface ProtectionOptions {
 }
 
 /**
+ * Options for removing document protection.
+ */
+export interface RemoveProtectionOptions {
+  /**
+   * Skip the owner access / modify permission check.
+   *
+   * Any successfully decrypted document (including one opened with only
+   * the user password) can then be saved without encryption.
+   * @default false
+   */
+  ignorePermissions?: boolean;
+}
+
+/**
  * Detailed security information about a document.
  */
 export interface SecurityInfo {

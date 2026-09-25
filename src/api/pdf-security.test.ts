@@ -115,6 +115,28 @@ describe("PDF security API", () => {
       // User doesn't have modify permission
       expect(() => pdf.removeProtection()).toThrow(PermissionDeniedError);
     });
+
+    it("removeProtection({ ignorePermissions: true }) succeeds without modify permission", async () => {
+      const bytes = await loadFixture("encryption", "PasswordSample-40bit.pdf");
+      const pdf = await PDF.load(bytes, { credentials: "user" });
+
+      expect(() => pdf.removeProtection({ ignorePermissions: true })).not.toThrow();
+
+      const savedBytes = await pdf.save();
+      const reloaded = await PDF.load(savedBytes);
+
+      expect(reloaded.isEncrypted).toBe(false);
+      expect(reloaded.getPageCount()).toBe(pdf.getPageCount());
+    });
+
+    it("removeProtection({ ignorePermissions: false }) still enforces permissions", async () => {
+      const bytes = await loadFixture("encryption", "PasswordSample-40bit.pdf");
+      const pdf = await PDF.load(bytes, { credentials: "user" });
+
+      expect(() => pdf.removeProtection({ ignorePermissions: false })).toThrow(
+        PermissionDeniedError,
+      );
+    });
   });
 
   describe("encrypted documents - owner password", () => {
