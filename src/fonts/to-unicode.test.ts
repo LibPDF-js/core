@@ -49,30 +49,35 @@ describe("ToUnicodeMap", () => {
     expect(map.has(0x42)).toBe(false);
   });
 
-  it("should report size", () => {
+  it("should report emptiness", () => {
     const map = new ToUnicodeMap();
 
-    expect(map.size).toBe(0);
+    expect(map.isEmpty).toBe(true);
 
     map.set(0x41, "A");
 
-    expect(map.size).toBe(1);
+    expect(map.isEmpty).toBe(false);
   });
 
-  it("should iterate with forEach", () => {
-    const map = new ToUnicodeMap();
-    map.set(0x41, "A");
-    map.set(0x42, "B");
-
-    const entries: [string, number][] = [];
-    map.forEach((unicode, code) => {
-      entries.push([unicode, code]);
-    });
-
-    expect(entries).toEqual([
-      ["A", 0x41],
-      ["B", 0x42],
+  it("should build from entries", () => {
+    const map = ToUnicodeMap.fromEntries([
+      [0x41, "A"],
+      [0x0100, "B"],
     ]);
+
+    expect(map.get(0x41)).toBe("A");
+    expect(map.get(0x0100)).toBe("B");
+  });
+
+  it("should reverse-lookup codes by Unicode", () => {
+    const map = ToUnicodeMap.fromEntries([
+      [0x41, "A"],
+      [0x0100, "B"],
+    ]);
+
+    expect(map.getCodeForUnicode("A")).toBe(0x41);
+    expect(map.getCodeForUnicode("B")).toBe(0x0100);
+    expect(map.getCodeForUnicode("C")).toBeUndefined();
   });
 });
 
@@ -266,7 +271,7 @@ endbfrange
       const cmap = makeCMap("");
       const map = parseToUnicode(cmap);
 
-      expect(map.size).toBe(0);
+      expect(map.isEmpty).toBe(true);
     });
 
     it("should handle single character range", () => {
@@ -279,7 +284,7 @@ endbfrange
       const map = parseToUnicode(cmap);
 
       expect(map.get(0x01)).toBe("A");
-      expect(map.size).toBe(1);
+      expect(map.get(0x02)).toBeUndefined();
     });
 
     it("should handle lowercase hex", () => {

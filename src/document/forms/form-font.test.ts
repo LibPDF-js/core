@@ -97,7 +97,7 @@ describe("ExistingFont", () => {
         baseFontName: "StubCID",
         cidToGidMap: new Uint16Array([0, 7]),
         embeddedProgram: new StubFontProgram(new Map([[0x0041, 7]]), new Set([7])),
-        toUnicodeMap: new ToUnicodeMap(new Map([[1, "A"]])),
+        toUnicodeMap: ToUnicodeMap.fromEntries([[1, "A"]]),
       });
       const font = new ExistingFont("F0", null, null, true, cidFont);
 

@@ -322,4 +322,25 @@ describe("CMap Parser", () => {
       expect(cmap.wmode).toBe(0);
     });
   });
+
+  describe("malformed dictionaries", () => {
+    it("recovers from an unterminated << (PDFBox readDictionary semantics)", () => {
+      // From genko_oc_shiryo1.pdf: the CIDSystemInfo dict is never closed.
+      const cmap = parseCMap(
+        new TextEncoder().encode(`/CIDInit /ProcSet findresource begin 12 dict begin begincmap
+CIDSystemInfo <</Registry (F1+0) /Ordering (F1) /Supplement 0
+/CMapName /F1+0 def
+/CMapType 2 def
+1 begincodespacerange <0002> <3A2A> endcodespacerange
+2 beginbfchar
+<0002> <0020>
+<0519> <2461>
+endbfchar
+endcmap`),
+      );
+
+      expect(cmap.toUnicodeBytes(new Uint8Array([0x05, 0x19]))).toBe("\u2461");
+      expect(cmap.toUnicodeBytes(new Uint8Array([0x00, 0x02]))).toBe(" ");
+    });
+  });
 });

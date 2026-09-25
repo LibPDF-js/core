@@ -192,7 +192,7 @@ describe("CIDFont", () => {
       subtype: "CIDFontType2",
       baseFontName: "TestFont",
       cidToGidMap: new Uint16Array([0, 2]),
-      toUnicodeMap: new ToUnicodeMap(new Map([[1, "A"]])),
+      toUnicodeMap: ToUnicodeMap.fromEntries([[1, "A"]]),
     });
 
     expect(font.tryGetCharCodeForUnicode(0x41)).toBe(1);

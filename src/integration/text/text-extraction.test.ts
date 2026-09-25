@@ -260,6 +260,24 @@ describe("Text Extraction Integration", () => {
 
       expect(() => page!.extractText()).not.toThrow();
     });
+
+    it("reads a ToUnicode CMap with an unterminated << dictionary", async () => {
+      const bytes = await loadFixture("malformed", "pdfbox/genko_oc_shiryo1.pdf");
+      const pdf = await PDF.load(bytes);
+      const text = pdf.getPage(0)!.extractText().text;
+
+      expect(text).toContain("統計法");
+      expect(text).toContain("秘密の保護");
+    });
+
+    it("reads a ToUnicode CMap written on a single line", async () => {
+      const bytes = await loadFixture("malformed", "pdfbox/PDFBOX-3208.pdf");
+      const pdf = await PDF.load(bytes);
+      const text = pdf.getPage(5)!.extractText().text;
+
+      expect(text).toContain("Tipo Documental");
+      expect(text).toContain("Hipertensiva");
+    });
   });
 
   describe("bounding boxes", () => {

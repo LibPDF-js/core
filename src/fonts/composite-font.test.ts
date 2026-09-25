@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CIDFont, CIDWidthMap } from "./cid-font";
-import { CMap } from "./cmap";
+import { CMap, parseCMap } from "./cmap";
 import { CompositeFont } from "./composite-font";
 import { ToUnicodeMap } from "./to-unicode";
 
@@ -165,13 +165,14 @@ describe("CompositeFont", () => {
 
     it("follows the CMap codespace ranges for mixed-width codes", () => {
       // Shift-JIS style: single-byte ASCII, double-byte kanji
-      const cmap = new CMap({
-        name: "Custom",
-        codespaceRanges: [
-          { low: 0x20, high: 0x7e, numBytes: 1 },
-          { low: 0x8140, high: 0x9ffc, numBytes: 2 },
-        ],
-      });
+      const cmap = parseCMap(
+        new TextEncoder().encode(`
+          2 begincodespacerange
+          <20> <7e>
+          <8140> <9ffc>
+          endcodespacerange
+        `),
+      );
       const font = new CompositeFont({ baseFontName: "TestFont", cmap, cidFont });
 
       expect(font.decode(new Uint8Array([0x41, 0x81, 0x40, 0x20]))).toEqual([

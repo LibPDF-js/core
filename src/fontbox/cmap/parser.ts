@@ -510,12 +510,10 @@ class CMapParser {
       const dict = new Map<string, unknown>();
       let key = this.parseNextToken();
 
-      while (key !== null && !(isOperator(key) && key.op === ">>")) {
-        if (isName(key)) {
-          const value = this.parseNextToken();
-          dict.set(key.name, value);
-        }
-
+      // As in PDFBox, stop at the first non-name key so an unterminated
+      // dictionary doesn't swallow the rest of the CMap.
+      while (isName(key)) {
+        dict.set(key.name, this.parseNextToken());
         key = this.parseNextToken();
       }
 
