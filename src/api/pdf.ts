@@ -83,6 +83,7 @@ import type {
   EncryptionAlgorithmOption,
   PendingSecurityState,
   ProtectionOptions,
+  RemoveProtectionOptions,
   SecurityInfo,
 } from "./pdf-security";
 import { PDFSignature } from "./pdf-signature";
@@ -923,9 +924,12 @@ export class PDF {
    * Remove all encryption from the document.
    *
    * After calling this, the document will be saved without encryption.
-   * Requires owner access, or user access with modify permission.
+   * Requires owner access, or user access with modify permission, unless
+   * `ignorePermissions` is set.
    *
+   * @param options - Removal options
    * @throws {PermissionDeniedError} If insufficient permissions to remove protection
+   *   and `ignorePermissions` is not set
    *
    * @example
    * ```typescript
@@ -933,9 +937,13 @@ export class PDF {
    * const pdf = await PDF.load(bytes, { credentials: "ownerPassword" });
    * pdf.removeProtection();
    * const unprotectedBytes = await pdf.save();
+   *
+   * // Remove encryption with only the user password
+   * const restricted = await PDF.load(bytes, { credentials: "userPassword" });
+   * restricted.removeProtection({ ignorePermissions: true });
    * ```
    */
-  removeProtection(): void {
+  removeProtection(options: RemoveProtectionOptions = {}): void {
     // For unencrypted documents, this is a no-op
     if (!this.isEncrypted) {
       return;
@@ -948,7 +956,7 @@ export class PDF {
     }
 
     // Check permissions
-    if (!handler.hasOwnerAccess && !handler.permissions.modify) {
+    if (!options.ignorePermissions && !handler.hasOwnerAccess && !handler.permissions.modify) {
       throw new PermissionDeniedError(
         "Cannot remove protection: requires owner access or modify permission",
         "modify",

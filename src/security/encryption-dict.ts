@@ -300,7 +300,7 @@ export function parseEncryptionDict(dict: PdfDict): EncryptionDict {
   const permissions = parsePermissions(permissionsRaw);
 
   // Parse EncryptMetadata (R4+)
-  const encryptMetadata = dict.getBool("EncryptMetadata")?.value ?? true;
+  const encryptMetadata = parseEncryptMetadata(dict);
 
   // Parse R5-R6 specific fields
   let ownerEncryptionKey: Uint8Array | undefined;
@@ -398,6 +398,32 @@ function validateVersionRevision(version: EncryptionVersion, revision: Encryptio
     // In strict mode, we'd throw here
     console.warn(`Unusual V/R combination: V=${version}, R=${revision}`);
   }
+}
+
+/**
+ * Parse /EncryptMetadata, defaulting to true.
+ *
+ * The spec defines this as a boolean, but earlier versions of this library
+ * wrote it as the name /false. Those files were encrypted with
+ * EncryptMetadata = false, so treat the name /false as the boolean false
+ * to keep them readable.
+ *
+ * TODO(1.0): Remove the name fallback. See https://github.com/LibPDF-js/core/issues/97
+ */
+function parseEncryptMetadata(dict: PdfDict): boolean {
+  const bool = dict.getBool("EncryptMetadata");
+
+  if (bool) {
+    return bool.value;
+  }
+
+  const name = dict.getName("EncryptMetadata");
+
+  if (name?.value === "false") {
+    return false;
+  }
+
+  return true;
 }
 
 /**
