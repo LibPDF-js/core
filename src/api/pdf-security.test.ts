@@ -489,4 +489,62 @@ describe("PDF security API", () => {
       expect(unauthenticated.isAuthenticated).toBe(false);
     });
   });
+
+  // https://github.com/LibPDF-js/core/issues/97
+  describe("EncryptMetadata false", () => {
+    const decode = (bytes: Uint8Array) => new TextDecoder("windows-1252").decode(bytes);
+
+    it("keeps an R4 cleartext-metadata PDF openable after a full save", async () => {
+      const bytes = await loadFixture("encryption", "r4-cleartext-metadata.pdf");
+      const pdf = await PDF.load(bytes);
+
+      expect(pdf.isAuthenticated).toBe(true);
+      expect(pdf.getSecurity().encryptMetadata).toBe(false);
+
+      pdf.setTitle("changed");
+      const savedBytes = await pdf.save();
+
+      expect(decode(savedBytes)).toMatch(/\/EncryptMetadata\s+false\b/);
+      expect(decode(savedBytes)).not.toContain("/EncryptMetadata /false");
+
+      const reloaded = await PDF.load(savedBytes);
+
+      expect(reloaded.isAuthenticated).toBe(true);
+      expect(reloaded.getSecurity().encryptMetadata).toBe(false);
+      expect(reloaded.getTitle()).toBe("changed");
+    });
+
+    it("keeps an R4 cleartext-metadata PDF openable after an incremental save", async () => {
+      const bytes = await loadFixture("encryption", "r4-cleartext-metadata.pdf");
+      const pdf = await PDF.load(bytes);
+
+      pdf.setTitle("changed");
+      const savedBytes = await pdf.save({ incremental: true });
+
+      expect(decode(savedBytes)).not.toContain("/EncryptMetadata /false");
+
+      const reloaded = await PDF.load(savedBytes);
+
+      expect(reloaded.isAuthenticated).toBe(true);
+      expect(reloaded.getSecurity().encryptMetadata).toBe(false);
+      expect(reloaded.getTitle()).toBe("changed");
+    });
+
+    it("writes a valid R6 dictionary for setProtection({ encryptMetadata: false })", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      pdf.setProtection({ ownerPassword: "owner", encryptMetadata: false });
+      const savedBytes = await pdf.save();
+
+      expect(decode(savedBytes)).toMatch(/\/EncryptMetadata\s+false\b/);
+      expect(decode(savedBytes)).not.toContain("/EncryptMetadata /false");
+
+      // /Perms encodes EncryptMetadata, so a mismatch would fail authentication
+      const reloaded = await PDF.load(savedBytes);
+
+      expect(reloaded.isAuthenticated).toBe(true);
+      expect(reloaded.getSecurity().encryptMetadata).toBe(false);
+    });
+  });
 });

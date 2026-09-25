@@ -8,6 +8,7 @@
  */
 
 import type { ProtectionOptions } from "#src/api/pdf-security";
+import { PdfBool } from "#src/objects/pdf-bool";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
@@ -112,7 +113,7 @@ export function generateEncryption(options: ProtectionOptions): GeneratedEncrypt
 
   // Only add EncryptMetadata if false (true is the default)
   if (!encryptMetadata) {
-    encryptDict.set("EncryptMetadata", PdfName.of("false"));
+    encryptDict.set("EncryptMetadata", PdfBool.FALSE);
   }
 
   // Create an EncryptionDict object for the security handler
@@ -243,7 +244,7 @@ export function reconstructEncryptDict(encryption: EncryptionDict): PdfDict {
 
   // EncryptMetadata (only if false, true is default)
   if (!encryption.encryptMetadata) {
-    dict.set("EncryptMetadata", PdfName.of("false"));
+    dict.set("EncryptMetadata", PdfBool.FALSE);
   }
 
   return dict;

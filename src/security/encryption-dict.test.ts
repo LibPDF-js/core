@@ -161,6 +161,21 @@ describe("parseEncryptionDict", () => {
       expect(result.encryptMetadata).toBe(false);
     });
 
+    it("should leniently parse EncryptMetadata written as the name /false", () => {
+      // Older libpdf versions wrote /EncryptMetadata /false
+      const dict = createR4Dict({ EncryptMetadata: PdfName.of("false") });
+      const result = parseEncryptionDict(dict);
+
+      expect(result.encryptMetadata).toBe(false);
+    });
+
+    it("should treat other EncryptMetadata names as the default (true)", () => {
+      const dict = createR4Dict({ EncryptMetadata: PdfName.of("true") });
+      const result = parseEncryptionDict(dict);
+
+      expect(result.encryptMetadata).toBe(true);
+    });
+
     it("should parse crypt filters", () => {
       const stdCF = PdfDict.of({
         CFM: PdfName.of("AESV2"),
