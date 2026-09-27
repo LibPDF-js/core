@@ -48,7 +48,15 @@ export interface ColorStop {
   offset: number;
   /** Color at this position */
   color: Color;
+  /** Optional stop opacity (default: 1, clamped to [0, 1]) */
+  opacity?: number;
 }
+
+/** Opacity classification for gradient stops. */
+export type GradientOpacityClassification =
+  | { mode: "opaque" }
+  | { mode: "uniform"; opacity: number }
+  | { mode: "varying" };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Options
@@ -159,6 +167,22 @@ export interface LinearGradientOptions {
   stops: ColorStop[];
 }
 
+type NormalizedColorStop = Omit<ColorStop, "opacity"> & { opacity: number };
+
+type ShadingDefinition =
+  | {
+      shadingType: "axial";
+      coords: AxialCoords;
+      extend: [boolean, boolean];
+      stops: NormalizedColorStop[];
+    }
+  | {
+      shadingType: "radial";
+      coords: RadialCoords;
+      extend: [boolean, boolean];
+      stops: NormalizedColorStop[];
+    };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Resource Class
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,10 +220,115 @@ export class PDFShading {
   readonly type = "shading";
   readonly ref: PdfRef;
   readonly shadingType: "axial" | "radial";
+  private readonly definition?: ShadingDefinition;
 
-  constructor(ref: PdfRef, shadingType: "axial" | "radial") {
+  constructor(ref: PdfRef, shadingType: "axial" | "radial", definition?: ShadingDefinition) {
     this.ref = ref;
     this.shadingType = shadingType;
+    this.definition = definition;
+  }
+
+  /**
+   * Classify gradient stop opacity as opaque, uniform, or varying.
+   */
+  getOpacityClassification(): GradientOpacityClassification {
+    if (!this.definition) {
+      return { mode: "opaque" };
+    }
+
+    return classifyStopOpacity(this.definition.stops);
+  }
+
+  /**
+   * Get uniform stop opacity when applicable.
+   */
+  getUniformOpacity(): number {
+    const classification = this.getOpacityClassification();
+
+    if (classification.mode === "uniform") {
+      return classification.opacity;
+    }
+
+    if (classification.mode === "opaque") {
+      return 1;
+    }
+
+    return 1;
+  }
+
+  /**
+   * Create a grayscale shading dictionary representing stop opacity.
+   */
+  createOpacityMaskDict(): PdfDict {
+    if (!this.definition) {
+      throw new Error("Cannot create opacity mask shading without gradient stop metadata");
+    }
+
+    if (this.definition.shadingType === "axial") {
+      const [x0, y0, x1, y1] = this.definition.coords;
+
+      return PdfDict.of({
+        ShadingType: PdfNumber.of(2),
+        ColorSpace: PdfName.of("DeviceGray"),
+        Coords: new PdfArray([
+          PdfNumber.of(x0),
+          PdfNumber.of(y0),
+          PdfNumber.of(x1),
+          PdfNumber.of(y1),
+        ]),
+        Function: createOpacityFunction(this.definition.stops),
+        Extend: new PdfArray([
+          PdfBool.of(this.definition.extend[0]),
+          PdfBool.of(this.definition.extend[1]),
+        ]),
+      });
+    }
+
+    const [x0, y0, r0, x1, y1, r1] = this.definition.coords;
+
+    return PdfDict.of({
+      ShadingType: PdfNumber.of(3),
+      ColorSpace: PdfName.of("DeviceGray"),
+      Coords: new PdfArray([
+        PdfNumber.of(x0),
+        PdfNumber.of(y0),
+        PdfNumber.of(r0),
+        PdfNumber.of(x1),
+        PdfNumber.of(y1),
+        PdfNumber.of(r1),
+      ]),
+      Function: createOpacityFunction(this.definition.stops),
+      Extend: new PdfArray([
+        PdfBool.of(this.definition.extend[0]),
+        PdfBool.of(this.definition.extend[1]),
+      ]),
+    });
+  }
+
+  /**
+   * Build shading metadata from API options.
+   */
+  static createDefinition(options: AxialShadingOptions): ShadingDefinition;
+  static createDefinition(options: RadialShadingOptions): ShadingDefinition;
+  static createDefinition(options: AxialShadingOptions | RadialShadingOptions): ShadingDefinition {
+    const stops = normalizeStops(options.stops);
+    const extend = options.extend ?? [true, true];
+
+    if (options.coords.length === 4) {
+      return {
+        shadingType: "axial",
+        coords: options.coords,
+        extend,
+        stops,
+      };
+    }
+
+    return {
+      shadingType: "radial",
+      coords: options.coords,
+      extend,
+      stops,
+    };
   }
 
   /**
@@ -276,17 +405,72 @@ export class PDFShading {
  * Create a gradient function from color stops.
  */
 function createGradientFunction(stops: ColorStop[]): PdfDict {
-  if (stops.length < 2) {
-    throw new Error("Gradient requires at least 2 color stops");
-  }
-
-  const sortedStops = [...stops].sort((a, b) => a.offset - b.offset);
+  const sortedStops = normalizeStops(stops);
 
   if (sortedStops.length === 2) {
     return createExponentialFunction(sortedStops[0], sortedStops[1]);
   }
 
   return createStitchingFunction(sortedStops);
+}
+
+function createOpacityFunction(stops: ColorStop[]): PdfDict {
+  const sortedStops = normalizeStops(stops);
+
+  if (sortedStops.length === 2) {
+    return createExponentialOpacityFunction(sortedStops[0], sortedStops[1]);
+  }
+
+  return createStitchingOpacityFunction(sortedStops);
+}
+
+function normalizeStops(stops: ColorStop[]): NormalizedColorStop[] {
+  if (stops.length < 2) {
+    throw new Error("Gradient requires at least 2 color stops");
+  }
+
+  return [...stops]
+    .map(stop => ({
+      ...stop,
+      opacity: normalizeOpacity(stop.opacity),
+    }))
+    .sort((a, b) => a.offset - b.offset);
+}
+
+function normalizeOpacity(value: number | undefined): number {
+  if (value === undefined || Number.isNaN(value)) {
+    return 1;
+  }
+
+  return Math.max(0, Math.min(1, value));
+}
+
+function classifyStopOpacity(stops: ColorStop[]): GradientOpacityClassification {
+  const normalizedStops = normalizeStops(stops);
+  const firstOpacity = normalizedStops[0].opacity;
+
+  let allSame = true;
+  let allOpaque = firstOpacity === 1;
+
+  for (const stop of normalizedStops) {
+    if (stop.opacity !== firstOpacity) {
+      allSame = false;
+    }
+
+    if (stop.opacity !== 1) {
+      allOpaque = false;
+    }
+  }
+
+  if (allOpaque) {
+    return { mode: "opaque" };
+  }
+
+  if (allSame) {
+    return { mode: "uniform", opacity: firstOpacity };
+  }
+
+  return { mode: "varying" };
 }
 
 function getRGB(color: Color): [number, number, number] {
@@ -319,6 +503,19 @@ function createExponentialFunction(start: ColorStop, end: ColorStop): PdfDict {
   });
 }
 
+function createExponentialOpacityFunction(start: ColorStop, end: ColorStop): PdfDict {
+  const c0 = normalizeOpacity(start.opacity);
+  const c1 = normalizeOpacity(end.opacity);
+
+  return PdfDict.of({
+    FunctionType: PdfNumber.of(2),
+    Domain: new PdfArray([PdfNumber.of(0), PdfNumber.of(1)]),
+    C0: new PdfArray([PdfNumber.of(c0)]),
+    C1: new PdfArray([PdfNumber.of(c1)]),
+    N: PdfNumber.of(1),
+  });
+}
+
 function createStitchingFunction(stops: ColorStop[]): PdfDict {
   const functions: PdfDict[] = [];
   const bounds: PdfNumber[] = [];
@@ -326,6 +523,31 @@ function createStitchingFunction(stops: ColorStop[]): PdfDict {
 
   for (let i = 0; i < stops.length - 1; i++) {
     functions.push(createExponentialFunction(stops[i], stops[i + 1]));
+
+    if (i < stops.length - 2) {
+      bounds.push(PdfNumber.of(stops[i + 1].offset));
+    }
+
+    encode.push(PdfNumber.of(0));
+    encode.push(PdfNumber.of(1));
+  }
+
+  return PdfDict.of({
+    FunctionType: PdfNumber.of(3),
+    Domain: new PdfArray([PdfNumber.of(0), PdfNumber.of(1)]),
+    Functions: new PdfArray(functions),
+    Bounds: new PdfArray(bounds),
+    Encode: new PdfArray(encode),
+  });
+}
+
+function createStitchingOpacityFunction(stops: ColorStop[]): PdfDict {
+  const functions: PdfDict[] = [];
+  const bounds: PdfNumber[] = [];
+  const encode: PdfNumber[] = [];
+
+  for (let i = 0; i < stops.length - 1; i++) {
+    functions.push(createExponentialOpacityFunction(stops[i], stops[i + 1]));
 
     if (i < stops.length - 2) {
       bounds.push(PdfNumber.of(stops[i + 1].offset));
