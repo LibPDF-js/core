@@ -10,7 +10,7 @@ export { CheckboxField } from "./checkbox-field";
 export { DropdownField, ListBoxField } from "./choice-fields";
 // Factory
 export { createFormField } from "./factory";
-export { ButtonField, SignatureField, UnknownField } from "./other-fields";
+export { ButtonField, SignatureField, type SignatureStatus, UnknownField } from "./other-fields";
 export { RadioField } from "./radio-field";
 // Field implementations
 export { TextField } from "./text-field";
