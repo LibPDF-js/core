@@ -98,6 +98,68 @@ describe("PageTree", () => {
     });
   });
 
+  describe("load() - indirect Kids", () => {
+    it("resolves a /Kids array stored as an indirect object", async () => {
+      // Some producers (e.g. "Dr. Tax Office") write the Kids array as its
+      // own indirect object: /Kids 4 0 R instead of /Kids [ ... ].
+      const page1Ref = PdfRef.of(3, 0);
+      const page2Ref = PdfRef.of(4, 0);
+      const kidsRef = PdfRef.of(2, 0);
+      const rootRef = PdfRef.of(1, 0);
+
+      const root = new PdfDict();
+      root.set("Type", PdfName.Pages);
+      root.set("Kids", kidsRef);
+      root.set("Count", PdfNumber.of(2));
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["2:0", new PdfArray([page1Ref, page2Ref])],
+        ["3:0", createPage()],
+        ["4:0", createPage()],
+      ]);
+
+      const tree = PDFPageTree.load(rootRef, createResolver(objects));
+
+      expect(tree.getPageCount()).toBe(2);
+      expect(tree.getPage(0)).toBe(page1Ref);
+      expect(tree.getPage(1)).toBe(page2Ref);
+    });
+
+    it("resolves indirect /Kids on intermediate nodes", async () => {
+      const page1Ref = PdfRef.of(5, 0);
+      const page2Ref = PdfRef.of(6, 0);
+      const intermediateKidsRef = PdfRef.of(4, 0);
+      const intermediateRef = PdfRef.of(3, 0);
+      const rootKidsRef = PdfRef.of(2, 0);
+      const rootRef = PdfRef.of(1, 0);
+
+      const root = new PdfDict();
+      root.set("Type", PdfName.Pages);
+      root.set("Kids", rootKidsRef);
+      root.set("Count", PdfNumber.of(2));
+
+      const intermediate = new PdfDict();
+      intermediate.set("Type", PdfName.Pages);
+      intermediate.set("Kids", intermediateKidsRef);
+      intermediate.set("Count", PdfNumber.of(2));
+
+      const objects = new Map<string, PdfObject>([
+        ["1:0", root],
+        ["2:0", new PdfArray([intermediateRef])],
+        ["3:0", intermediate],
+        ["4:0", new PdfArray([page1Ref, page2Ref])],
+        ["5:0", createPage()],
+        ["6:0", createPage()],
+      ]);
+
+      const tree = PDFPageTree.load(rootRef, createResolver(objects));
+
+      expect(tree.getPageCount()).toBe(2);
+      expect(tree.getPages()).toEqual([page1Ref, page2Ref]);
+    });
+  });
+
   describe("load() - nested tree", () => {
     it("loads a two-level tree", async () => {
       // Structure:
