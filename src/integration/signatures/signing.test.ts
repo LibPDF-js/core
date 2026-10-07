@@ -11,9 +11,9 @@ import { HttpTimestampAuthority } from "#src/signatures/timestamp";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
-import { loadTestSigner, P12_FILES, TEST_TSA_URL } from "./test-helpers";
+import { loadTestSigner, NETWORK_TEST_TIMEOUT, P12_FILES, TEST_TSA_URL } from "./test-helpers";
 
-describe("signing integration", () => {
+describe("signing integration", { timeout: NETWORK_TEST_TIMEOUT }, () => {
   describe("B-B signing (basic)", () => {
     it("signs a simple PDF document", async () => {
       const pdfBytes = await loadFixture("basic", "rot0.pdf");

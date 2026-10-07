@@ -8,6 +8,14 @@ import { loadFixture } from "#src/test-utils";
 /** Public RFC 3161 timestamp authority used by integration tests. */
 export const TEST_TSA_URL = "https://freetsa.org/tsr";
 
+/**
+ * Per-test timeout for suites that hit the live TSA and fetch OCSP/CRL data.
+ *
+ * These tests do real network round-trips plus RSA/CMS work, and when the
+ * full suite runs in parallel they can easily exceed the global 15s default.
+ */
+export const NETWORK_TEST_TIMEOUT = 60_000;
+
 /** Test P12 files with different encryption formats */
 export const P12_FILES = {
   /** AES-256-CBC (modern default) */

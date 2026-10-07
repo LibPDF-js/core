@@ -76,7 +76,9 @@ export class PDFPageTree {
 
         loadedPages.set(key, node);
       } else if (type === "Pages") {
-        const kids = node.getArray("Kids");
+        // Kids may be an indirect reference to the array (e.g. /Kids 4 0 R),
+        // so resolve through getObject rather than reading the raw value.
+        const kids = node.getArray("Kids", getObject);
 
         if (kids) {
           for (let i = 0; i < kids.length; i++) {
