@@ -11,9 +11,9 @@ import { HttpTimestampAuthority } from "#src/signatures/timestamp";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
-import { loadTestSigner, TEST_TSA_URL } from "./test-helpers";
+import { loadTestSigner, NETWORK_TEST_TIMEOUT, TEST_TSA_URL } from "./test-helpers";
 
-describe("timestamping integration", () => {
+describe("timestamping integration", { timeout: NETWORK_TEST_TIMEOUT }, () => {
   const tsa = new HttpTimestampAuthority(TEST_TSA_URL);
 
   describe("standalone document timestamp", () => {
