@@ -1,3 +1,4 @@
+import { ByteWriter } from "#src/io/byte-writer";
 import { describe, expect, it } from "vitest";
 
 import { PdfRef } from "./pdf-ref";
@@ -48,5 +49,22 @@ describe("PdfRef", () => {
   it("formats as PDF syntax via toString()", () => {
     expect(PdfRef.of(1, 0).toString()).toBe("1 0 R");
     expect(PdfRef.of(42, 1).toString()).toBe("42 1 R");
+  });
+
+  it("applies the writer's renumber map when serializing", () => {
+    const writer = new ByteWriter();
+
+    writer.refRenumberMap = new Map([[7, 2]]);
+
+    PdfRef.of(7, 1).toBytes(writer);
+    writer.writeAscii(" ");
+    PdfRef.of(8, 0).toBytes(writer);
+
+    writer.refRenumberMap = null;
+
+    writer.writeAscii(" ");
+    PdfRef.of(7, 0).toBytes(writer);
+
+    expect(new TextDecoder().decode(writer.toBytes())).toBe("2 1 R null 7 0 R");
   });
 });

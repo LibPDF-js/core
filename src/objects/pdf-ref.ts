@@ -72,6 +72,16 @@ export class PdfRef implements PdfPrimitive {
   }
 
   toBytes(writer: ByteWriter): void {
+    const renumberMap = writer.refRenumberMap;
+
+    if (renumberMap) {
+      const newNum = renumberMap.get(this.objectNumber);
+
+      writer.writeAscii(newNum === undefined ? "null" : `${newNum} ${this.generation} R`);
+
+      return;
+    }
+
     writer.writeAscii(`${this.objectNumber} ${this.generation} R`);
   }
 }
