@@ -37,6 +37,14 @@ describe("PdfRef", () => {
     expect(a).not.toBe(c);
   });
 
+  it("keeps refs with large generations distinct", () => {
+    const a = PdfRef.of(1, 65536);
+    const b = PdfRef.of(2, 0);
+
+    expect(a).not.toBe(b);
+    expect(a.generation).toBe(65536);
+  });
+
   it("formats as PDF syntax via toString()", () => {
     expect(PdfRef.of(1, 0).toString()).toBe("1 0 R");
     expect(PdfRef.of(42, 1).toString()).toBe("42 1 R");

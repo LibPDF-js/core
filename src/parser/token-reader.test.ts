@@ -141,6 +141,20 @@ describe("TokenReader", () => {
       expect(token).toMatchObject({ value: -17, isInteger: true });
     });
 
+    it("parses large integers", () => {
+      const r = reader("123456789012345 1234567890123456789");
+
+      expect(r.nextToken()).toMatchObject({ value: 123456789012345, isInteger: true });
+      // Beyond 2^53, so it falls back to parseFloat rounding
+      expect(r.nextToken()).toMatchObject({ value: Number.parseFloat("1234567890123456789") });
+    });
+
+    it("parses integer with leading zeros", () => {
+      const r = reader("000123");
+
+      expect(r.nextToken()).toMatchObject({ value: 123, isInteger: true });
+    });
+
     it("parses positive integer with explicit plus", () => {
       const r = reader("+123");
       const token = r.nextToken();
@@ -711,6 +725,19 @@ describe("TokenReader", () => {
   });
 
   describe("keyword parsing", () => {
+    it("decodes non-ASCII bytes in short keywords as UTF-8", () => {
+      const r = reader("caf\u00e9");
+
+      expect(r.nextToken()).toMatchObject({ type: "keyword", value: "caf\u00e9" });
+    });
+
+    it("parses long keywords", () => {
+      const keyword = "x".repeat(40);
+      const r = reader(keyword);
+
+      expect(r.nextToken()).toMatchObject({ type: "keyword", value: keyword });
+    });
+
     it("parses true", () => {
       const r = reader("true");
       const token = r.nextToken();

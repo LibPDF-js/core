@@ -23,7 +23,7 @@ export class PdfRef implements PdfPrimitive {
     return "ref";
   }
 
-  private static cache = new LRUCache<string, PdfRef>({ max: DEFAULT_REF_CACHE_SIZE });
+  private static cache = new LRUCache<number | string, PdfRef>({ max: DEFAULT_REF_CACHE_SIZE });
 
   private constructor(
     readonly objectNumber: number,
@@ -34,7 +34,8 @@ export class PdfRef implements PdfPrimitive {
    * Get or create an interned PdfRef for the given object/generation pair.
    */
   static of(objectNumber: number, generation: number = 0): PdfRef {
-    const key = `${objectNumber} ${generation}`;
+    // Numeric keys are much cheaper to hash; nearly all refs are generation 0
+    const key = generation === 0 ? objectNumber : `${objectNumber} ${generation}`;
 
     let cached = PdfRef.cache.get(key);
 
