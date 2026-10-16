@@ -267,9 +267,7 @@ export class TokenReader {
       return { type: "keyword", value: fullText, position };
     }
 
-    // Extract just the numeric part (without multiple signs)
-    const numericText = this.extractText(digitsStart, end);
-    let value = parseFloat(numericText);
+    let value = this.parseNumber(digitsStart, end, hasDecimal);
 
     if (isNegative) {
       value = -value;
@@ -611,9 +609,49 @@ export class TokenReader {
     return { type: "keyword", value, position };
   }
 
-  private extractText(start: number, end: number): string {
-    const bytes = this.scanner.bytes.subarray(start, end);
+  /**
+   * Parse the numeric part of a number token (without signs).
+   *
+   * Integers that fit exactly in a double are accumulated directly from the
+   * bytes, avoiding a string allocation and `parseFloat` for the most common
+   * tokens (object numbers, offsets, lengths).
+   */
+  private parseNumber(start: number, end: number, hasDecimal: boolean): number {
+    if (hasDecimal || end - start > 15) {
+      return parseFloat(this.extractText(start, end));
+    }
 
-    return sharedTextDecoder.decode(bytes);
+    const data = this.scanner.bytes;
+    let value = 0;
+
+    for (let i = start; i < end; i++) {
+      value = value * 10 + (data[i] - DIGIT_0);
+    }
+
+    return value;
+  }
+
+  private extractText(start: number, end: number): string {
+    const data = this.scanner.bytes;
+
+    // Fast path: short ASCII text (keywords, numbers) is built directly from
+    // the byte range, avoiding a subarray allocation and TextDecoder call.
+    if (end - start <= 32) {
+      let value = "";
+
+      for (let i = start; i < end; i++) {
+        const byte = data[i];
+
+        if (byte >= 0x80) {
+          return sharedTextDecoder.decode(data.subarray(start, end));
+        }
+
+        value += String.fromCharCode(byte);
+      }
+
+      return value;
+    }
+
+    return sharedTextDecoder.decode(data.subarray(start, end));
   }
 }
