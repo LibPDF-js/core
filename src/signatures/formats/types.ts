@@ -22,7 +22,7 @@ export interface CMSCreateOptions {
   /** Digest algorithm used */
   digestAlgorithm: DigestAlgorithm;
 
-  /** Signing time (optional, embedded in signed attributes) */
+  /** Signing time for the signing-time signed attribute. Ignored by CAdES (PAdES forbids it). */
   signingTime?: Date;
 }
 

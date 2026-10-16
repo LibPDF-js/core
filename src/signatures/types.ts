@@ -173,6 +173,9 @@ export interface SignOptions {
    * Signing time to embed in the signature.
    * Defaults to current system time.
    *
+   * Written to /M. Also embedded as a CMS signed attribute for
+   * `adbe.pkcs7.detached` only, since PAdES forbids it there.
+   *
    * NOTE: This is NOT cryptographically verified - it's just a claim.
    * The signer's local clock provides this value. For proven time,
    * use a TimestampAuthority (B-T level or higher).

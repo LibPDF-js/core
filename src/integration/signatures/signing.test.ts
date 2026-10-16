@@ -6,6 +6,9 @@
  */
 
 import { PDF } from "#src/api/pdf";
+import { hexToBytes } from "#src/helpers/buffer";
+import { getSignedAttributeOids } from "#src/signatures/formats/test-helpers";
+import { OID_SIGNING_TIME } from "#src/signatures/oids";
 import { P12Signer } from "#src/signatures/signers";
 import { HttpTimestampAuthority } from "#src/signatures/timestamp";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
@@ -96,6 +99,23 @@ describe("signing integration", { timeout: NETWORK_TEST_TIMEOUT }, () => {
       expect(pdfStr).toContain("/Location (New York)");
       expect(pdfStr).toContain("/ContactInfo (test@example.com)");
       expect(pdfStr).toContain("/M (D:20250105120000Z)");
+    });
+
+    it("forwards signingTime into the CMS for adbe.pkcs7.detached", async () => {
+      const pdfBytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(pdfBytes);
+      const signer = await loadTestSigner();
+
+      const { bytes } = await pdf.sign({
+        signer,
+        subFilter: "adbe.pkcs7.detached",
+        signingTime: new Date("2025-01-05T12:00:00Z"),
+      });
+
+      const pdfStr = new TextDecoder().decode(bytes);
+      const contentsHex = pdfStr.match(/\/Contents\s*<([0-9A-Fa-f]+)>/)?.[1] ?? "";
+
+      expect(getSignedAttributeOids(hexToBytes(contentsHex))).toContain(OID_SIGNING_TIME);
     });
   });
 

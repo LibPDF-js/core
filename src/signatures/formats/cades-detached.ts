@@ -1,15 +1,14 @@
 /**
  * CAdES Detached signature format (ETSI.CAdES.detached).
  *
- * This is the modern PAdES-compliant signature format. It extends PKCS#7 with:
- * - ESS signing-certificate-v2 attribute (binds certificate to signature)
- * - Content hints (optional)
+ * This is the modern PAdES-compliant signature format. It extends PKCS#7 with
+ * the ESS signing-certificate-v2 attribute (binds certificate to signature).
  *
  * ETSI EN 319 122-1: CAdES digital signatures
  * ETSI EN 319 142-1: PAdES digital signatures
  */
 
-import { fromBER, ObjectIdentifier, OctetString, Sequence, UTCTime } from "asn1js";
+import { fromBER, ObjectIdentifier, OctetString, Sequence } from "asn1js";
 import * as pkijs from "pkijs";
 
 import { toArrayBuffer } from "../../helpers/buffer";
@@ -22,13 +21,11 @@ import {
   OID_SHA512,
   OID_SIGNED_DATA,
   OID_SIGNING_CERTIFICATE_V2,
-  OID_SIGNING_TIME,
   OID_TIMESTAMP_TOKEN,
 } from "../oids";
-import type { DigestAlgorithm, Signer } from "../types";
+import type { DigestAlgorithm } from "../types";
 import { hashData } from "../utils";
 import {
-  buildCMSAlgorithmProtection,
   encodeSignedAttributesForSigning,
   getDigestAlgorithmOid,
   getSignatureAlgorithmOid,
@@ -54,7 +51,7 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
    * being serialized to DER.
    */
   async create(options: CMSCreateOptions): Promise<CMSSignedData> {
-    const { signer, documentHash, digestAlgorithm, signingTime } = options;
+    const { signer, documentHash, digestAlgorithm } = options;
 
     // Parse certificates
     const signerCert = parseCertificate(signer.certificate);
@@ -62,13 +59,7 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
     const allCerts = [signerCert, ...chainCerts];
 
     // Build signed attributes
-    const signedAttrs = await this.buildSignedAttributes(
-      documentHash,
-      digestAlgorithm,
-      signer,
-      signerCert,
-      signingTime,
-    );
+    const signedAttrs = await this.buildSignedAttributes(documentHash, digestAlgorithm, signerCert);
 
     // Encode and sign
     const signedAttrsForSigning = encodeSignedAttributesForSigning(signedAttrs);
@@ -150,13 +141,16 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
 
   /**
    * Build the signed attributes for CAdES signature.
+   *
+   * Deliberately omitted, per ETSI EN 319 142-1 Table 1 / clause 6.3:
+   * - signing-time: "shall not be present" at every level; /M carries it.
+   * - cms-algorithm-protection: defined in EN 319 122-1 §5.2.13 but not
+   *   listed in Table 1, and 6.3 forbids any such 122-1 attribute.
    */
   private async buildSignedAttributes(
     documentHash: Uint8Array,
     digestAlgorithm: DigestAlgorithm,
-    signer: Signer,
     signerCert: pkijs.Certificate,
-    signingTime?: Date,
   ): Promise<pkijs.Attribute[]> {
     const attrs: pkijs.Attribute[] = [];
 
@@ -167,19 +161,6 @@ export class CAdESDetachedBuilder implements CMSFormatBuilder, CMSSignedData {
         values: [new ObjectIdentifier({ value: OID_DATA })],
       }),
     );
-
-    // Signing Time (optional but recommended)
-    if (signingTime) {
-      attrs.push(
-        new pkijs.Attribute({
-          type: OID_SIGNING_TIME,
-          values: [new UTCTime({ valueDate: signingTime })],
-        }),
-      );
-    }
-
-    // CMS Algorithm Protection (RFC 6211)
-    attrs.push(buildCMSAlgorithmProtection(digestAlgorithm, signer));
 
     // Message Digest (required)
     attrs.push(

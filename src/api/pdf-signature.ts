@@ -196,9 +196,6 @@ export class PDFSignature {
     const formatBuilder = this.getFormatBuilder(resolved.subFilter);
 
     // Create the CMS structure (signs the document)
-    // Note: PDFBox includes signingTime even when using a timestamp.
-    // The timestamp provides the authoritative time, but signingTime
-    // may be needed for Adobe to recognize the timestamp token.
     const signedData = await formatBuilder.create({
       signer: resolved.signer,
       documentHash,
