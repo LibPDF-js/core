@@ -188,6 +188,26 @@ describe("PDF attachments", () => {
       expect(retrievedData).toEqual(testData);
     });
 
+    it("writes the MIME subtype escaped once", async () => {
+      const bytes = await loadFixture("basic", "rot0.pdf");
+      const pdf = await PDF.load(bytes);
+
+      pdf.addAttachment("invoice.xml", new TextEncoder().encode("<Invoice/>"), {
+        mimeType: "application/xml",
+      });
+
+      const savedBytes = await pdf.save();
+      const raw = new TextDecoder("latin1").decode(savedBytes);
+
+      // "/" is escaped once as #2F; a double escape (#232F) is an invalid
+      // MIME type and fails PDF/A-3 validation
+      expect(raw).toContain("/Subtype /application#2Fxml");
+      expect(raw).not.toContain("#232F");
+
+      const pdf2 = await PDF.load(savedBytes);
+      expect(pdf2.getAttachments().get("invoice.xml")?.mimeType).toBe("application/xml");
+    });
+
     it("preserves existing attachments when adding new ones", async () => {
       const bytes = await loadFixture("attachments", "null_PDComplexFileSpecification.pdf");
       const pdf = await PDF.load(bytes);
