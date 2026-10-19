@@ -59,6 +59,7 @@ export type {
   ListBoxField,
   RadioField,
   SignatureField,
+  SignatureStatus,
   TextField,
 } from "./document/forms/fields";
 export type { FlattenOptions } from "./document/forms/form-flattener";
