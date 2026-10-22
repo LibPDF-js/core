@@ -270,9 +270,8 @@ export function createEmbeddedFileStream(
   // Add MIME type if known
 
   if (mimeType) {
-    // Encode MIME type as PDF name (replace / with #2F)
-    const encodedMime = mimeType.replaceAll("/", "#2F").replaceAll(" ", "#20");
-    streamEntries.push(["Subtype", PdfName.of(encodedMime)]);
+    // PdfName escapes "/" and " " as #2F / #20 when serialized
+    streamEntries.push(["Subtype", PdfName.of(mimeType)]);
   }
 
   return new PdfStream(streamEntries, data);
@@ -307,10 +306,8 @@ export function createFileSpec(
 
 /**
  * Encode MIME type as a PDF name (for /Subtype).
- * Replaces special characters with # hex sequences.
+ * PdfName escapes special characters with # hex sequences when serialized.
  */
 export function encodeMimeTypeAsName(mimeType: string): PdfName {
-  const encoded = mimeType.replaceAll("/", "#2F").replaceAll(" ", "#20");
-
-  return PdfName.of(encoded);
+  return PdfName.of(mimeType);
 }

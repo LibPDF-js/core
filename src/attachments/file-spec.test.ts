@@ -289,7 +289,7 @@ describe("createEmbeddedFileStream", () => {
 
     expect(stream.data).toBe(data);
     expect(stream.getName("Type")?.value).toBe("EmbeddedFile");
-    expect(stream.getName("Subtype")?.value).toBe("application#2Fpdf");
+    expect(stream.getName("Subtype")?.value).toBe("application/pdf");
 
     const params = stream.getDict("Params");
     expect(params?.getNumber("Size")?.value).toBe(5);
@@ -299,14 +299,14 @@ describe("createEmbeddedFileStream", () => {
 
   it("auto-detects MIME type from filename", () => {
     const stream = createEmbeddedFileStream(new Uint8Array([1]), "image.png");
-    expect(stream.getName("Subtype")?.value).toBe("image#2Fpng");
+    expect(stream.getName("Subtype")?.value).toBe("image/png");
   });
 
   it("uses provided MIME type over auto-detected", () => {
     const stream = createEmbeddedFileStream(new Uint8Array([1]), "file.bin", {
       mimeType: "application/octet-stream",
     });
-    expect(stream.getName("Subtype")?.value).toBe("application#2Foctet-stream");
+    expect(stream.getName("Subtype")?.value).toBe("application/octet-stream");
   });
 
   it("omits Subtype for unknown file types", () => {
