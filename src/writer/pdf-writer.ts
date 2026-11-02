@@ -16,7 +16,6 @@ import { ByteWriter } from "#src/io/byte-writer";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
-import { PdfNull } from "#src/objects/pdf-null";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
@@ -291,65 +290,6 @@ function renumberRef(ref: PdfRef, renumberMap: Map<number, number>): PdfRef {
 }
 
 /**
- * Recursively renumber indirect references inside an object onto the new
- * numbering. Returns a structural copy of dictionaries, arrays, and streams
- * with all `PdfRef` children replaced by renumbered references. Primitives
- * (names, numbers, strings, booleans, null) are returned unchanged because
- * they carry no embedded refs.
- *
- * The original object graph is not mutated — this is important because the
- * in-memory `PDF` instance may be reused after `save()`, and mutating its
- * objects would corrupt subsequent operations.
- */
-function renumberRefs(obj: PdfObject, renumberMap: Map<number, number>): PdfObject {
-  if (obj instanceof PdfRef) {
-    const newNum = renumberMap.get(obj.objectNumber);
-
-    if (newNum === undefined) {
-      return PdfNull.instance;
-    }
-
-    return PdfRef.of(newNum, obj.generation);
-  }
-
-  if (obj instanceof PdfStream) {
-    // PdfStream extends PdfDict but carries binary data. Build a new stream
-    // sharing the same data buffer (data is immutable from the writer's POV)
-    // and copy the renumbered dict entries.
-    const renumbered = new PdfStream([], obj.data);
-
-    for (const [key, value] of obj) {
-      renumbered.set(key.value, renumberRefs(value, renumberMap));
-    }
-
-    return renumbered;
-  }
-
-  if (obj instanceof PdfDict) {
-    const renumbered = new PdfDict();
-
-    for (const [key, value] of obj) {
-      renumbered.set(key.value, renumberRefs(value, renumberMap));
-    }
-
-    return renumbered;
-  }
-
-  if (obj instanceof PdfArray) {
-    const renumbered = new PdfArray();
-
-    for (const item of obj) {
-      renumbered.push(renumberRefs(item, renumberMap));
-    }
-
-    return renumbered;
-  }
-
-  // Primitives carry no embedded refs.
-  return obj;
-}
-
-/**
  * Collect all refs reachable from the document root and trailer entries.
  *
  * Walks the object graph starting from Root, Info, and Encrypt (if present),
@@ -493,11 +433,6 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
     // Prepare object (compress streams if needed)
     let prepared = prepareObjectForWrite(obj, compress, threshold);
 
-    // Renumber any indirect references inside this object onto the new
-    // numbering before writing. Without this the body would still reference
-    // old object numbers, producing a broken PDF.
-    prepared = renumberRefs(prepared, renumberMap);
-
     // Apply encryption if security handler is provided
     // Skip encrypting the /Encrypt dictionary itself.
     // Encryption keys are derived from the object number, so we use the NEW
@@ -515,7 +450,15 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
       generation: ref.generation,
     });
 
+    // Renumber indirect references inside this object onto the new numbering
+    // as they are serialized. Without this the body would still reference old
+    // object numbers, producing a broken PDF. Scoped to object bodies so the
+    // already-renumbered trailer refs are not remapped twice.
+    writer.refRenumberMap = renumberMap;
+
     writeIndirectObject(writer, newRef, prepared);
+
+    writer.refRenumberMap = null;
   }
 
   // Record xref offset before writing it

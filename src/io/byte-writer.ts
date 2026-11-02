@@ -19,6 +19,13 @@ export class ByteWriter {
   private readonly maxSize: number;
 
   /**
+   * Object number remapping applied when serializing indirect references.
+   * Refs missing from the map are written as `null`. Used by full saves to
+   * compact object numbers without copying the object graph.
+   */
+  refRenumberMap: Map<number, number> | null = null;
+
+  /**
    * Create a new ByteWriter.
    *
    * @param existingBytes - Optional existing bytes to start with (for incremental saves)
