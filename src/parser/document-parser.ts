@@ -677,6 +677,23 @@ export class DocumentParser {
 
             // Verify generation matches
             if (result.genNum !== ref.generation) {
+              // Stale reference: neither the xref entry nor the object header
+              // carries the requested generation, so the ref does not refer to
+              // this object (ISO 32000-1 §7.5.4) and is treated as a reference
+              // to the null object (§7.3.10). Returning the live body here
+              // would register a second copy under the stale (num, gen).
+              if (entry.generation !== ref.generation) {
+                this.warnings.push(
+                  `Stale reference ${ref.objectNumber} ${ref.generation} R: object ${ref.objectNumber} is at generation ${result.genNum}; treating as null`,
+                );
+
+                cache.set(key, null);
+
+                return null;
+              }
+
+              // Only the xref generation is wrong but the header matches the
+              // requested generation: keep the lenient behaviour.
               this.warnings.push(
                 `Generation mismatch for object ${ref.objectNumber}: expected ${ref.generation}, got ${result.genNum}`,
               );
@@ -693,12 +710,28 @@ export class DocumentParser {
           }
 
           case "compressed": {
+            // Objects in object streams always have generation 0
+            // (ISO 32000-1 §7.5.7), so any other generation is a stale ref.
+            if (ref.generation !== 0) {
+              this.warnings.push(
+                `Stale reference ${ref.objectNumber} ${ref.generation} R: compressed object ${ref.objectNumber} has generation 0; treating as null`,
+              );
+
+              cache.set(key, null);
+
+              return null;
+            }
+
             // Get or create object stream parser
             let streamParser = objectStreamCache.get(entry.streamObjNum);
 
             if (!streamParser) {
               // Load the object stream
-              const streamRef = PdfRef.of(entry.streamObjNum, 0);
+              // Look the stream up at its own xref generation so a malformed
+              // non-zero generation does not hide every object inside it.
+              const streamEntry = xref.get(entry.streamObjNum);
+              const streamGen = streamEntry?.type === "uncompressed" ? streamEntry.generation : 0;
+              const streamRef = PdfRef.of(entry.streamObjNum, streamGen);
               const streamObj = getObject(streamRef);
 
               if (!streamObj || !(streamObj instanceof PdfStream)) {
