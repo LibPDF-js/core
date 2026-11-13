@@ -4,8 +4,14 @@ import { PdfStream } from "#src/objects/pdf-stream";
 import { loadFixture } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
 
+import { parseCIDWidths } from "./cid-font";
 import { EmbeddedFont } from "./embedded-font";
-import { createFontObjects, generateSubsetTag, registerFontObjects } from "./font-embedder";
+import {
+  createFontObjects,
+  createFontObjectsFull,
+  generateSubsetTag,
+  registerFontObjects,
+} from "./font-embedder";
 
 describe("generateSubsetTag", () => {
   it("should generate 6 uppercase letters", () => {
@@ -107,6 +113,20 @@ describe("createFontObjects", () => {
     expect(text).toContain("begincmap");
     expect(text).toContain("endcmap");
     expect(text).toContain("begincodespacerange");
+  });
+});
+
+describe("createFontObjectsFull", () => {
+  it("has widths for used glyphs outside the preset ranges", async () => {
+    const font = EmbeddedFont.fromBytes(await loadFixture("fonts", "ttf/DejaVuSans.ttf"));
+    font.encodeText("ש");
+    const [gid] = font.getGidToCodePointMap().keys();
+
+    const result = createFontObjectsFull(font);
+    const widths = parseCIDWidths(result.cidFontDict.getArray("W")!);
+    const scale = 1000 / font.program.unitsPerEm;
+
+    expect(widths.get(gid)).toBe(Math.round(font.program.getAdvanceWidth(gid) * scale));
   });
 });
 
