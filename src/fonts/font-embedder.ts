@@ -216,10 +216,11 @@ export function createFontObjectsFull(font: EmbeddedFont): FontEmbedResult {
 
   // For full embedding, build a complete width array for all glyphs
   // We need to enumerate all code points the font supports
-  const widthsArray = buildFullWidthsArray(program);
+  const usedGlyphs = font.getGidToCodePointMap();
+  const widthsArray = buildFullWidthsArray(program, usedGlyphs);
 
   // Build ToUnicode CMap for the full font
-  const toUnicodeData = buildFullToUnicodeCMap(program);
+  const toUnicodeData = buildFullToUnicodeCMap(program, usedGlyphs);
 
   // Create font stream with full font data
   const fontStreamDict = new PdfDict();
@@ -469,12 +470,21 @@ function getFontFileType(program: FontProgram): {
  * We enumerate common Unicode ranges to find which GIDs are supported,
  * then build the widths array keyed by GID.
  */
-function buildFullWidthsArray(program: FontProgram): PdfArray {
+function buildFullWidthsArray(program: FontProgram, usedGlyphs: Map<number, number>): PdfArray {
   const scale = 1000 / program.unitsPerEm;
 
   // Collect all GIDs and their widths
   // Use a Map to handle multiple code points mapping to the same GID
   const gidWidths = new Map<number, number>();
+
+  // glyphs the document drew can lie outside the ranges below
+  for (const gid of usedGlyphs.keys()) {
+    const width = program.getAdvanceWidth(gid);
+
+    if (Number.isFinite(width) && width >= 0) {
+      gidWidths.set(gid, Math.round(width * scale));
+    }
+  }
 
   // Enumerate common Unicode ranges
   const ranges = FULL_EMBED_UNICODE_RANGES;
@@ -514,11 +524,11 @@ function buildFullWidthsArray(program: FontProgram): PdfArray {
 /**
  * Build a ToUnicode CMap covering all glyphs in the font.
  */
-function buildFullToUnicodeCMap(program: FontProgram): Uint8Array {
+function buildFullToUnicodeCMap(program: FontProgram, usedGlyphs: Map<number, number>): Uint8Array {
   // Build a gidToCodePoint map for all supported code points
   // With CIDToGIDMap /Identity, content stream contains GIDs
   // ToUnicode maps GID → Unicode code point
-  const gidToCodePoint = new Map<number, number>();
+  const gidToCodePoint = new Map<number, number>(usedGlyphs);
 
   for (const [start, end] of FULL_EMBED_UNICODE_RANGES) {
     for (let cp = start; cp <= end; cp++) {
