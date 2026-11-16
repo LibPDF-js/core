@@ -273,6 +273,15 @@ function encryptStreamDict(stream: PdfStream, ctx: EncryptionContext): PdfStream
 }
 
 /**
+ * Key for the renumbering map. Keyed by (object number, generation) because
+ * two refs with the same number but different generations are different
+ * objects (ISO 32000-1 §7.5.4) and must never share an output number.
+ */
+function refKey(ref: PdfRef): string {
+  return `${ref.objectNumber} ${ref.generation}`;
+}
+
+/**
  * Renumber a single PdfRef using the renumbering map.
  *
  * Returns a new PdfRef pointing at the mapped object number, or the original
@@ -280,8 +289,8 @@ function encryptStreamDict(stream: PdfStream, ctx: EncryptionContext): PdfStream
  * reachable objects, but is allowed defensively so unreachable trailing refs
  * don't crash the writer).
  */
-function renumberRef(ref: PdfRef, renumberMap: Map<number, number>): PdfRef {
-  const newNum = renumberMap.get(ref.objectNumber);
+function renumberRef(ref: PdfRef, renumberMap: Map<string, number>): PdfRef {
+  const newNum = renumberMap.get(refKey(ref));
 
   if (newNum === undefined) {
     return ref;
@@ -301,9 +310,9 @@ function renumberRef(ref: PdfRef, renumberMap: Map<number, number>): PdfRef {
  * in-memory `PDF` instance may be reused after `save()`, and mutating its
  * objects would corrupt subsequent operations.
  */
-function renumberRefs(obj: PdfObject, renumberMap: Map<number, number>): PdfObject {
+function renumberRefs(obj: PdfObject, renumberMap: Map<string, number>): PdfObject {
   if (obj instanceof PdfRef) {
-    const newNum = renumberMap.get(obj.objectNumber);
+    const newNum = renumberMap.get(refKey(obj));
 
     if (newNum === undefined) {
       return PdfNull.instance;
@@ -461,17 +470,17 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
   //
   // Compaction also avoids embedding a record of how many objects the PDF
   // used to have before garbage collection.
-  const renumberMap = new Map<number, number>();
+  const renumberMap = new Map<string, number>();
   let nextNum = 1;
 
   for (const [ref] of registry.entries()) {
-    const key = `${ref.objectNumber} ${ref.generation}`;
+    const key = refKey(ref);
 
-    if (!reachableKeys.has(key)) {
+    if (!reachableKeys.has(key) || renumberMap.has(key)) {
       continue;
     }
 
-    renumberMap.set(ref.objectNumber, nextNum++);
+    renumberMap.set(key, nextNum++);
   }
 
   // Renumber trailer-level refs (Root / Info / Encrypt) onto the new numbering.
@@ -479,15 +488,30 @@ export function writeComplete(registry: ObjectRegistry, options: WriteOptions): 
   const renumberedInfo = options.info ? renumberRef(options.info, renumberMap) : undefined;
   const renumberedEncrypt = options.encrypt ? renumberRef(options.encrypt, renumberMap) : undefined;
 
-  // Write only reachable objects and record offsets
+  // Write only reachable objects and record offsets. Each (num, gen) is
+  // written exactly once.
+  const written = new Set<string>();
+
   for (const [ref, obj] of registry.entries()) {
-    const key = `${ref.objectNumber} ${ref.generation}`;
+    const key = refKey(ref);
 
     if (!reachableKeys.has(key)) {
       continue; // Skip orphan objects
     }
 
-    const newObjectNumber = renumberMap.get(ref.objectNumber)!;
+    if (written.has(key)) {
+      continue;
+    }
+
+    written.add(key);
+
+    const newObjectNumber = renumberMap.get(key)!;
+
+    if (offsets.has(newObjectNumber)) {
+      throw new Error(
+        `Internal error: two objects renumbered to ${newObjectNumber} during full save (source ${key})`,
+      );
+    }
     const newRef = PdfRef.of(newObjectNumber, ref.generation);
 
     // Prepare object (compress streams if needed)
