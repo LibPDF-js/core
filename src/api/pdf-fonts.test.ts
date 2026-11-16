@@ -409,3 +409,18 @@ describe("PDFFonts API", () => {
     expect(pdf.fonts.isFinalized).toBe(firstFinalizedState);
   });
 });
+
+describe("PDF.embedFont full embedding", () => {
+  it("extracts text outside the preset ranges like the subset save", async () => {
+    const fontBytes = await loadFixture("fonts", "ttf/DejaVuSans.ttf");
+    const draw = async (subsetFonts: boolean) => {
+      const pdf = PDF.create();
+      const font = pdf.embedFont(fontBytes);
+      pdf.addPage({ size: "a4" }).drawText("שלום ✓", { x: 20, y: 780, font, size: 14 });
+      const reloaded = await PDF.load(await pdf.save({ subsetFonts }));
+      return reloaded.getPage(0)!.extractText().text;
+    };
+
+    expect(await draw(false)).toBe(await draw(true));
+  });
+});
