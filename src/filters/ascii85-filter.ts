@@ -2,6 +2,7 @@ import { SINGLE_BYTE_MASK, SPACE } from "#src/helpers/chars";
 import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 
+import { countDecoded } from "./decode-limit";
 import type { Filter } from "./filter";
 
 /**
@@ -31,6 +32,7 @@ export class ASCII85Filter implements Filter {
 
     let buffer = 0;
     let count = 0;
+    let written = 0;
 
     for (let i = 0; i < data.length; i++) {
       const byte = data[i];
@@ -56,6 +58,9 @@ export class ASCII85Filter implements Filter {
           // 'z' inside a group - invalid, but be lenient
           continue;
         }
+        written += 4;
+        countDecoded(written, 4);
+
         output.writeByte(0);
         output.writeByte(0);
         output.writeByte(0);
@@ -75,6 +80,9 @@ export class ASCII85Filter implements Filter {
 
       if (count === 5) {
         // Complete group - output 4 bytes
+        written += 4;
+        countDecoded(written, 4);
+
         output.writeByte((buffer >> 24) & SINGLE_BYTE_MASK);
         output.writeByte((buffer >> 16) & SINGLE_BYTE_MASK);
         output.writeByte((buffer >> 8) & SINGLE_BYTE_MASK);

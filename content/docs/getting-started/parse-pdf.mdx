@@ -49,6 +49,36 @@ const pdf = await PDF.load(bytes, {
 
 Both user and owner passwords work. If you provide the owner password, you get full access to the document regardless of permission restrictions.
 
+### Untrusted PDFs
+
+A small PDF can hold a stream that decodes to gigabytes. When you read PDFs you don't control, especially on memory-constrained runtimes such as serverless or edge workers, set a decode limit so decoding stops early instead of exhausting memory. Nothing is limited by default.
+
+```ts
+import { PDF, resetDecodedBytes, setDecodeLimit } from "@libpdf/core";
+
+setDecodeLimit({
+  maxStreamBytes: 32 * 1024 * 1024,
+  maxTotalBytes: 128 * 1024 * 1024,
+  onExceeded: () => {
+    console.warn("PDF decode limit hit");
+  },
+});
+
+resetDecodedBytes();
+
+const pdf = await PDF.load(bytes);
+```
+
+| Option           | Description                                                                    |
+| ---------------- | ------------------------------------------------------------------------------ |
+| `maxStreamBytes` | Largest decoded size of a single stream.                                       |
+| `maxTotalBytes`  | Largest decoded size of all streams since the last `resetDecodedBytes()` call. |
+| `onExceeded`     | Called each time a limit is hit, just before `DecodeLimitError` is thrown.     |
+
+The limits apply to every filter that can expand its input: `FlateDecode`, `LZWDecode`, `RunLengthDecode`, `ASCII85Decode` and `CCITTFaxDecode`. Font and ToUnicode parsing catch decode errors and carry on with empty data, so use `onExceeded` to learn that content was left out.
+
+The limits are shared by every document in the process. Call `resetDecodedBytes()` before each document to start a new total, and `setDecodeLimit({})` to remove them.
+
 ## Inspect the Document
 
 ### Page Count

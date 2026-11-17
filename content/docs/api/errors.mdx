@@ -95,6 +95,14 @@ Stream decompression failed.
 
 ---
 
+### DecodeLimitError
+
+**Extends**: `Error`
+
+Decoding a stream would produce more bytes than a limit set with `setDecodeLimit()`. Its `limit` property is the limit that was hit. See [Untrusted PDFs](/docs/getting-started/parse-pdf#untrusted-pdfs).
+
+---
+
 ### StructureError
 
 **Extends**: `RecoverableParseError`

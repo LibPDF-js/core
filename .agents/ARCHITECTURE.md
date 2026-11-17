@@ -99,6 +99,8 @@ Stream filter implementations:
 | JBIG2Decode     | Passthrough |
 | JPXDecode       | Passthrough |
 
+Decode limits (`decode-limit.ts`): `setDecodeLimit()` caps the bytes one stream, and every stream since `resetDecodedBytes()`, may decode to. The filters that can expand their input (Flate, LZW, ASCII85, RunLength, CCITTFax) count their output as they produce it and throw `DecodeLimitError` past a limit; `onExceeded` fires even where a caller catches that error. Unlimited by default.
+
 ### Parser Layer (`src/parser/`)
 
 ```
