@@ -16,6 +16,12 @@ describe("FlateFilter", () => {
       expect(new TextDecoder().decode(result)).toBe("Hello, World!");
     });
 
+    it("returns a small stream in a buffer of its own size", () => {
+      const result = filter.decode(pako.deflate(new TextEncoder().encode("Hello, World!")));
+
+      expect(result.buffer.byteLength).toBe(result.byteLength);
+    });
+
     it("decodes repeated data (high compression)", async () => {
       const original = new TextEncoder().encode("AAAA".repeat(1000));
       const compressed = pako.deflate(original);

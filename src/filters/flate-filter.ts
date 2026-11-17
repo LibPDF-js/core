@@ -1,8 +1,19 @@
 import type { PdfDict } from "#src/objects/pdf-dict";
 import pako from "pako";
 
+import { countDecoded, DecodeLimitError } from "./decode-limit";
 import type { Filter } from "./filter";
 import { applyPredictor } from "./predictor";
+
+declare module "pako" {
+  /** State pako's `Inflate` carries at runtime that its published types leave out. */
+  interface Inflate {
+    /** The zlib stream: `output` is the buffer being filled, `next_out` how much of it is filled. */
+    strm?: { output: Uint8Array | null; next_out: number };
+    /** Whether `push` has finished the stream, cleanly or not. */
+    ended: boolean;
+  }
+}
 
 /**
  * FlateDecode filter - zlib/deflate compression.
@@ -13,8 +24,11 @@ import { applyPredictor } from "./predictor";
  * Some PDF generators (notably PDFium) produce zlib streams terminated
  * with a sync-flush marker (00 00 FF FF) instead of a proper final
  * block and Adler-32 checksum. Standard `pako.inflate()` returns
- * `undefined` for these streams. We detect this case and recover
- * the decompressed data from pako's internal state.
+ * `undefined` for these streams, so output is collected chunk by chunk
+ * and whatever pako produced is kept.
+ *
+ * Output is checked against the limits from `setDecodeLimit()` as it is
+ * produced, so a decompression bomb stops early.
  *
  * Supports Predictor parameter for PNG/TIFF prediction algorithms.
  */
@@ -43,61 +57,75 @@ export class FlateFilter implements Filter {
   }
 
   /**
-   * Decompress zlib data with fallback for sync-flush terminated streams.
+   * Decompress zlib data, counting every chunk against the decode limits.
    *
-   * pako.inflate() returns undefined (instead of throwing) when the
-   * zlib stream ends with a sync-flush marker (00 00 FF FF) and lacks
-   * a proper final deflate block. This is technically invalid per the
-   * zlib spec but common in practice — PDFium and other generators
-   * produce these streams.
+   * Some PDF generators (notably PDFium) end the zlib stream with a
+   * sync-flush marker instead of a final block, and corrupt streams fail
+   * partway through. In both cases pako reports no result, so we collect
+   * the chunks it produced and keep them.
    *
-   * When this happens, we use pako's Inflate class directly and
-   * extract whatever data was successfully decompressed from its
-   * internal output buffer.
+   * When a stream ends on a sync-flush marker or fails partway, pako stops
+   * without handing its last chunk to `onData`; that output is still in its
+   * buffer, so it is copied out of pako's internal state.
    */
   private inflate(data: Uint8Array): Uint8Array {
-    // Fast path: standard inflate handles well-formed streams
-    try {
-      const result = pako.inflate(data);
+    const chunks: Uint8Array[] = [];
+    let total = 0;
 
-      if (result !== undefined) {
-        return result;
+    const inf = new pako.Inflate();
+
+    inf.onData = (chunk: Uint8Array) => {
+      total += chunk.length;
+      countDecoded(total, chunk.length);
+      chunks.push(chunk);
+    };
+
+    try {
+      inf.push(data, true);
+    } catch (error) {
+      if (error instanceof DecodeLimitError) {
+        throw error;
       }
-    } catch {
-      // pako throws on invalid headers, corrupt data, etc.
-      // Fall through to the recovery path below.
+
+      // Anything else is a corrupt stream. Keep what was produced.
     }
 
-    // Slow path: recover partial output from malformed streams.
-    //
-    // This handles two cases:
-    // 1. Sync-flush terminated streams (pako.inflate returns undefined):
-    //    Some PDF generators (e.g. PDFium) produce zlib streams ending
-    //    with a sync-flush marker (00 00 FF FF) instead of a proper
-    //    final block. Push without finalization to extract output.
-    // 2. Streams with corrupt headers or checksums (pako.inflate throws):
-    //    Try to recover whatever was decompressed before the error.
-    try {
-      const inf = new pako.Inflate();
-      inf.push(data, false);
+    const { strm, ended } = inf;
 
-      // Access pako's internal zlib stream state. The `strm` property
-      // exists at runtime but is not exposed in pako's type definitions.
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-      const strm = (inf as any).strm;
-      const totalOut = strm.total_out;
+    if ((!ended || inf.err) && strm?.output && strm.next_out > 0) {
+      const tail: Uint8Array = strm.output.slice(0, strm.next_out);
 
-      if (totalOut > 0 && strm.output) {
-        // Copy the decompressed bytes out of pako's internal buffer
-        return new Uint8Array(strm.output.slice(0, totalOut));
-      }
-    } catch {
-      // Recovery also failed — truly unrecoverable
+      total += tail.length;
+      countDecoded(total, tail.length);
+      chunks.push(tail);
     }
 
-    // No data could be recovered. Return empty rather than throwing to
-    // stay lenient with malformed PDFs — callers (font parsers, content
-    // stream extractors) already handle empty data gracefully.
-    return new Uint8Array(0);
+    // No data recovered gives empty output rather than an error, to stay
+    // lenient with malformed PDFs — callers (font parsers, content stream
+    // extractors) already handle empty data gracefully.
+    return concatChunks(chunks, total);
   }
+}
+
+/**
+ * Join pako's chunks into one array of exactly `total` bytes.
+ *
+ * pako hands out views into its 64 KB output buffer, so a lone chunk is
+ * returned as it is only when it spans its whole buffer; otherwise a small
+ * stream would keep the full buffer alive.
+ */
+function concatChunks(chunks: Uint8Array[], total: number): Uint8Array {
+  if (chunks.length === 1 && chunks[0].byteLength === chunks[0].buffer.byteLength) {
+    return chunks[0];
+  }
+
+  const result = new Uint8Array(total);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return result;
 }

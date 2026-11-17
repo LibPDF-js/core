@@ -240,6 +240,17 @@ export type {
 export { parsePem, type PemBlock } from "./helpers/pem";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Decode Limits
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  DecodeLimitError,
+  type DecodeLimitOptions,
+  resetDecodedBytes,
+  setDecodeLimit,
+} from "./filters/decode-limit";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Annotations
 // ─────────────────────────────────────────────────────────────────────────────
 

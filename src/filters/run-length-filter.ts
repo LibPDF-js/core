@@ -1,6 +1,7 @@
 import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 
+import { countDecoded } from "./decode-limit";
 import type { Filter } from "./filter";
 
 /**
@@ -23,6 +24,7 @@ export class RunLengthFilter implements Filter {
       initialSize: data.length * 4, // Estimate output size (RLE can expand up to 4x)
     });
     let i = 0;
+    let written = 0;
 
     while (i < data.length) {
       const length = data[i++];
@@ -31,6 +33,11 @@ export class RunLengthFilter implements Filter {
         // EOD marker
         break;
       }
+
+      const run = length < 128 ? length + 1 : 257 - length;
+
+      written += run;
+      countDecoded(written, run);
 
       if (length < 128) {
         // Literal run: copy next (length + 1) bytes

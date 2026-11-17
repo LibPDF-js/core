@@ -1,6 +1,7 @@
 import { ByteWriter } from "#src/io/byte-writer.ts";
 import type { PdfDict } from "#src/objects/pdf-dict";
 
+import { countDecoded } from "./decode-limit";
 import type { Filter } from "./filter";
 import { applyPredictor } from "./predictor";
 
@@ -96,6 +97,7 @@ export class LZWFilter implements Filter {
     };
 
     let prevEntry: Uint8Array | null = null;
+    let written = 0;
 
     while (true) {
       const code = readCode();
@@ -129,7 +131,10 @@ export class LZWFilter implements Filter {
         throw new Error(`Invalid LZW code: ${code}`);
       }
 
-      // Output entry
+      // Output entry, after checking it against the decode limits
+      written += entry.length;
+      countDecoded(written, entry.length);
+
       for (const byte of entry) {
         output.writeByte(byte);
       }

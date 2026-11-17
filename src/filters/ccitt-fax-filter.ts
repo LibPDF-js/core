@@ -2,6 +2,7 @@ import { SINGLE_BYTE_MASK } from "#src/helpers/chars";
 import { ByteWriter } from "#src/io/byte-writer";
 import type { PdfDict } from "#src/objects/pdf-dict";
 
+import { countDecoded } from "./decode-limit";
 import type { Filter } from "./filter";
 
 /**
@@ -79,6 +80,16 @@ export class CCITTFaxFilter implements Filter {
 
     // Bit reading state
     let bitPos = 0;
+
+    // The two row buffers are sized by the stream's own /Columns, so they
+    // count against the decode limits before they are allocated.
+    if (!Number.isInteger(columns) || columns <= 0) {
+      throw new Error(`CCITTFaxDecode: /Columns must be a positive integer, got ${columns}`);
+    }
+
+    let written = 2 * columns;
+
+    countDecoded(written, written);
 
     // Reference row (all white initially)
     let refRow = new Uint8Array(columns);
@@ -273,6 +284,9 @@ export class CCITTFaxFilter implements Filter {
       }
 
       // Pack row into bytes
+      written += bytesPerRow;
+      countDecoded(written, bytesPerRow);
+
       for (let byte = 0; byte < bytesPerRow; byte++) {
         let value = 0;
 
