@@ -143,16 +143,17 @@ export class LZWFilter implements Filter {
         dictionary[nextCode] = newEntry;
         nextCode++;
 
-        // Increase code length when needed
-        // EarlyChange=1 (default): increase before code is used
-        // EarlyChange=0: increase after code is used
-        const threshold = earlyChange === 1 ? nextCode : nextCode - 1;
+        // Increase code length when needed. The encoder switches to the
+        // wider code size once the table would need it, i.e. when
+        // nextCode + EarlyChange reaches the next power of two. EarlyChange=1
+        // (default) switches one code earlier than EarlyChange=0.
+        const widthProbe = nextCode + earlyChange;
 
-        if (threshold === 512 && codeLength < 10) {
+        if (widthProbe === 512 && codeLength < 10) {
           codeLength = 10;
-        } else if (threshold === 1024 && codeLength < 11) {
+        } else if (widthProbe === 1024 && codeLength < 11) {
           codeLength = 11;
-        } else if (threshold === 2048 && codeLength < 12) {
+        } else if (widthProbe === 2048 && codeLength < 12) {
           codeLength = 12;
         }
       }
