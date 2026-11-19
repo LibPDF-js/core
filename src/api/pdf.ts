@@ -73,7 +73,7 @@ import { deflate } from "pako";
 import { PDFAttachments } from "./pdf-attachments";
 import { PDFCatalog } from "./pdf-catalog";
 import { PDFContext, type DocumentInfo } from "./pdf-context";
-import { PDFEmbeddedPage } from "./pdf-embedded-page";
+import { getRotatedFormTransform, PDFEmbeddedPage } from "./pdf-embedded-page";
 import { PDFFonts } from "./pdf-fonts";
 import { PDFForm } from "./pdf-form";
 import { PDFPage } from "./pdf-page";
@@ -1895,6 +1895,22 @@ export class PDF {
     // Get the MediaBox
     const mediaBox = srcPage.getMediaBox();
 
+    // Resolve the raw MediaBox coordinates so non-zero origins reach the
+    // form's BBox and rotation matrix intact.
+    const boxCoords =
+      this.getMediaBoxCoords(source, srcPage) ??
+      ([mediaBox.x, mediaBox.y, mediaBox.x + mediaBox.width, mediaBox.y + mediaBox.height] as [
+        number,
+        number,
+        number,
+        number,
+      ]);
+
+    // A rotated page needs its rotation baked into the form matrix;
+    // otherwise drawPage() scales unrotated content into
+    // rotation-adjusted dimensions and transposes the output.
+    const transform = getRotatedFormTransform(srcPage.rotation, boxCoords);
+
     // Create Form XObject
     const formXObject = PdfStream.fromDict(
       {
@@ -1902,11 +1918,14 @@ export class PDF {
         Subtype: PdfName.of("Form"),
         FormType: PdfNumber.of(1),
         BBox: new PdfArray([
-          PdfNumber.of(mediaBox.x),
-          PdfNumber.of(mediaBox.y),
-          PdfNumber.of(mediaBox.x + mediaBox.width),
-          PdfNumber.of(mediaBox.y + mediaBox.height),
+          PdfNumber.of(boxCoords[0]),
+          PdfNumber.of(boxCoords[1]),
+          PdfNumber.of(boxCoords[2]),
+          PdfNumber.of(boxCoords[3]),
         ]),
+        ...(transform
+          ? { Matrix: new PdfArray(transform.matrix.map(value => PdfNumber.of(value))) }
+          : {}),
         Resources: resources,
       },
       contentData,
@@ -1914,7 +1933,36 @@ export class PDF {
 
     const ref = this.register(formXObject);
 
-    return new PDFEmbeddedPage(ref, mediaBox, srcPage.width, srcPage.height);
+    return new PDFEmbeddedPage(
+      ref,
+      transform ? { x: 0, y: 0, width: transform.width, height: transform.height } : mediaBox,
+      srcPage.width,
+      srcPage.height,
+    );
+  }
+
+  /**
+   * Resolve a page's MediaBox as raw [x1, y1, x2, y2] coordinates.
+   * Returns null when the page has no readable MediaBox array.
+   */
+  private getMediaBoxCoords(source: PDF, page: PDFPage): [number, number, number, number] | null {
+    const box = page.dict.get("MediaBox", source.getObject.bind(source));
+
+    if (!(box instanceof PdfArray) || box.length < 4) {
+      return null;
+    }
+
+    const resolve = source.getObject.bind(source);
+    const coords = [0, 1, 2, 3].map(index => {
+      const value = box.at(index, resolve);
+      return value instanceof PdfNumber ? value.value : null;
+    });
+
+    if (coords.some(coord => coord === null)) {
+      return null;
+    }
+
+    return coords as [number, number, number, number];
   }
 
   /**

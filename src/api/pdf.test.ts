@@ -1,6 +1,8 @@
+import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
 import { loadFixture, saveTestOutput } from "#src/test-utils";
 import { describe, expect, it } from "vitest";
@@ -848,6 +850,133 @@ describe("PDF", () => {
       const xobjects = resources.get("XObject");
 
       expect(xobjects).toBeInstanceOf(PdfDict);
+    });
+
+    it("bakes source page rotation into the embedded form", async () => {
+      const source = await PDF.create();
+      source.addPage({ width: 1000, height: 200, rotate: 90 });
+      const sourceDoc = await PDF.load(await source.save());
+
+      const dest = await PDF.create();
+      dest.addPage({ width: 612, height: 792 });
+
+      const embedded = await dest.embedPage(sourceDoc, 0);
+
+      expect(embedded.width).toBe(200);
+      expect(embedded.height).toBe(1000);
+
+      const page = dest.getPage(0)!;
+      page.drawPage(embedded, { x: 50, y: 60, width: 400, height: 2000 });
+
+      const reloaded = await PDF.load(await dest.save());
+      const reloadedPage = reloaded.getPage(0)!;
+      const resolve = reloaded.getObject.bind(reloaded);
+
+      const xobjects = reloadedPage.getResources().get("XObject") as PdfDict;
+      const formName = [...xobjects.keys()][0];
+      const form = xobjects.get(formName, resolve) as PdfStream;
+
+      const matrix = form.get("Matrix", resolve) as PdfArray;
+      const matrixValues = [0, 1, 2, 3, 4, 5].map(i => {
+        const value = matrix.at(i, resolve);
+        return value instanceof PdfNumber ? value.value : NaN;
+      });
+
+      // /Rotate=90 on a 1000x200 page maps (x, y) -> (y, 1000 - x)
+      expect(matrixValues).toEqual([0, -1, 1, 0, 0, 1000]);
+
+      // The drawn footprint must equal the requested rectangle: composing
+      // the page's cm transform with the form matrix and applying it to the
+      // raw page corners yields [50, 60] -> [450, 2060].
+      const contents = reloadedPage.dict.get("Contents", resolve);
+      const contentBytes =
+        contents instanceof PdfArray
+          ? contents
+              .toArray()
+              .map(ref => {
+                const stream = reloaded.getObject(ref as never) as PdfStream;
+                return stream.getDecodedData();
+              })
+              .reduce((acc, chunk) => {
+                const merged = new Uint8Array(acc.length + chunk.length);
+                merged.set(acc);
+                merged.set(chunk, acc.length);
+                return merged;
+              }, new Uint8Array(0))
+          : (contents as PdfStream).getDecodedData();
+      const contentText = new TextDecoder().decode(contentBytes);
+
+      const cmOps = [
+        ...contentText.matchAll(
+          /(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+cm/g,
+        ),
+      ];
+      const lastCm = cmOps.at(-1)!;
+      const pageMatrix = lastCm.slice(1, 7).map(Number) as [
+        number,
+        number,
+        number,
+        number,
+        number,
+        number,
+      ];
+
+      // Composite = pageMatrix * formMatrix (form applied first)
+      const [a1, b1, c1, d1, e1, f1] = pageMatrix;
+      const [a2, b2, c2, d2, e2, f2] = matrixValues;
+      const composite: [number, number, number, number, number, number] = [
+        a1 * a2 + c1 * b2,
+        b1 * a2 + d1 * b2,
+        a1 * c2 + c1 * d2,
+        b1 * c2 + d1 * d2,
+        a1 * e2 + c1 * f2 + e1,
+        b1 * e2 + d1 * f2 + f1,
+      ];
+
+      const [a, b, c, d, e, f] = composite;
+      const corners = [
+        [0, 0],
+        [1000, 0],
+        [0, 200],
+        [1000, 200],
+      ].map(([px, py]) => [a * px + c * py + e, b * px + d * py + f]);
+
+      const xs = corners.map(p => p[0]);
+      const ys = corners.map(p => p[1]);
+      expect(Math.min(...xs)).toBeCloseTo(50);
+      expect(Math.max(...xs)).toBeCloseTo(450);
+      expect(Math.min(...ys)).toBeCloseTo(60);
+      expect(Math.max(...ys)).toBeCloseTo(2060);
+    });
+
+    it("does not add a matrix for unrotated pages", async () => {
+      const source = await PDF.create();
+      source.addPage({ width: 300, height: 400 });
+      const sourceDoc = await PDF.load(await source.save());
+
+      const dest = await PDF.create();
+      dest.addPage({ width: 612, height: 792 });
+
+      const embedded = await dest.embedPage(sourceDoc, 0);
+      dest.getPage(0)!.drawPage(embedded);
+
+      const reloaded = await PDF.load(await dest.save());
+      const reloadedPage = reloaded.getPage(0)!;
+      const resolve = reloaded.getObject.bind(reloaded);
+
+      const xobjects = reloadedPage.getResources().get("XObject") as PdfDict;
+      const formName = [...xobjects.keys()][0];
+      const form = xobjects.get(formName, resolve) as PdfStream;
+
+      expect(form.get("Matrix", resolve)).toBeUndefined();
+
+      const bbox = form.get("BBox", resolve) as PdfArray;
+      expect(
+        [0, 1, 2, 3].map(i => {
+          const value = bbox.at(i, resolve);
+          return value instanceof PdfNumber ? value.value : NaN;
+        }),
+      ).toEqual([0, 0, 300, 400]);
     });
 
     it("preserves resources when drawing Skia-produced overlay onto page", async () => {
