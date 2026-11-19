@@ -1,5 +1,6 @@
 import type { FilterSpec } from "#src/filters/filter";
 import { FilterPipeline } from "#src/filters/filter-pipeline";
+import type { RefResolver } from "#src/helpers/types";
 import type { ByteWriter } from "#src/io/byte-writer";
 
 import { PdfArray } from "./pdf-array";
@@ -44,6 +45,14 @@ export class PdfStream extends PdfDict {
   private _data: Uint8Array;
 
   /**
+   * Resolver for indirect references inside this stream's dictionary
+   * (e.g. `/Filter 6 0 R`). Bound by the owning document's object registry
+   * when the stream is loaded; standalone streams have none and treat such
+   * entries as absent.
+   */
+  private _resolver: RefResolver | null = null;
+
+  /**
    * Create a new PdfStream.
    *
    * @param dict - Either a PdfDict to copy entries from, or an iterable of
@@ -70,6 +79,16 @@ export class PdfStream extends PdfDict {
    */
   get data(): Uint8Array {
     return this._data;
+  }
+
+  /**
+   * Bind a resolver for indirect references in this stream's dictionary.
+   *
+   * Called by the document's object registry when the stream is loaded or
+   * registered, so `/Filter` and `/DecodeParms` given as `N G R` resolve.
+   */
+  setResolver(resolver: RefResolver): void {
+    this._resolver = resolver;
   }
 
   /**
@@ -106,7 +125,7 @@ export class PdfStream extends PdfDict {
    * @throws {Error} if a filter fails or is unknown
    */
   getDecodedData(): Uint8Array {
-    const filterEntry = this.get("Filter");
+    const filterEntry = this.get("Filter", this._resolver ?? undefined);
 
     // No filter - return raw data
     if (!filterEntry) {
@@ -140,7 +159,7 @@ export class PdfStream extends PdfDict {
    * @returns Encoded data (compressed if filters are specified)
    */
   getEncodedData(): Uint8Array {
-    const filterEntry = this.get("Filter");
+    const filterEntry = this.get("Filter", this._resolver ?? undefined);
 
     if (!filterEntry) {
       return this._data;
@@ -159,6 +178,7 @@ export class PdfStream extends PdfDict {
    * Build filter specs from /Filter and /DecodeParms entries.
    */
   private buildFilterSpecs(filterEntry: PdfObject): FilterSpec[] {
+    const resolver = this._resolver ?? undefined;
     const filters: PdfName[] = [];
     const params: (PdfDict | null)[] = [];
 
@@ -166,7 +186,9 @@ export class PdfStream extends PdfDict {
     if (filterEntry instanceof PdfName) {
       filters.push(filterEntry);
     } else if (filterEntry instanceof PdfArray) {
-      for (const item of filterEntry) {
+      for (let i = 0; i < filterEntry.length; i++) {
+        const item = filterEntry.at(i, resolver);
+
         if (item instanceof PdfName) {
           filters.push(item);
         }
@@ -174,12 +196,14 @@ export class PdfStream extends PdfDict {
     }
 
     // Collect decode parameters
-    const parmsEntry = this.get("DecodeParms");
+    const parmsEntry = this.get("DecodeParms", resolver);
 
     if (parmsEntry instanceof PdfDict) {
       params.push(parmsEntry);
     } else if (parmsEntry instanceof PdfArray) {
-      for (const item of parmsEntry) {
+      for (let i = 0; i < parmsEntry.length; i++) {
+        const item = parmsEntry.at(i, resolver);
+
         if (item instanceof PdfDict) {
           params.push(item);
         } else {

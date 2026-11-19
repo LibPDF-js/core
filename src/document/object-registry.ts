@@ -9,6 +9,7 @@ import { max } from "#src/helpers/math";
 import type { RefResolver } from "#src/helpers/types";
 import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
+import { PdfStream } from "#src/objects/pdf-stream";
 import type { XRefEntry } from "#src/parser/xref-parser";
 
 /**
@@ -77,6 +78,7 @@ export class ObjectRegistry {
    */
   addLoaded(ref: PdfRef, obj: PdfObject): void {
     this.loaded.set(ref, obj);
+    this.bindStreamResolver(obj);
 
     // Only add to reverse map if it's an object type (not primitives)
     if (obj !== null && typeof obj === "object") {
@@ -95,6 +97,7 @@ export class ObjectRegistry {
     const ref = PdfRef.of(this._nextObjNum++, 0);
 
     this.newObjects.set(ref, obj);
+    this.bindStreamResolver(obj);
 
     // Add to reverse map if it's an object type
     if (obj !== null && typeof obj === "object") {
@@ -124,6 +127,7 @@ export class ObjectRegistry {
    */
   registerAt(ref: PdfRef, obj: PdfObject): void {
     this.newObjects.set(ref, obj);
+    this.bindStreamResolver(obj);
 
     // Add to reverse map if it's an object type
     if (obj !== null && typeof obj === "object") {
@@ -259,5 +263,15 @@ export class ObjectRegistry {
   *entries(): IterableIterator<[PdfRef, PdfObject]> {
     yield* this.loaded;
     yield* this.newObjects;
+  }
+
+  /**
+   * Give a stream access to this registry so indirect references inside its
+   * dictionary (e.g. `/Filter 6 0 R`) resolve when its data is decoded.
+   */
+  private bindStreamResolver(obj: PdfObject): void {
+    if (obj instanceof PdfStream) {
+      obj.setResolver(ref => this.resolve(ref));
+    }
   }
 }
