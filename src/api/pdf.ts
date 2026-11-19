@@ -955,6 +955,14 @@ export class PDF {
       return;
     }
 
+    // The file key only exists after authentication. Stripping /Encrypt
+    // while content streams are still ciphertext would save a file that
+    // looks unencrypted but is unreadable — declared permissions are
+    // meaningless until the document is unlocked.
+    if (!handler.isAuthenticated) {
+      throw new PermissionDeniedError("Cannot remove protection: document is not authenticated");
+    }
+
     // Check permissions
     if (!options.ignorePermissions && !handler.hasOwnerAccess && !handler.permissions.modify) {
       throw new PermissionDeniedError(
