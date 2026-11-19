@@ -12,6 +12,21 @@ import { LZWFilter } from "./lzw-filter";
 import { RunLengthFilter } from "./run-length-filter";
 
 /**
+ * Abbreviated filter names from ISO 32000-1 Table 6. Real-world PDFs use
+ * them interchangeably with the full names, so lookups resolve through
+ * this table before hitting the registry.
+ */
+const FILTER_ALIASES: Record<string, string> = {
+  AHx: "ASCIIHexDecode",
+  A85: "ASCII85Decode",
+  LZW: "LZWDecode",
+  Fl: "FlateDecode",
+  RL: "RunLengthDecode",
+  CCF: "CCITTFaxDecode",
+  DCT: "DCTDecode",
+};
+
+/**
  * Registry and executor for PDF stream filters.
  *
  * Handles filter chaining - when a stream has multiple filters,
@@ -45,14 +60,14 @@ export class FilterPipeline {
    * Check if a filter is registered.
    */
   static hasFilter(name: string): boolean {
-    return FilterPipeline.filters.has(name);
+    return FilterPipeline.filters.has(FILTER_ALIASES[name] ?? name);
   }
 
   /**
    * Get a registered filter by name.
    */
   static getFilter(name: string): Filter | undefined {
-    return FilterPipeline.filters.get(name);
+    return FilterPipeline.filters.get(FILTER_ALIASES[name] ?? name);
   }
 
   /**
@@ -77,7 +92,7 @@ export class FilterPipeline {
     let result = data;
 
     for (const spec of filterList) {
-      const filter = FilterPipeline.filters.get(spec.name);
+      const filter = FilterPipeline.getFilter(spec.name);
 
       if (!filter) {
         throw new Error(`Unknown filter: ${spec.name}`);
@@ -112,7 +127,7 @@ export class FilterPipeline {
 
     // Apply in reverse order for encoding
     for (const spec of filterList.toReversed()) {
-      const filter = FilterPipeline.filters.get(spec.name);
+      const filter = FilterPipeline.getFilter(spec.name);
 
       if (!filter) {
         throw new Error(`Unknown filter: ${spec.name}`);

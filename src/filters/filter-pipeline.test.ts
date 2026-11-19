@@ -1,9 +1,14 @@
+import pako from "pako";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ASCIIHexFilter } from "./ascii-hex-filter";
 import { ASCII85Filter } from "./ascii85-filter";
+import { CCITTFaxFilter } from "./ccitt-fax-filter";
+import { DCTFilter } from "./dct-filter";
 import { FilterPipeline } from "./filter-pipeline";
 import { FlateFilter } from "./flate-filter";
+import { LZWFilter } from "./lzw-filter";
+import { RunLengthFilter } from "./run-length-filter";
 
 describe("FilterPipeline", () => {
   beforeEach(() => {
@@ -31,6 +36,51 @@ describe("FilterPipeline", () => {
     it("clears all filters", () => {
       FilterPipeline.clear();
       expect(FilterPipeline.hasFilter("FlateDecode")).toBe(false);
+    });
+  });
+
+  // Abbreviated filter names from ISO 32000-1 Table 6 — real-world PDFs
+  // use them and readers are expected to accept them.
+  describe("filter name abbreviations", () => {
+    beforeEach(() => {
+      FilterPipeline.register(new LZWFilter());
+      FilterPipeline.register(new RunLengthFilter());
+      FilterPipeline.register(new DCTFilter());
+      FilterPipeline.register(new CCITTFaxFilter());
+    });
+
+    it("resolves every standard abbreviation to its filter", () => {
+      const aliases: [string, string][] = [
+        ["AHx", "ASCIIHexDecode"],
+        ["A85", "ASCII85Decode"],
+        ["LZW", "LZWDecode"],
+        ["Fl", "FlateDecode"],
+        ["RL", "RunLengthDecode"],
+        ["CCF", "CCITTFaxDecode"],
+        ["DCT", "DCTDecode"],
+      ];
+
+      for (const [alias, canonical] of aliases) {
+        expect(FilterPipeline.hasFilter(alias)).toBe(true);
+        expect(FilterPipeline.getFilter(alias)!.name).toBe(canonical);
+      }
+    });
+
+    it("decodes a stream tagged with the /Fl abbreviation", () => {
+      const original = new TextEncoder().encode("Hello, World!");
+      const compressed = pako.deflate(original);
+
+      const result = FilterPipeline.decode(new Uint8Array(compressed), { name: "Fl" });
+
+      expect(new TextDecoder().decode(result)).toBe("Hello, World!");
+    });
+
+    it("still rejects unknown and case-mismatched names", () => {
+      expect(FilterPipeline.hasFilter("fl")).toBe(false);
+      expect(FilterPipeline.hasFilter("FlateDecod")).toBe(false);
+      expect(() => FilterPipeline.decode(new Uint8Array([1]), { name: "bogus" })).toThrow(
+        "Unknown filter: bogus",
+      );
     });
   });
 
