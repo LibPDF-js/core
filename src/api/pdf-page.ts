@@ -114,11 +114,13 @@ import {
   showText,
 } from "#src/helpers/operators";
 import * as operatorHelpers from "#src/helpers/operators";
+import type { RefResolver } from "#src/helpers/types";
 import type { PDFImage } from "#src/images/pdf-image";
 import { PdfArray } from "#src/objects/pdf-array";
 import { PdfDict } from "#src/objects/pdf-dict";
 import { PdfName } from "#src/objects/pdf-name";
 import { PdfNumber } from "#src/objects/pdf-number";
+import type { PdfObject } from "#src/objects/pdf-object";
 import { PdfRef } from "#src/objects/pdf-ref";
 import { PdfStream } from "#src/objects/pdf-stream";
 import { PdfString } from "#src/objects/pdf-string";
@@ -367,10 +369,12 @@ export class PDFPage {
    * Page rotation in degrees (0, 90, 180, or 270).
    */
   get rotation(): 0 | 90 | 180 | 270 {
-    const rotate = this.dict.getNumber("Rotate", this.ctx.resolve.bind(this.ctx));
+    const rotate = this.resolveInherited("Rotate", value =>
+      value instanceof PdfNumber ? value.value : null,
+    );
 
-    if (rotate) {
-      const value = rotate.value % 360;
+    if (rotate !== null) {
+      const value = rotate % 360;
 
       // Normalize to 0, 90, 180, 270
       if (value === 90 || value === -270) {
@@ -2608,35 +2612,75 @@ export class PDFPage {
   }
 
   /**
-   * Get a box (MediaBox, CropBox, etc.) from the page dictionary.
+   * Resolve an inheritable page-tree attribute per PDF 32000-1 §7.7.3.4.
+   *
+   * Attributes like MediaBox, CropBox and Rotate may be defined on any node of
+   * the page tree; the value nearest the page wins. Entries that fail to parse
+   * are skipped so a malformed nearer value does not hide a valid ancestor's.
+   */
+  private resolveInherited<T>(
+    name: string,
+    parse: (value: PdfObject, resolve: RefResolver) => T | null,
+  ): T | null {
+    const resolve = this.ctx.resolve.bind(this.ctx);
+    const visited = new Set<PdfDict>();
+
+    let dict: PdfDict | null = this.dict;
+
+    while (dict && !visited.has(dict)) {
+      visited.add(dict);
+
+      const value = dict.get(name, resolve);
+
+      if (value !== undefined) {
+        const parsed = parse(value, resolve);
+
+        if (parsed !== null) {
+          return parsed;
+        }
+      }
+
+      const parent = dict.get("Parent", resolve);
+
+      dict = parent instanceof PdfDict ? parent : null;
+    }
+
+    return null;
+  }
+
+  /**
+   * Get a box (MediaBox, CropBox, etc.) from the page or its ancestors.
+   *
+   * Box entries are [x1, y1, x2, y2] corner coordinates; width and height are
+   * the absolute spans so boxes with a non-zero origin are handled correctly.
    */
   private getBox(name: string): Rectangle | null {
-    const box = this.dict.get(name, this.ctx.resolve.bind(this.ctx));
+    return this.resolveInherited(name, (value, resolve) => {
+      if (!(value instanceof PdfArray) || value.length < 4) {
+        return null;
+      }
 
-    if (!(box instanceof PdfArray) || box.length < 4) {
-      return null;
-    }
+      const x1 = value.at(0, resolve);
+      const y1 = value.at(1, resolve);
+      const x2 = value.at(2, resolve);
+      const y2 = value.at(3, resolve);
 
-    const x1 = box.at(0);
-    const y1 = box.at(1);
-    const x2 = box.at(2);
-    const y2 = box.at(3);
+      if (
+        !(x1 instanceof PdfNumber) ||
+        !(y1 instanceof PdfNumber) ||
+        !(x2 instanceof PdfNumber) ||
+        !(y2 instanceof PdfNumber)
+      ) {
+        return null;
+      }
 
-    if (
-      !(x1 instanceof PdfNumber) ||
-      !(y1 instanceof PdfNumber) ||
-      !(x2 instanceof PdfNumber) ||
-      !(y2 instanceof PdfNumber)
-    ) {
-      return null;
-    }
-
-    return {
-      x: x1.value,
-      y: y1.value,
-      width: x2.value,
-      height: y2.value,
-    };
+      return {
+        x: x1.value,
+        y: y1.value,
+        width: Math.abs(x2.value - x1.value),
+        height: Math.abs(y2.value - y1.value),
+      };
+    });
   }
 
   /**
