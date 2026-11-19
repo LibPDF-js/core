@@ -286,6 +286,44 @@ describe("PDF security API", () => {
     });
   });
 
+  // https://github.com/LibPDF-js/core/issues/82
+  describe("removeProtection() on unauthenticated documents", () => {
+    const createEncrypted = async () => {
+      const pdf = PDF.create();
+      pdf.addPage({ size: "a4" });
+      // Default permissions include modify, which is what let the old
+      // permission check pass for a session that never unlocked the file.
+      pdf.setProtection({ userPassword: "secret" });
+
+      return pdf.save();
+    };
+
+    it("throws PermissionDeniedError instead of producing a corrupt file", async () => {
+      const encrypted = await createEncrypted();
+      const locked = await PDF.load(encrypted, { credentials: "wrong" });
+
+      expect(locked.isEncrypted).toBe(true);
+      expect(locked.isAuthenticated).toBe(false);
+
+      expect(() => locked.removeProtection()).toThrow(PermissionDeniedError);
+      expect(() => locked.removeProtection({ ignorePermissions: true })).toThrow(
+        PermissionDeniedError,
+      );
+    });
+
+    it("still works after authenticate() succeeds", async () => {
+      const encrypted = await createEncrypted();
+      const locked = await PDF.load(encrypted);
+
+      expect(locked.isAuthenticated).toBe(false);
+
+      const result = locked.authenticate("secret");
+
+      expect(result.authenticated).toBe(true);
+      expect(() => locked.removeProtection()).not.toThrow();
+    });
+  });
+
   describe("setProtection()", () => {
     it("throws PermissionDeniedError when encrypted without owner access", async () => {
       const bytes = await loadFixture("encryption", "PasswordSample-40bit.pdf");
