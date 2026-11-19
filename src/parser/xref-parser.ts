@@ -93,6 +93,9 @@ export class XRefParser {
   parseAt(offset: number): XRefData {
     this.scanner.moveTo(offset);
 
+    // Some producers point the offset at padding before the keyword.
+    this.skipWhitespaceFromCurrent();
+
     // Peek to detect format
     const firstByte = this.scanner.peek();
 
@@ -116,6 +119,7 @@ export class XRefParser {
    */
   detectXRefFormat(offset: number): boolean | null {
     this.scanner.moveTo(offset);
+    this.skipWhitespaceFromCurrent();
 
     const firstByte = this.scanner.peek();
 

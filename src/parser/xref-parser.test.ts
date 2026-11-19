@@ -316,6 +316,22 @@ trailer
       expect(result.entries.size).toBe(1);
     });
 
+    it("skips whitespace between the offset and a table xref", () => {
+      // Some producers point startxref at padding before the keyword.
+      const input = `\n\r  xref\n0 1\n0000000000 65535 f\ntrailer\n<< /Size 1 /Root 1 0 R >>\n`;
+      const p = parser(input);
+      const result = p.parseAt(0);
+
+      expect(result.entries.size).toBe(1);
+    });
+
+    it("detects a table xref after leading whitespace", () => {
+      const input = ` \nxref\n0 1\n0000000000 65535 f\ntrailer\n<< /Size 1 /Root 1 0 R >>\n`;
+      const p = parser(input);
+
+      expect(p.detectXRefFormat(0)).toBe(false);
+    });
+
     it("throws for invalid format at offset", () => {
       const p = parser("random garbage here");
 
@@ -678,6 +694,41 @@ trailer
       const result = p.parseAt(0);
 
       expect(result.entries.size).toBe(2);
+    });
+
+    it("parseAt skips whitespace before a stream xref", () => {
+      const inner = createXRefStream([
+        { objNum: 0, type: 0, field2: 0, field3: 65535 },
+        { objNum: 1, type: 1, field2: 100, field3: 0 },
+      ]);
+
+      const padding = new TextEncoder().encode("\n\r ");
+      const bytes = new Uint8Array(padding.length + inner.length);
+      bytes.set(padding, 0);
+      bytes.set(inner, padding.length);
+
+      const scanner = new Scanner(bytes);
+      const p = new XRefParser(scanner);
+      const result = p.parseAt(0);
+
+      expect(result.entries.size).toBe(2);
+    });
+
+    it("detectXRefFormat skips whitespace before a stream xref", () => {
+      const inner = createXRefStream([
+        { objNum: 0, type: 0, field2: 0, field3: 65535 },
+        { objNum: 1, type: 1, field2: 100, field3: 0 },
+      ]);
+
+      const padding = new TextEncoder().encode("\n ");
+      const bytes = new Uint8Array(padding.length + inner.length);
+      bytes.set(padding, 0);
+      bytes.set(inner, padding.length);
+
+      const scanner = new Scanner(bytes);
+      const p = new XRefParser(scanner);
+
+      expect(p.detectXRefFormat(0)).toBe(true);
     });
   });
 });
