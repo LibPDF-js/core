@@ -91,7 +91,7 @@
   },
   "peerDependencies": {
     "@google-cloud/kms": "^5.0.0",
-    "@google-cloud/secret-manager": "^6.0.0"
+    "@google-cloud/secret-manager": "^6.0.0 || ^7.0.0"
   },
   "peerDependenciesMeta": {
     "@google-cloud/kms": {
